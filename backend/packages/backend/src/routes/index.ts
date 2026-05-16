@@ -26,32 +26,20 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
   })
 
-  // POST /api/fires/filter — recibe CSV de NASA, devuelve focos peligrosos + centroide
-  // Make.com usa el centroide para fetchear OpenWeather y luego llama /api/trigger/csv
+  // POST /api/fires/filter — recibe CSV de NASA, devuelve focos peligrosos ordenados por FRP
   app.post('/api/fires/filter', (req, res) => {
     const csv = typeof req.body === 'string' ? req.body : ''
     const all = csv ? parseFirmsCSV(csv) : []
 
-    // Focos peligrosos: FRP > 50 MW, ordenados por intensidad
     const dangerous = all
       .filter(f => f.frp > 50)
       .sort((a, b) => b.frp - a.frp)
 
-    if (dangerous.length === 0) {
-      res.json({ fires: [], centroid: null, total: all.length, dangerous: 0 })
-      return
-    }
-
-    const centroid = {
-      lat: parseFloat((dangerous.reduce((s, f) => s + f.lat, 0) / dangerous.length).toFixed(4)),
-      lon: parseFloat((dangerous.reduce((s, f) => s + f.lon, 0) / dangerous.length).toFixed(4)),
-    }
-
-    res.json({ fires: dangerous, centroid, total: all.length, dangerous: dangerous.length })
+    res.json({ fires: dangerous, total: all.length, dangerous: dangerous.length })
   })
 
-  // POST /api/trigger/full — recibe fires[] de Make.com con clima embebido en cada foco
-  // Cada fire trae: { lat, lon, frp, brightness, speed, deg, humidity }
+  // POST /api/trigger/full — recibe fires[] de Make.com
+  // Cada fire trae: { lat, lon, frp, brightness, speed, deg, humidity, date, pm25 }
   app.post('/api/trigger/full', async (req, res) => {
     const body = req.body as { fires?: unknown[] }
     const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
@@ -60,7 +48,6 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       lat: f.lat, lon: f.lon, frp: f.frp, brightness: f.brightness, timestamp: f.date ?? f.timestamp,
     }))
 
-    // Clima del primer foco (el más peligroso — vienen ordenados por FRP desc)
     const first = rawFires[0]
     const weather = first
       ? { speed: first.speed as number, deg: first.deg as number, humidity: first.humidity as number, temp: first.temp as number | undefined }
@@ -68,9 +55,10 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
 
     const lat = typeof first?.lat === 'number' ? first.lat : undefined
     const lon = typeof first?.lon === 'number' ? first.lon : undefined
+    const pm25 = typeof first?.pm25 === 'number' ? first.pm25 : undefined
 
     try {
-      await executeAndBroadcast(io, lat, lon, firms, weather)
+      await executeAndBroadcast(io, lat, lon, firms, weather, pm25)
       res.json({ ok: true, fires: firms.length })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
