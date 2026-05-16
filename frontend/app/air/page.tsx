@@ -1,3 +1,5 @@
+"use client"
+
 import dynamic from "next/dynamic"
 import { MOCK_FIRES, MOCK_ENV, MAP_CENTER, computeAQI, aqiInfo } from "@/components/air/types"
 import { SmokeAlert } from "@/components/air/smoke-alert"
