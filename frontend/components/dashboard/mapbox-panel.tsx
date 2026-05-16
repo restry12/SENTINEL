@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-import { ArrowUp } from 'lucide-react'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { degToCompass } from '@/lib/utils'
 
@@ -161,11 +160,11 @@ function buildPopupHTML(d: PopupData, active: ExpansionKey | null): string {
             const c = expColors[k]
             const bg = expBg[k]
             const ar = areas[k]
-            return `<div style="background:${bg}${isAct ? '0.22' : '0.08'});border:1px solid ${c}${isAct ? '70' : '30'};border-radius:8px;padding:8px 6px;text-align:center;${isAct ? `box-shadow:0 0 14px ${c}30;` : ''}">
-              <div style="font-size:10px;font-weight:900;color:${c};letter-spacing:0.1em;${isAct ? `text-shadow:0 0 8px ${c};` : 'opacity:0.7;'}">${k.toUpperCase()}</div>
-              <div style="font-size:11px;font-weight:800;color:${isAct ? '#fff' : 'rgba(255,255,255,0.6)'};margin-top:3px;">${fmtKm2(ar.km2)}</div>
-              <div style="font-size:9px;color:rgba(255,255,255,${isAct ? '0.45' : '0.25'});margin-top:1px;">${fmtHa(ar.ha)}</div>
-            </div>`
+            return `<button onclick="window.__sentinelToggle('${k}')" style="cursor:pointer;all:unset;display:block;width:100%;box-sizing:border-box;background:${bg}${isAct ? '0.22' : '0.08'});border:1px solid ${c}${isAct ? '70' : '30'};border-radius:8px;padding:10px 6px;text-align:center;${isAct ? `box-shadow:0 0 14px ${c}30;` : ''}transition:all 0.15s;">
+              <div style="font-size:11px;font-weight:900;color:${c};letter-spacing:0.1em;${isAct ? `text-shadow:0 0 8px ${c};` : 'opacity:0.7;'}">${k.toUpperCase()}</div>
+              <div style="font-size:12px;font-weight:800;color:${isAct ? '#fff' : 'rgba(255,255,255,0.6)'};margin-top:4px;">${fmtKm2(ar.km2)}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,${isAct ? '0.45' : '0.25'});margin-top:2px;">${fmtHa(ar.ha)}</div>
+            </button>`
           }).join('')}
         </div>
         <div style="margin-top:8px;font-size:8px;color:rgba(255,255,255,0.18);text-align:center;letter-spacing:0.08em;">${d.lat.toFixed(4)}° ${d.lon.toFixed(4)}°</div>
@@ -183,6 +182,13 @@ export function MapboxPanel() {
   const { sentinelUpdate } = useSentinel()
   const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
   const [selectedFire, setSelectedFire] = useState<SelectedFire | null>(null)
+
+  // Expose toggle to popup onclick handlers
+  useEffect(() => {
+    (window as any).__sentinelToggle = (key: ExpansionKey) =>
+      setActiveExpansion(prev => prev === key ? null : key)
+    return () => { delete (window as any).__sentinelToggle }
+  }, [])
 
   // Init map
   useEffect(() => {
@@ -430,86 +436,10 @@ export function MapboxPanel() {
     else map.once('style.load', drawExpansion)
   }, [selectedFire, activeExpansion, sentinelUpdate])
 
-  const expansionOptions: Array<{ key: ExpansionKey; label: string; color: string }> = [
-    { key: '2h',  label: '2H',  color: '#ef4444' },
-    { key: '6h',  label: '6H',  color: '#ea580c' },
-    { key: '12h', label: '12H', color: '#d97706' },
-  ]
-
-  // Wind display values
-  const windDeg = sentinelUpdate?.weather?.deg ?? 315
-  const windSpeed = sentinelUpdate?.weather?.speed ?? 6.7
-  const windKmh = Math.round(windSpeed * 3.6)
-  const spreadDeg = (windDeg + 180) % 360
-  const spreadCardinal = degToCompass(spreadDeg)
-
-  // Pre-compute areas for all timeframes (use backend area_km2 if available, else calculated)
-  const exp = sentinelUpdate?.expansion
-  const areas: Record<ExpansionKey, { km2: number; ha: number }> = {
-    '2h':  exp?.expansion_2h?.area_km2
-      ? { km2: exp.expansion_2h.area_km2, ha: Math.round(exp.expansion_2h.area_km2 * 100) }
-      : computeFireSpreadArea(windSpeed, 2),
-    '6h':  exp?.expansion_6h?.area_km2
-      ? { km2: exp.expansion_6h.area_km2, ha: Math.round(exp.expansion_6h.area_km2 * 100) }
-      : computeFireSpreadArea(windSpeed, 6),
-    '12h': exp?.expansion_12h?.area_km2
-      ? { km2: exp.expansion_12h.area_km2, ha: Math.round(exp.expansion_12h.area_km2 * 100) }
-      : computeFireSpreadArea(windSpeed, 12),
-  }
-
   return (
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
-      {/* Wind + expansion toggle — compact top-right widget */}
-      {selectedFire && (
-        <div className="absolute top-4 right-4 z-20 flex flex-col items-center gap-2 px-3 py-3 rounded-2xl backdrop-blur-md"
-          style={{
-            background: 'rgba(0,0,0,0.78)',
-            border: '1px solid rgba(251,146,60,0.22)',
-            boxShadow: '0 0 20px rgba(251,146,60,0.07)',
-          }}
-        >
-          {/* Wind */}
-          <span className="text-[8px] font-mono font-bold tracking-[0.25em] text-white/25 uppercase">Viento</span>
-          <ArrowUp
-            className="w-6 h-6 text-orange-400"
-            style={{ transform: `rotate(${spreadDeg}deg)`, filter: 'drop-shadow(0 0 6px rgba(251,146,60,0.65))' }}
-          />
-          <span className="text-[11px] font-mono font-black text-orange-400 tracking-widest">{spreadCardinal} · {windKmh}km/h</span>
-
-          <div className="w-full h-px bg-white/8" />
-
-          {/* Timeframe pills */}
-          <div className="flex gap-1">
-            {expansionOptions.map(({ key, label, color }) => {
-              const isActive = activeExpansion === key
-              return (
-                <button
-                  key={key}
-                  onClick={() => setActiveExpansion(prev => prev === key ? null : key)}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-black tracking-wider transition-all duration-150"
-                  style={{
-                    color: isActive ? '#000' : `${color}99`,
-                    background: isActive ? color : `${color}14`,
-                    border: `1px solid ${isActive ? color : `${color}30`}`,
-                    boxShadow: isActive ? `0 0 12px ${color}60` : 'none',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-
-          <button
-            onClick={() => { setSelectedFire(null); setActiveExpansion(null) }}
-            className="text-[9px] font-mono text-white/20 hover:text-white/50 transition-colors"
-          >
-            cerrar
-          </button>
-        </div>
-      )}
     </div>
   )
 }
