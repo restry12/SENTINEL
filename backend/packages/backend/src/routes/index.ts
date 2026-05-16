@@ -26,6 +26,45 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
   })
 
+  // POST /api/fires/filter — recibe CSV de NASA, devuelve focos peligrosos + centroide
+  // Make.com usa el centroide para fetchear OpenWeather y luego llama /api/trigger/csv
+  app.post('/api/fires/filter', (req, res) => {
+    const csv = typeof req.body === 'string' ? req.body : ''
+    const all = csv ? parseFirmsCSV(csv) : []
+
+    // Focos peligrosos: FRP > 50 MW, ordenados por intensidad
+    const dangerous = all
+      .filter(f => f.frp > 50)
+      .sort((a, b) => b.frp - a.frp)
+
+    if (dangerous.length === 0) {
+      res.json({ fires: [], centroid: null, total: all.length, dangerous: 0 })
+      return
+    }
+
+    const centroid = {
+      lat: parseFloat((dangerous.reduce((s, f) => s + f.lat, 0) / dangerous.length).toFixed(4)),
+      lon: parseFloat((dangerous.reduce((s, f) => s + f.lon, 0) / dangerous.length).toFixed(4)),
+    }
+
+    res.json({ fires: dangerous, centroid, total: all.length, dangerous: dangerous.length })
+  })
+
+  // POST /api/trigger/full — recibe fires (JSON) + weather (JSON) de Make.com
+  // Usado después de /api/fires/filter + OpenWeather
+  app.post('/api/trigger/full', async (req, res) => {
+    const body = req.body as { fires?: unknown[]; weather?: unknown }
+    const firms = Array.isArray(body.fires) ? body.fires : undefined
+    const weather = body.weather
+    try {
+      await executeAndBroadcast(io, undefined, undefined, firms, weather)
+      res.json({ ok: true, fires: firms?.length ?? 0 })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(500).json({ ok: false, error: message })
+    }
+  })
+
   // POST /api/trigger/csv — recibe CSV crudo de NASA FIRMS (text/plain)
   // Header opcional X-Weather-Data: JSON string con WeatherData
   app.post('/api/trigger/csv', async (req, res) => {
