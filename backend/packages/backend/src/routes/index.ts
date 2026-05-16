@@ -3,12 +3,33 @@ import type { Server } from 'socket.io'
 import type { PollingController } from '../controllers/polling'
 import { executeAndBroadcast } from '../socket/handlers'
 import { parseFirmsCSV } from '../utils/parseFirmsCSV'
+import { isLocked, getLockStatus } from '../services/analysis-lock'
+import authRouter from './auth'
+import geoRouter from './geo'
+import historyRouter from './history'
 
 export function registerRoutes(app: Express, io: Server, polling: PollingController): void {
+  // Auth, geo, history
+  app.use('/api/auth', authRouter)
+  app.use('/api/geo', geoRouter)
+  app.use('/api/history', historyRouter)
+
+  // GET /api/status — system status for monitoring
+  app.get('/api/status', (_req, res) => {
+    res.json({
+      lock: getLockStatus(),
+      polling: polling.getState(),
+    })
+  })
+
   // POST /api/trigger — manual single analysis run
   // Accepts optional `firms` (FireData[]) or `firmsCSV` (raw NASA CSV string)
   // Data is broadcast to all socket subscribers; HTTP caller receives confirmation only
   app.post('/api/trigger', async (req, res) => {
+    if (isLocked()) {
+      res.status(429).json({ ok: false, error: 'Analysis in progress — try again shortly' })
+      return
+    }
     const body = req.body as { lat?: number; lon?: number; firms?: unknown; firmsCSV?: string }
     const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
