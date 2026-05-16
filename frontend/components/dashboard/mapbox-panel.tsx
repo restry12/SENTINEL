@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useSentinel } from '@/contexts/sentinel-context'
+import { useFireSelection, type SelectedFireData, type FireIntensity } from '@/contexts/fire-selection-context'
 import { degToCompass } from '@/lib/utils'
 
 const TOKEN =
@@ -11,7 +12,6 @@ const TOKEN =
 
 
 type ExpansionKey = '2h' | '6h' | '12h'
-interface SelectedFire { lat: number; lon: number; id: string }
 
 // Elliptical fire spread model (simplified Rothermel).
 // Fire origin sits at the REAR of the ellipse — spread is clearly one-directional.
@@ -175,8 +175,8 @@ export function MapboxPanel() {
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<MarkerEntry[]>([])
   const { sentinelUpdate } = useSentinel()
+  const { selectedFire, setSelectedFire } = useFireSelection()
   const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
-  const [selectedFire, setSelectedFire] = useState<SelectedFire | null>(null)
 
   // Init map
   useEffect(() => {
@@ -212,6 +212,7 @@ export function MapboxPanel() {
       ? sentinelUpdate.fires.map((f, i) => ({
           id: `FIRE-${String(i + 1).padStart(3, '0')}`,
           lat: f.lat, lon: f.lon, frp: f.frp,
+          brightness: f.brightness,
           intensity: sentinelUpdate.riskLevel,
         }))
       : []
@@ -272,7 +273,7 @@ export function MapboxPanel() {
 
       // Delegated listener — survives setHTML updates
       popup.on('open', () => {
-        popup.getElement().addEventListener('click', (e) => {
+        popup.getElement()?.addEventListener('click', (e) => {
           const btn = (e.target as HTMLElement).closest('[data-sentinel-key]')
           if (!btn) return
           const key = btn.getAttribute('data-sentinel-key') as ExpansionKey
@@ -282,7 +283,21 @@ export function MapboxPanel() {
 
       el.addEventListener('click', () => {
         map.flyTo({ center: [inc.lon, inc.lat], zoom: 12, duration: 1200, essential: true })
-        setSelectedFire({ lat: inc.lat, lon: inc.lon, id: inc.id })
+        const intensity: FireIntensity = inc.frp >= 300 ? 'critical' : inc.frp >= 100 ? 'high' : 'moderate'
+        const fireData: SelectedFireData = {
+          id: inc.id,
+          lat: inc.lat,
+          lon: inc.lon,
+          frp: inc.frp,
+          brightness: inc.brightness,
+          intensity,
+          windImpactDir: sDirLabel,
+          windKmh: wKmh,
+          expansion2h: a2,
+          expansion6h: a6,
+          expansion12h: a12,
+        }
+        setSelectedFire(fireData)
         setActiveExpansion('2h')
       })
 
