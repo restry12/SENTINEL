@@ -25,7 +25,10 @@ function toNasaData(fires: FireData[]) {
       frp: f.frp,
     })),
     total_hotspots: fires.length,
-    acq_date: fires[0]?.timestamp?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+    acq_date: (() => {
+      const d = new Date(fires[0]?.timestamp ?? '')
+      return isNaN(d.getTime()) ? new Date().toISOString().split('T')[0] : d.toISOString().split('T')[0]
+    })(),
     centroid: center,
     // LLM determines region name from actual coordinates
     region_hint: `centroide en lat ${center.lat}, lon ${center.lon}`,

@@ -57,7 +57,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
 
     const firms = rawFires.map(f => ({
-      lat: f.lat, lon: f.lon, frp: f.frp, brightness: f.brightness, timestamp: f.timestamp,
+      lat: f.lat, lon: f.lon, frp: f.frp, brightness: f.brightness, timestamp: f.date ?? f.timestamp,
     }))
 
     // Clima del primer foco (el más peligroso — vienen ordenados por FRP desc)
