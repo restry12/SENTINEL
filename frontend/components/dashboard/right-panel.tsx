@@ -2,63 +2,60 @@
 
 import { Users, Route, FileText } from "lucide-react"
 
+function SectionHeader({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div className="w-px h-3 bg-muted-foreground/40 shrink-0" />
+      {icon}
+      <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        {children}
+      </span>
+    </div>
+  )
+}
+
 export function RightPanel() {
   return (
     <div className="w-80 border-l border-border bg-card flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+      <div className="px-4 py-3 border-b border-border">
+        <span className="text-[10px] font-mono font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Situational Intelligence
-        </h2>
+        </span>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
+
         {/* Social Impact */}
         <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="h-4 w-4 text-info" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Social Impact
-            </span>
-          </div>
-          <div className="space-y-4">
+          <SectionHeader icon={<Users className="h-3 w-3 text-info" />}>
+            Social Impact
+          </SectionHeader>
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                Population at Risk
-              </span>
-              <span className="text-lg font-mono font-bold text-critical">
-                127,450
-              </span>
+              <span className="text-xs font-mono text-muted-foreground">Population at Risk</span>
+              <span className="text-base font-mono font-bold text-critical tabular-nums">127,450</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Evacuated</span>
-              <span className="text-lg font-mono font-bold text-safe">
-                84,230
-              </span>
+              <span className="text-xs font-mono text-muted-foreground">Evacuated</span>
+              <span className="text-base font-mono font-bold text-safe tabular-nums">84,230</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">In Shelters</span>
-              <span className="text-lg font-mono font-bold text-info">
-                23,847
-              </span>
+              <span className="text-xs font-mono text-muted-foreground">In Shelters</span>
+              <span className="text-base font-mono font-bold text-info tabular-nums">23,847</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">
-                Structures Threatened
-              </span>
-              <span className="text-lg font-mono font-bold text-warning">
-                4,892
-              </span>
+              <span className="text-xs font-mono text-muted-foreground">Structures Threatened</span>
+              <span className="text-base font-mono font-bold text-warning tabular-nums">4,892</span>
             </div>
-            {/* Progress bar */}
-            <div className="mt-2">
-              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+            <div className="pt-1">
+              <div className="flex justify-between text-[10px] font-mono text-muted-foreground mb-1.5">
                 <span>Evacuation Progress</span>
-                <span className="font-mono">66%</span>
+                <span className="text-foreground">66%</span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-safe" style={{ width: "66%" }} />
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className="h-full shimmer rounded-full" style={{ width: "66%" }} />
               </div>
             </div>
           </div>
@@ -66,113 +63,88 @@ export function RightPanel() {
 
         {/* Safe Route */}
         <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-2 mb-4">
-            <Route className="h-4 w-4 text-safe" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Safe Route
-            </span>
-          </div>
-          <div className="space-y-3">
-            <div className="p-3 bg-safe/10 border border-safe/30 rounded">
-              <div className="text-xs text-muted-foreground uppercase mb-1">
+          <SectionHeader icon={<Route className="h-3 w-3 text-safe" />}>
+            Safe Route
+          </SectionHeader>
+          <div className="space-y-2.5">
+            <div className="p-3 bg-safe/5 border border-safe/30 rounded">
+              <div className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
                 Primary Route
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-mono text-safe">→ Oak Valley Rd</p>
-                <p className="text-sm font-mono text-safe">→ Interstate 42 N</p>
-                <p className="text-sm font-mono text-safe">→ Exit 17B</p>
-                <p className="text-sm font-mono text-safe">
-                  → Lincoln High School
-                </p>
+              <div className="space-y-0.5">
+                {["Oak Valley Rd", "Interstate 42 N", "Exit 17B", "Lincoln High School"].map((step) => (
+                  <p key={step} className="text-xs font-mono text-safe flex items-center gap-1.5">
+                    <span className="text-safe/40">›</span>{step}
+                  </p>
+                ))}
               </div>
-              <div className="mt-2 text-xs text-muted-foreground">
-                Est. travel time:{" "}
-                <span className="font-mono text-foreground">23 min</span>
+              <div className="mt-2.5 text-[10px] font-mono text-muted-foreground">
+                Est. travel time: <span className="text-foreground tabular-nums">23 min</span>
               </div>
             </div>
             <div className="p-3 bg-background border border-border rounded">
-              <div className="text-xs text-muted-foreground uppercase mb-1">
+              <div className="text-[9px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
                 Alternate Route
               </div>
-              <div className="space-y-1">
-                <p className="text-sm font-mono text-muted-foreground">
-                  → Maple St
-                </p>
-                <p className="text-sm font-mono text-muted-foreground">
-                  → Highway 7 W
-                </p>
-                <p className="text-sm font-mono text-muted-foreground">
-                  → Community Center
-                </p>
+              <div className="space-y-0.5">
+                {["Maple St", "Highway 7 W", "Community Center"].map((step) => (
+                  <p key={step} className="text-xs font-mono text-muted-foreground flex items-center gap-1.5">
+                    <span className="text-muted-foreground/40">›</span>{step}
+                  </p>
+                ))}
               </div>
-              <div className="mt-2 text-xs text-muted-foreground">
-                Est. travel time:{" "}
-                <span className="font-mono text-foreground">31 min</span>
+              <div className="mt-2.5 text-[10px] font-mono text-muted-foreground">
+                Est. travel time: <span className="text-foreground tabular-nums">31 min</span>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <div className="h-2 w-2 rounded-full bg-critical animate-pulse" />
-              <span className="text-critical font-semibold">
-                Highway 9 CLOSED
-              </span>
+            <div className="flex items-center gap-2 text-xs font-mono">
+              <div className="h-1.5 w-1.5 rounded-full bg-critical blink shrink-0" />
+              <span className="text-critical font-bold tracking-wider">HWY 9 CLOSED</span>
             </div>
           </div>
         </div>
 
         {/* Municipal Briefing */}
         <div className="p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="h-4 w-4 text-foreground" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Municipal Briefing
-            </span>
-          </div>
+          <SectionHeader icon={<FileText className="h-3 w-3 text-muted-foreground" />}>
+            Municipal Briefing
+          </SectionHeader>
           <div className="space-y-4">
             <div className="p-3 bg-background border border-border rounded">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-foreground uppercase">
+                <span className="text-[9px] font-mono font-bold text-foreground uppercase tracking-widest">
                   Executive Summary
                 </span>
-                <span className="text-xs font-mono text-muted-foreground">
-                  15:00 UTC
-                </span>
+                <span className="text-[9px] font-mono text-muted-foreground">15:00 UTC</span>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed font-mono">
                 The Cedar Ridge Fire has expanded to approximately{" "}
-                <span className="text-foreground font-semibold">
-                  12,400 acres
-                </span>{" "}
+                <span className="text-foreground font-semibold">12,400 acres</span>{" "}
                 with <span className="text-warning font-semibold">8%</span>{" "}
-                containment. NW winds at 24 km/h are pushing the fire toward
-                residential zones 7A-C. All available CAL FIRE resources have
-                been deployed. Air tanker support expected by 16:00 UTC.
+                containment. NW winds at 24 km/h pushing toward zones 7A-C.
+                Air tanker support expected by 16:00 UTC.
               </p>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">
-                  Fire Personnel Deployed
-                </span>
-                <span className="font-mono text-foreground">1,247</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Ground Vehicles</span>
-                <span className="font-mono text-foreground">89</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">
-                  Aircraft Operations
-                </span>
-                <span className="font-mono text-foreground">12</span>
-              </div>
+              {[
+                { label: "Fire Personnel Deployed", value: "1,247" },
+                { label: "Ground Vehicles",         value: "89" },
+                { label: "Aircraft Operations",     value: "12" },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-muted-foreground">{label}</span>
+                  <span className="text-xs font-mono font-bold text-foreground tabular-nums">{value}</span>
+                </div>
+              ))}
             </div>
-            <div className="p-2 bg-warning/10 border border-warning/30 rounded">
-              <p className="text-xs text-warning">
-                ⚡ Next briefing scheduled: 18:00 UTC
+            <div className="p-2 bg-warning/8 border border-warning/25 rounded">
+              <p className="text-[10px] font-mono text-warning text-center tracking-wider">
+                ⚡ Next briefing: 18:00 UTC
               </p>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   )
