@@ -20,10 +20,12 @@ export class PollingController {
     this.state.active = true
     this.state.nextRun = new Date(Date.now() + intervalMs).toISOString()
 
-    this.timer = setInterval(async () => {
+    this.timer = setInterval(() => {
       this.state.lastRun = new Date().toISOString()
       this.state.nextRun = new Date(Date.now() + intervalMs).toISOString()
-      await this.run()
+      this.run().catch((err) => {
+        console.error('[PollingController] run error:', err)
+      })
     }, intervalMs)
   }
 
