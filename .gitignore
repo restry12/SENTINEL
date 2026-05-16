@@ -7,9 +7,22 @@ __v0_jsx-dev-runtime.ts
 .vercel/
 
 # Environment variables
-.env*.local
+.env
+.env.*
+!.env.example
 
 # Common ignores
-node_modules
+node_modules/
 .next/
 .DS_Store
+
+# IDE / tools
+.claude/
+
+# Local only — backend monorepo lives in hackaindies, not here
+packages/
+shared/
+tsconfig.base.json
+
+# Duplicate test files (use zavu/ folder)
+test-zavu.js

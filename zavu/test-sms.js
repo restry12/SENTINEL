@@ -1,4 +1,4 @@
-require('dotenv').config({ path: __dirname + '/.env' });
+require('dotenv').config();
 
 async function sendTestSMS() {
   const res = await fetch('https://api.zavu.dev/v1/messages', {
@@ -8,6 +8,7 @@ async function sendTestSMS() {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      from: process.env.ZAVU_FROM_NUMBER,
       to: '+56993253397',
       text: '🔥 SENTINEL TEST — Sistema de alerta temprana activo. Foco detectado en zona de prueba. Este es un mensaje de verificación.',
     }),
