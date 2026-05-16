@@ -6,7 +6,7 @@ import styles from './login.module.css';
 
 export default function LoginPage() {
   return (
-    <main className="relative min-h-screen bg-background text-foreground overflow-hidden selection:bg-orange/30">
+    <main className="relative h-screen bg-background text-foreground overflow-hidden selection:bg-orange/30">
       <Background />
       
       {/* Top Accent Strip */}
@@ -31,9 +31,9 @@ export default function LoginPage() {
       </header>
 
       {/* Main Content */}
-      <div className="relative z-10 pt-[60px] pb-[44px] grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] min-h-screen">
+      <div className="relative z-10 pt-[60px] pb-[44px] h-full grid grid-cols-1 lg:grid-cols-[1.15fr_1fr]">
         <VisualScene />
-        <section className="flex flex-col justify-center items-center p-6 md:p-10 lg:p-14 min-h-[calc(100vh-104px)]">
+        <section className="flex flex-col justify-center items-center p-6 md:p-8 lg:p-10 overflow-y-auto">
           <AuthCard />
         </section>
       </div>
