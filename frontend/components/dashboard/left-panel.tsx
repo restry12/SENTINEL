@@ -132,24 +132,30 @@ export function LeftPanel() {
           </div>
         </div>
 
-        {/* SMS Alert */}
-        <div className="p-4 bg-[linear-gradient(180deg,rgba(56,189,248,0.15),rgba(56,189,248,0.05))] border border-blue/30 rounded-xl shadow-[0_10px_25px_-10px_rgba(56,189,248,0.2)]">
-          <div className="flex items-center gap-2 mb-3 text-[10px] font-bold tracking-[0.2em] text-blue uppercase">
-            <MessageSquare className="h-4 w-4" />
-            <span>{tx.activeBroadcast}</span>
+        {/* SMS Alert — only when a real high/critical broadcast exists */}
+        {(m.riskLevel === "HIGH" || m.riskLevel === "CRITICAL") && (
+          <div className="p-4 bg-[linear-gradient(180deg,rgba(56,189,248,0.15),rgba(56,189,248,0.05))] border border-blue/30 rounded-xl shadow-[0_10px_25px_-10px_rgba(56,189,248,0.2)]">
+            <div className="flex items-center gap-2 mb-3 text-[10px] font-bold tracking-[0.2em] text-blue uppercase">
+              <MessageSquare className="h-4 w-4" />
+              <span>{tx.activeBroadcast}</span>
+            </div>
+            <div className="text-[13px] text-foreground leading-relaxed font-medium">
+              {u?.riskAssessment?.resumen ?? u?.airAlerts?.resumen_general ?? (
+                <>
+                  <span className="text-amber font-bold">{tx.wildfireAlert}</span>&nbsp;
+                  {tx.evacuationOrder}
+                </>
+              )}
+            </div>
+            <div className="mt-3.5 text-[10px] font-bold text-text-muted tracking-wide uppercase border-t border-blue/10 pt-3">
+              <span className="num opacity-70">
+                {u?.timestamp
+                  ? new Date(u.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"
+                  : "— UTC"}
+              </span>
+            </div>
           </div>
-          <div className="text-[13px] text-foreground leading-relaxed font-medium">
-            <span className="text-amber font-bold">{tx.wildfireAlert}</span>&nbsp;
-            {tx.evacuationOrder}
-          </div>
-          <div className="mt-3.5 text-[10px] font-bold text-text-muted tracking-wide uppercase border-t border-blue/10 pt-3">
-            <span className="num opacity-70">
-              {u?.timestamp
-                ? new Date(u.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"
-                : "— UTC"}
-            </span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )
