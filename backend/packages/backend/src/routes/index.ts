@@ -7,11 +7,12 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   // POST /api/trigger — manual single analysis run
   // Data is broadcast to all socket subscribers; HTTP caller receives confirmation only
   app.post('/api/trigger', async (req, res) => {
-    const body = req.body as { lat?: number; lon?: number }
+    const body = req.body as { lat?: number; lon?: number; firms?: unknown }
     const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+    const firms = Array.isArray(body.firms) ? body.firms : undefined
     try {
-      await executeAndBroadcast(io, lat, lon)
+      await executeAndBroadcast(io, lat, lon, firms)
       res.json({ ok: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
