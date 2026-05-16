@@ -99,3 +99,35 @@
 .pulse-dot {
   animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ── SENTINEL AIR animations ─────────────────────────────── */
+@keyframes sentinelFirePulse {
+  0%   { transform: scale(1);    opacity: 1; }
+  100% { transform: scale(1.35); opacity: 0.85; }
+}
+
+@keyframes sentinelFireRing {
+  0%   { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(3.5); opacity: 0; }
+}
+
+@keyframes smokeAlertBlink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.sentinel-tooltip {
+  background: #0a0a0a !important;
+  border: 1px solid #2a2a2a !important;
+  border-radius: 2px !important;
+  color: #e8e6e0 !important;
+  font-family: 'Geist Mono', monospace !important;
+  font-size: 10px !important;
+  letter-spacing: 0.08em !important;
+  padding: 3px 7px !important;
+  box-shadow: 0 0 12px rgba(255, 100, 0, 0.3) !important;
+}
+
+.sentinel-tooltip::before {
+  border-top-color: #2a2a2a !important;
+}
