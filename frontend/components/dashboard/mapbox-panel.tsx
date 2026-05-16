@@ -160,7 +160,7 @@ function buildPopupHTML(d: PopupData, active: ExpansionKey | null): string {
             const c = expColors[k]
             const bg = expBg[k]
             const ar = areas[k]
-            return `<button onclick="window.__sentinelToggle('${k}')" style="cursor:pointer;all:unset;display:block;width:100%;box-sizing:border-box;background:${bg}${isAct ? '0.22' : '0.08'});border:1px solid ${c}${isAct ? '70' : '30'};border-radius:8px;padding:10px 6px;text-align:center;${isAct ? `box-shadow:0 0 14px ${c}30;` : ''}transition:all 0.15s;">
+            return `<button data-sentinel-key="${k}" style="cursor:pointer;all:unset;display:block;width:100%;box-sizing:border-box;background:${bg}${isAct ? '0.22' : '0.08'});border:1px solid ${c}${isAct ? '70' : '30'};border-radius:8px;padding:10px 6px;text-align:center;${isAct ? `box-shadow:0 0 14px ${c}30;` : ''}transition:all 0.15s;">
               <div style="font-size:11px;font-weight:900;color:${c};letter-spacing:0.1em;${isAct ? `text-shadow:0 0 8px ${c};` : 'opacity:0.7;'}">${k.toUpperCase()}</div>
               <div style="font-size:12px;font-weight:800;color:${isAct ? '#fff' : 'rgba(255,255,255,0.6)'};margin-top:4px;">${fmtKm2(ar.km2)}</div>
               <div style="font-size:10px;color:rgba(255,255,255,${isAct ? '0.45' : '0.25'});margin-top:2px;">${fmtHa(ar.ha)}</div>
@@ -182,13 +182,6 @@ export function MapboxPanel() {
   const { sentinelUpdate } = useSentinel()
   const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
   const [selectedFire, setSelectedFire] = useState<SelectedFire | null>(null)
-
-  // Expose toggle to popup onclick handlers
-  useEffect(() => {
-    (window as any).__sentinelToggle = (key: ExpansionKey) =>
-      setActiveExpansion(prev => prev === key ? null : key)
-    return () => { delete (window as any).__sentinelToggle }
-  }, [])
 
   // Init map
   useEffect(() => {
@@ -281,6 +274,16 @@ export function MapboxPanel() {
 
       const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '320px' })
         .setHTML(buildPopupHTML(popupData, null))
+
+      // Delegated listener — survives setHTML updates
+      popup.on('open', () => {
+        popup.getElement().addEventListener('click', (e) => {
+          const btn = (e.target as HTMLElement).closest('[data-sentinel-key]')
+          if (!btn) return
+          const key = btn.getAttribute('data-sentinel-key') as ExpansionKey
+          setActiveExpansion(prev => prev === key ? null : key)
+        })
+      })
 
       el.addEventListener('click', () => {
         map.flyTo({ center: [inc.lon, inc.lat], zoom: 12, duration: 1200, essential: true })
