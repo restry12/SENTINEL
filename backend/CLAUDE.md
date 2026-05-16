@@ -32,75 +32,108 @@
 
 ---
 
+## Estado actual del proyecto (2026-05-16)
+
+Sistema **completo funcionando end-to-end**, frontend cableado a datos en vivo.
+
+```
+Make.com (NASA FIRMS + OpenWeather + OpenAQ)
+   → POST /api/trigger/full  (responde 202 al instante, análisis en background)
+   → orchestrator (Promise.allSettled, fault-isolated)
+   → agent-fire + agent-weather + agent-air + agent-routes (+ agent-report)
+   → SentinelUpdate → Socket.io → frontend (dashboard en vivo)
+   → si riskLevel high/critical → Make.com webhook → SMS/Gmail
+```
+
+**Decisión arquitectónica clave:** Make.com hace las 3 llamadas externas (NASA,
+OpenWeather, OpenAQ). El backend NO fetchea nada externo — recibe todo embebido
+por foco en el body de `/api/trigger/full`.
+
+### Deploy
+
+| Componente | Dónde | Notas |
+|---|---|---|
+| Backend + 5 agentes | Render (`sentinel-0zkq.onrender.com`, rama `backend-pruebas`) | Socket.io necesita server persistente |
+| Frontend (Next.js) | Vercel (pendiente) — Root Dir `frontend/`, branch `frontend` | Apunta al backend de Render |
+
+Render free tier: cold start ~30-60s tras inactividad.
+
 ## Arquitectura del backend (packages/)
 
-El backend vive en `packages/` como monorepo TypeScript. Correr todo: `npm run dev` desde la raíz.
+Monorepo TypeScript. Correr todo local: `npm install && npm run dev` desde `backend/`.
 
-### Servicios y puertos
-
-| Servicio | Carpeta | Puerto |
+| Servicio | Carpeta | Puerto local |
 |---|---|---|
 | Backend principal | `packages/backend` | 3000 |
 | Agent Fire | `packages/agent-fire` | 3001 |
 | Agent Weather | `packages/agent-weather` | 3002 |
 | Agent Air | `packages/agent-air` | 3003 |
 | Agent Routes | `packages/agent-routes` | 3004 |
-| Tipos compartidos | `packages/types` | — |
+| Agent Report | `packages/agent-report` | 3005 |
+| Tipos compartidos | `shared/types` (`@sentinel/types`) | — |
 
-### Flujo de datos
-
-```
-NASA FIRMS + OpenWeather + OpenAQ
-        ↓ (Promise.allSettled — fault isolated)
-    orchestrator.ts
-        ↓ llama en paralelo
-agent-fire → GeoJSON polygon
-agent-weather → WeatherAnalysis (interno)
-agent-air → AirAnalysis (interno)
-agent-routes → RouteData[] (ORS)
-        ↓
-    SentinelUpdate → Socket.io → frontend
-        ↓ si riskLevel = high/critical
-    Make.com webhook → SMS/Gmail
-```
-
-### HTTP API (backend puerto 3000)
+### HTTP API (backend)
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `POST` | `/api/trigger` | Corre análisis una vez. Body opcional: `{ lat, lon }` |
-| `POST` | `/api/polling/start` | Inicia polling. Body: `{ intervalMs }` (mín 10000) |
-| `POST` | `/api/polling/stop` | Detiene polling |
-| `GET` | `/api/polling/status` | Estado actual del polling |
-| `GET` | `/health` | Health check |
+| `POST` | `/api/trigger/full` | Make.com manda `{fires:[...]}` con clima+pm25 embebido. **Responde 202 al instante** y corre el análisis en background (evita el timeout de 40s de Make) |
+| `POST` | `/api/trigger` | Análisis manual. Body opcional `{ lat, lon, firms?, firmsCSV? }` |
+| `POST` | `/api/trigger/csv` | CSV crudo de NASA (text/plain), header opcional `X-Weather-Data` |
+| `POST` | `/api/fires/filter` | CSV NASA → top 50 focos por FRP |
+| `POST` | `/api/auth/register\|login\|logout` · `GET /api/auth/me` | Auth con Supabase |
+| `POST` | `/api/polling/start\|stop` · `GET /api/polling/status` | Control de polling (mín 10s) |
+| `GET` | `/api/status` · `/health` | Estado / health |
 
 Los resultados NO se devuelven por HTTP — van por Socket.io a todos los suscriptores.
 
-### Socket.io — eventos
+### Socket.io — eventos (CORS `*`)
 
-**Cliente → Servidor:** `trigger`, `start-polling`, `stop-polling`, `subscribe`
+**Cliente → Servidor:** `trigger` (rate limit 1/15s + lock global), `start-polling`, `stop-polling`, `subscribe`
 
 **Servidor → Cliente:** `status` (loading/ok/error), `update` (SentinelUpdate), `alert` (solo high/critical)
 
 ### Contrato de agentes
 
-Todos exponen `POST /analyze` con body `AgentRequest` y responden `AgentResponse<T>`:
-
+Todos exponen `POST /analyze` con body `AgentRequest` y responden:
 ```ts
 { success: true; data: T } | { success: false; data: null; error: string }
 ```
 
-### Variables de entorno requeridas
+### Variables de entorno (backend)
 
 ```
-AGENT_FIRE_URL / AGENT_WEATHER_URL / AGENT_AIR_URL / AGENT_ROUTES_URL
+AGENT_FIRE_URL / AGENT_WEATHER_URL / AGENT_AIR_URL / AGENT_ROUTES_URL  (fail-fast)
+AGENT_REPORT_URL  # opcional
 NASA_FIRMS_API_KEY / OPENWEATHER_API_KEY / OPENAQ_API_KEY / OPENROUTE_API_KEY
+OPENROUTER_API_KEY  # LLM de todos los agentes (mistral-large)
+SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_KEY  # auth + historial
 MAKE_WEBHOOK_URL  # opcional
 ```
 
-### Lógica de riesgo
+### Lógica de riesgo (orchestrator)
 
-- **critical**: >5 fires FRP alto, o >2 + viento >10 m/s
-- **high**: >2 fires, o cualquier fire + viento fuerte, o AQI >150
-- **medium**: cualquier fire, o AQI >100
-- **low**: sin fires, aire aceptable
+- **critical**: >5 fires FRP>100, o >2 + viento >10 m/s
+- **high**: >2 fires FRP>100, o cualquiera + viento fuerte, o AQI >150
+- **medium**: cualquier fire FRP>100, o AQI >100
+- **low**: resto
+
+## Frontend (branch `frontend`)
+
+Next.js 16 + pnpm. Vive en la branch `frontend` (standalone — su `.gitignore` ignora
+`packages/`/`shared/` a propósito). Local vía **git worktree**:
+`/Users/restry/Desktop/SENTINEL-frontend` (branch `frontend`).
+
+- Corre en **puerto 3010** (`next dev -p 3010` — el 3000 local lo ocupa otro proceso).
+- `frontend/.env.local` apunta al **backend de Render** (`NEXT_PUBLIC_SOCKET_URL` +
+  `BACKEND_URL` = `https://sentinel-0zkq.onrender.com`).
+- Socket centralizado en `contexts/sentinel-context.tsx` (`SentinelProvider` +
+  `useSentinelMetrics`). Paneles con datos en vivo y **fallback** a valores demo.
+- Mapa (`mapbox-panel`): focos + polígono + expansión 2h/6h/12h + rutas desde socket.
+- Auth real vía **proxy**: `app/api/auth/login|register/route.ts` reenvían a
+  `${BACKEND_URL}/api/auth/*` (Supabase). `AuthGuard` protege `/dashboard` y `/air`.
+- Rutas: `/` → redirect `/login`; dashboard en `/dashboard`; simulador aire en `/air`.
+
+### Deploy Vercel (pendiente)
+
+Root Directory = `frontend/`, Production Branch = `frontend`, Install `pnpm install`.
+Env: `NEXT_PUBLIC_SOCKET_URL` y `BACKEND_URL` = `https://sentinel-0zkq.onrender.com`.
