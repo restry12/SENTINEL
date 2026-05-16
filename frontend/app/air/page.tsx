@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
 import {
   MAP_CENTER, computeAQI, aqiInfo, computeThreatLevel,
@@ -22,6 +24,7 @@ const AirMap = dynamic(
 )
 
 export default function AirPage() {
+  const pathname = usePathname()
   const [scenarioId, setScenarioId] = useState<ScenarioId>("none")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const scenario = SCENARIOS[scenarioId]
@@ -46,9 +49,24 @@ export default function AirPage() {
             SENTINEL
           </span>
           <span className="text-border">|</span>
-          <span className="text-xs font-semibold tracking-widest uppercase text-warning font-mono">
-            AIR QUALITY MONITOR
-          </span>
+          <nav className="flex items-center gap-1">
+            {[
+              { href: '/dashboard', label: 'DASHBOARD' },
+              { href: '/air',       label: 'AIR QUALITY' },
+            ].map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`px-3 py-1 rounded text-[10px] font-mono font-bold tracking-widest uppercase transition-colors ${
+                  pathname === href
+                    ? 'bg-orange/15 text-orange border border-orange/30'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
         </div>
         <div className="flex items-center gap-4">
           <ThreatIndicator level={threat} />

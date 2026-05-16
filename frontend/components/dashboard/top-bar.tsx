@@ -2,8 +2,11 @@
 
 import { Flame, Activity, Globe } from "lucide-react"
 import { useState, useEffect } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 export function TopBar() {
+  const pathname = usePathname()
   const [time, setTime] = useState<string>("")
 
   useEffect(() => {
@@ -33,8 +36,27 @@ export function TopBar() {
           </div>
         </div>
 
-        {/* Center: Mission Critical Status */}
+        {/* Center nav + status */}
         <div className="flex-1 flex items-center justify-center gap-4">
+          {/* Page nav */}
+          <nav className="flex items-center gap-1 p-1 rounded-lg border border-white/5 bg-surface/40 backdrop-blur-md">
+            {[
+              { href: '/dashboard', label: 'DASHBOARD' },
+              { href: '/air',       label: 'AIR QUALITY' },
+            ].map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className={`px-4 py-1.5 rounded text-[10px] font-mono font-bold tracking-widest uppercase transition-all duration-200 ${
+                  pathname === href
+                    ? 'bg-orange/15 text-orange border border-orange/30 shadow-[0_0_12px_rgba(255,126,21,0.15)]'
+                    : 'text-text-muted hover:text-foreground hover:bg-white/5'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+          </nav>
           <div className="px-4 py-2 rounded-full border border-red/40 bg-[linear-gradient(180deg,rgba(255,51,51,0.15),rgba(255,51,51,0.05))] text-red flex items-center gap-3 shadow-[0_10px_30px_-10px_rgba(255,51,51,0.3),inset_0_1px_1px_rgba(255,255,255,0.05)] animate-in fade-in zoom-in duration-500">
             <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_12px_rgba(255,51,51,1)] animate-pulse" />
             <span className="text-[11px] font-black tracking-[0.2em] uppercase whitespace-nowrap">Critical Active</span>
