@@ -37,13 +37,23 @@ function requireEnv(name: string): string {
 }
 
 async function callAgent<T>(url: string, body: AgentRequest): Promise<AgentResponse<T>> {
-  const res = await fetch(`${url}/analyze`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`Agent at ${url} returned ${res.status}`)
-  return res.json() as Promise<AgentResponse<T>>
+  const retryDelays = [0, 15000, 20000] // 0s, 15s, 20s — cold start de Render free tier
+  for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+    if (retryDelays[attempt] > 0) {
+      console.warn(`[orchestrator] retrying ${url} in ${retryDelays[attempt] / 1000}s (attempt ${attempt + 1})...`)
+      await new Promise(r => setTimeout(r, retryDelays[attempt]))
+    }
+    const res = await fetch(`${url}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (res.ok) return res.json() as Promise<AgentResponse<T>>
+    if (res.status !== 502 && res.status !== 503) throw new Error(`Agent at ${url} returned ${res.status}`)
+    if (attempt < retryDelays.length - 1) console.warn(`[orchestrator] ${url} returned ${res.status}, will retry`)
+    else throw new Error(`Agent at ${url} returned ${res.status} after ${retryDelays.length} attempts`)
+  }
+  throw new Error(`Agent at ${url} unreachable`)
 }
 
 function calculateRiskLevel(fires: FireData[], weather: WeatherData, air: AirData): SentinelUpdate['riskLevel'] {
