@@ -6,15 +6,14 @@ import type {
   WeatherData,
   AirData,
   GeoJSONFeature,
-  RouteData,
+  FireAnalysis,
+  AirAlerts,
+  AuthorityReport,
 } from '@sentinel/types'
+import type { RoutesResult } from '../../../agent-routes/src/analyze'
 import { fetchWeather } from './openweather'
 import { fetchFires } from './firms'
 import { fetchAirQuality } from './openaq'
-
-// Note: agent-weather returns WeatherAnalysis and agent-air returns AirAnalysis.
-// These are agent-internal types — their analysis is logged but SentinelUpdate
-// carries the raw WeatherData and AirData from the external APIs directly.
 
 const DEFAULT_LAT = -38.5
 const DEFAULT_LON = -72.0
@@ -51,10 +50,9 @@ async function callAgent<T>(url: string, body: AgentRequest): Promise<AgentRespo
 }
 
 function calculateRiskLevel(fires: FireData[], weather: WeatherData, air: AirData): SentinelUpdate['riskLevel'] {
-  // highFrp: fires with Fire Radiative Power > 100 MW (severe intensity threshold)
   const highFrp = fires.filter(f => f.frp > 100).length
-  const strongWind = weather.speed > 10   // m/s — accelerates spread significantly
-  const badAir = air.aqi > 150            // Unhealthy range per US EPA
+  const strongWind = weather.speed > 10
+  const badAir = air.aqi > 150
 
   if (highFrp > 5 || (highFrp > 2 && strongWind)) return 'critical'
   if (highFrp > 2 || (highFrp > 0 && strongWind) || badAir) return 'high'
@@ -66,7 +64,7 @@ export async function runAnalysis(
   lat = DEFAULT_LAT,
   lon = DEFAULT_LON
 ): Promise<SentinelUpdate> {
-  // Step 1: fetch external APIs — fault-isolated so one failure doesn't block the rest
+  // Step 1: fetch external APIs — fault-isolated
   const [firesSettled, weatherSettled, airSettled] = await Promise.allSettled([
     fetchFires(DEFAULT_AREA.latSouth, DEFAULT_AREA.lonWest, DEFAULT_AREA.latNorth, DEFAULT_AREA.lonEast),
     fetchWeather(lat, lon),
@@ -81,17 +79,19 @@ export async function runAnalysis(
   const weather = weatherSettled.status === 'fulfilled' ? weatherSettled.value : EMPTY_WEATHER
   const airQuality = airSettled.status === 'fulfilled' ? airSettled.value : EMPTY_AIR
 
-  // Step 2: call agents in parallel — fault-isolated via Promise.allSettled
+  // Step 2: call agents in parallel (fire, air, routes) — fault-isolated
+  // agent-fire runs A1→A2 internally (sequential), others are independent
   const fireUrl = requireEnv('AGENT_FIRE_URL')
   const weatherUrl = requireEnv('AGENT_WEATHER_URL')
   const airUrl = requireEnv('AGENT_AIR_URL')
   const routesUrl = requireEnv('AGENT_ROUTES_URL')
+  const reportUrl = process.env.AGENT_REPORT_URL  // optional — skip silently if not set
 
   const [fireSettled, weatherAgentSettled, airAgentSettled, routesSettled] = await Promise.allSettled([
-    callAgent<GeoJSONFeature>(fireUrl, { firms: fires, weather }),
+    callAgent<FireAnalysis>(fireUrl, { firms: fires, weather }),
     callAgent<unknown>(weatherUrl, { weather, firms: fires }),
-    callAgent<unknown>(airUrl, { openaq: airQuality, firms: fires }),
-    callAgent<RouteData[]>(routesUrl, { firms: fires }),
+    callAgent<AirAlerts>(airUrl, { openaq: airQuality, firms: fires }),
+    callAgent<RoutesResult>(routesUrl, { firms: fires }),
   ])
 
   if (fireSettled.status === 'rejected') console.warn('[orchestrator] agent-fire failed:', fireSettled.reason)
@@ -99,17 +99,42 @@ export async function runAnalysis(
   if (airAgentSettled.status === 'rejected') console.warn('[orchestrator] agent-air failed:', airAgentSettled.reason)
   if (routesSettled.status === 'rejected') console.warn('[orchestrator] agent-routes failed:', routesSettled.reason)
 
-  // Step 3: consolidate — discriminated union narrowing eliminates unsafe casts
-  const polygon =
+  // Extract LLM outputs
+  const fireAnalysis =
     fireSettled.status === 'fulfilled' && fireSettled.value.success
       ? fireSettled.value.data
-      : EMPTY_POLYGON
+      : null
 
-  const routes =
+  const airAlerts =
+    airAgentSettled.status === 'fulfilled' && airAgentSettled.value.success
+      ? airAgentSettled.value.data
+      : null
+
+  const routesResult =
     routesSettled.status === 'fulfilled' && routesSettled.value.success
       ? routesSettled.value.data
-      : []
+      : null
 
+  // Step 3: agent-report (A4) — needs A1+A2+A3 output, runs after step 2
+  let report: AuthorityReport | undefined
+  if (reportUrl && fireAnalysis?.riskAssessment && fireAnalysis?.expansion && airAlerts) {
+    const [reportSettled] = await Promise.allSettled([
+      callAgent<AuthorityReport>(reportUrl, {
+        riskAssessment: fireAnalysis.riskAssessment,
+        expansion: fireAnalysis.expansion,
+        airAlerts,
+      }),
+    ])
+    if (reportSettled.status === 'fulfilled' && reportSettled.value.success) {
+      report = reportSettled.value.data
+    } else if (reportSettled.status === 'rejected') {
+      console.warn('[orchestrator] agent-report failed:', reportSettled.reason)
+    }
+  }
+
+  // Step 4: consolidate
+  const polygon = fireAnalysis?.polygon ?? EMPTY_POLYGON
+  const routes = routesResult?.routes ?? []
   const riskLevel = calculateRiskLevel(fires, weather, airQuality)
 
   return {
@@ -120,5 +145,10 @@ export async function runAnalysis(
     airQuality,
     routes,
     riskLevel,
+    riskAssessment: fireAnalysis?.riskAssessment,
+    expansion: fireAnalysis?.expansion,
+    airAlerts: airAlerts ?? undefined,
+    report,
+    naturalRoutes: routesResult?.naturalRoutes ?? undefined,
   }
 }

@@ -1,27 +1,39 @@
-import type { AirData, FireData } from '@sentinel/types'
+import type { AirData, FireData, AirAlerts } from '@sentinel/types'
+import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
-export interface AirAnalysis {
-  safe: boolean
-  recommendation: string
-  fireContribution: boolean
+function toAqiData(air: AirData, fires: FireData[]) {
+  return {
+    stations: [
+      { name: 'Estación principal', aqi: air.aqi, pm25: air.pm25 },
+    ],
+    fire_count: fires.length,
+  }
 }
 
-export function analyzeAir(air: AirData, fires: FireData[]): AirAnalysis {
-  const safe = air.aqi <= 100
-  const fireContribution = fires.length > 0 && air.pm25 > 35
+// A3: AQI / Health Monitor
+export async function analyzeAir(air: AirData, fires: FireData[]): Promise<AirAlerts> {
+  const aqiData = toAqiData(air, fires)
+  const location = { region: 'Patagonia / Araucanía, Chile-Argentina' }
 
-  let recommendation: string
-  if (air.aqi <= 50) {
-    recommendation = 'Air quality is good. No restrictions needed.'
-  } else if (air.aqi <= 100) {
-    recommendation = 'Moderate air quality. Sensitive groups should limit outdoor activity.'
-  } else if (air.aqi <= 150) {
-    recommendation = 'Unhealthy for sensitive groups. Masks recommended for outdoor activity.'
-  } else if (air.aqi <= 200) {
-    recommendation = 'Unhealthy. Everyone should limit outdoor exposure. Use N95 masks.'
-  } else {
-    recommendation = 'Very unhealthy or hazardous. Avoid all outdoor activity. Evacuate if possible.'
-  }
+  const system = `Eres un monitor experto de calidad del aire y salud pública en contexto de incendios.
+Recibes datos de AQI (Air Quality Index) y ubicación.
+Debes responder SOLO con JSON válido, sin texto adicional, sin markdown, sin bloques de código.
+El JSON debe tener exactamente esta estructura:
+{
+  "alertas": [
+    {
+      "zona": "nombre de la zona",
+      "aqi": número,
+      "color": "verde" | "amarillo" | "naranja" | "rojo" | "morado" | "granate",
+      "nivel": "Bueno" | "Moderado" | "Dañino para grupos sensibles" | "Dañino" | "Muy dañino" | "Peligroso",
+      "recomendacion": "instrucción concreta en español para la población"
+    }
+  ],
+  "resumen_general": "evaluación general de la calidad del aire en la zona afectada"
+}`
 
-  return { safe, recommendation, fireContribution }
+  const user = `Datos AQI:\n${JSON.stringify(aqiData, null, 2)}\n\nUbicación: ${JSON.stringify(location)}\n\nGenera alertas de salud por zona con colores semánticos y recomendaciones.`
+
+  const raw = await callOpenRouter(MODELS.small, system, user)
+  return parseJSON<AirAlerts>(raw, 'Agent 3 (AQI)')
 }

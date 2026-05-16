@@ -49,6 +49,12 @@ export interface SentinelUpdate {
   airQuality: AirData
   routes: RouteData[]
   riskLevel: 'low' | 'medium' | 'high' | 'critical'
+  // LLM enrichment — optional, degrade gracefully if agents fail
+  riskAssessment?: RiskAssessment
+  expansion?: ExpansionData
+  airAlerts?: AirAlerts
+  report?: AuthorityReport
+  naturalRoutes?: NaturalRoutes
 }
 
 export interface AlertPayload {
@@ -69,12 +75,88 @@ export interface PollingState {
   nextRun: string | null
 }
 
+// ─── LLM Agent output types ──────────────────────────────────────────────────
+
+export interface RiskAssessment {
+  risk_level: 'CRITICO' | 'ALTO' | 'MEDIO' | 'BAJO'
+  zona_afectada: string
+  confianza: number
+  resumen: string
+}
+
+export interface ExpansionPolygon {
+  type: 'Polygon'
+  coordinates: number[][][]
+  area_km2: number
+}
+
+export interface ExpansionData {
+  expansion_2h: ExpansionPolygon
+  expansion_6h: ExpansionPolygon
+  expansion_12h: ExpansionPolygon
+  velocidad_propagacion_kmh: number
+  direccion_principal: string
+}
+
+// Combined output of agent-fire (A1 + A2)
+export interface FireAnalysis {
+  polygon: GeoJSONFeature        // expansion_2h wrapped as GeoJSONFeature for map display
+  riskAssessment: RiskAssessment
+  expansion: ExpansionData
+}
+
+export interface AirAlert {
+  zona: string
+  aqi: number
+  color: string
+  nivel: string
+  recomendacion: string
+}
+
+export interface AirAlerts {
+  alertas: AirAlert[]
+  resumen_general: string
+}
+
+export interface AuthorityReport {
+  reporte_id: string
+  timestamp: string
+  nivel_emergencia: 'NIVEL 1' | 'NIVEL 2' | 'NIVEL 3'
+  zona_impacto: string
+  poblacion_en_riesgo_estimada: number
+  recursos_recomendados: string[]
+  acciones_inmediatas: string[]
+  zonas_evacuacion_prioritaria: string[]
+  resumen_ejecutivo: string
+}
+
+export interface NaturalRoute {
+  nombre: string
+  origen: string
+  destino: string
+  distancia_km: number
+  tiempo_estimado_min: number
+  instrucciones: string
+  estado: 'LIBRE' | 'CONGESTIONADA' | 'BLOQUEADA'
+  prioridad: 1 | 2 | 3
+}
+
+export interface NaturalRoutes {
+  rutas: NaturalRoute[]
+  punto_encuentro_principal: string
+  mensaje_alerta: string
+}
+
 // Agent contract — POST /analyze
 export interface AgentRequest {
   firms?: FireData[]
   weather?: WeatherData
   openaq?: AirData
   polygon?: GeoJSONFeature
+  // LLM pipeline — passed by orchestrator to agent-report
+  riskAssessment?: RiskAssessment
+  expansion?: ExpansionData
+  airAlerts?: AirAlerts
 }
 
 export type AgentResponse<T = unknown> =
