@@ -2,6 +2,7 @@
 
 import { Users, FileText } from "lucide-react"
 import { useLang } from "@/contexts/language-context"
+import { useSentinel } from "@/contexts/sentinel-context"
 
 function Label({ children, right }: { children: React.ReactNode, right?: string }) {
   return (
@@ -15,7 +16,10 @@ function Label({ children, right }: { children: React.ReactNode, right?: string 
 
 export function InfoSections() {
   const { tx } = useLang()
+  const { sentinelUpdate: u } = useSentinel()
   const evacPct = 66
+  const briefingText = u?.report?.resumen_ejecutivo ?? u?.riskAssessment?.resumen ?? null
+  const populationAtRisk = u?.report?.poblacion_en_riesgo_estimada ?? null
 
   return (
     <div className="space-y-4">
@@ -26,11 +30,15 @@ export function InfoSections() {
         </div>
         
         <div className="p-4 bg-surface-2 border border-border rounded-md">
-          <p className="text-[13px] text-text-2 leading-relaxed italic">
-            "The <span className="text-orange font-semibold not-italic">Cedar Ridge Fire</span> has expanded to 
-            <span className="text-foreground font-bold not-italic"> 12,400 acres</span> with 
-            <span className="text-foreground font-bold not-italic"> 8% containment</span>. {tx.windNote}"
-          </p>
+          {briefingText ? (
+            <p className="text-[13px] text-text-2 leading-relaxed italic">"{briefingText}"</p>
+          ) : (
+            <p className="text-[13px] text-text-2 leading-relaxed italic">
+              "The <span className="text-orange font-semibold not-italic">Cedar Ridge Fire</span> has expanded to
+              <span className="text-foreground font-bold not-italic"> 12,400 acres</span> with
+              <span className="text-foreground font-bold not-italic"> 8% containment</span>. {tx.windNote}"
+            </p>
+          )}
         </div>
         
         <div className="grid grid-cols-3 gap-3 mt-4">
@@ -61,7 +69,7 @@ export function InfoSections() {
         
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: tx.atRisk, value: "127,450", color: "text-red-soft" },
+            { label: tx.atRisk, value: populationAtRisk != null ? populationAtRisk.toLocaleString() : "127,450", color: "text-red-soft" },
             { label: tx.evacuated, value: "84,230", color: "text-green-soft" },
             { label: tx.inShelters, value: "23,847", color: "text-blue" },
             { label: tx.structures, value: "4,892", color: "text-orange-soft" },

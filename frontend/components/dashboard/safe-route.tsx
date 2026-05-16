@@ -2,9 +2,16 @@
 
 import { Route } from "lucide-react"
 import { useLang } from "@/contexts/language-context"
+import { useSentinel } from "@/contexts/sentinel-context"
 
 export function SafeRoute() {
   const { tx } = useLang()
+  const { sentinelUpdate: u } = useSentinel()
+  const r = u?.naturalRoutes?.rutas?.[0] ?? null
+  const steps = r
+    ? [r.origen, r.destino]
+    : ["Oak Valley Rd", "I-42 N", "Exit 17B", "Lincoln High"]
+  const travelTime = r ? `${r.tiempo_estimado_min} MIN` : "23 MIN"
   return (
     <div className="sentinel-card p-4">
       <div className="flex items-center gap-2 mb-4">
@@ -20,17 +27,16 @@ export function SafeRoute() {
       
       <div className="p-4 bg-green/5 border border-green/20 rounded-md">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm font-medium text-text-2">
-          <span>Oak Valley Rd</span>
-          <span className="text-text-muted">→</span>
-          <span>I-42 N</span>
-          <span className="text-text-muted">→</span>
-          <span>Exit 17B</span>
-          <span className="text-text-muted">→</span>
-          <span>Lincoln High</span>
+          {steps.map((s, i) => (
+            <span key={i} className="flex items-center gap-x-3">
+              {i > 0 && <span className="text-text-muted">→</span>}
+              <span>{s}</span>
+            </span>
+          ))}
         </div>
         <div className="mt-3 pt-3 border-t border-border flex justify-between items-center text-[10px] font-semibold text-text-muted uppercase tracking-wider">
           <span>{tx.estTravelTime}</span>
-          <span className="text-sm font-medium text-foreground num">23 MIN</span>
+          <span className="text-sm font-medium text-foreground num">{travelTime}</span>
         </div>
       </div>
     </div>

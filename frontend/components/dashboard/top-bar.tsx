@@ -1,15 +1,28 @@
 "use client"
 
-import { Flame, Activity, Globe } from "lucide-react"
+import { Flame, Activity, Globe, RadarIcon } from "lucide-react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLang } from "@/contexts/language-context"
+import { useSentinel } from "@/contexts/sentinel-context"
 
 export function TopBar() {
   const pathname = usePathname()
   const { lang, toggle, tx } = useLang()
+  const { connected, status, trigger, sentinelUpdate } = useSentinel()
   const [time, setTime] = useState<string>("")
+
+  const fireCount = sentinelUpdate?.fires.length ?? 0
+  const isLoading = status.state === "loading"
+  const statusLabel = !connected
+    ? "OFFLINE"
+    : isLoading
+      ? "ANALIZANDO…"
+      : status.state === "error"
+        ? "ERROR"
+        : (sentinelUpdate?.riskLevel ?? "").toUpperCase() || (connected ? "EN LÍNEA" : tx.statusCritical)
+  const statusColor = !connected || status.state === "error" ? "text-text-muted" : "text-red"
 
   useEffect(() => {
     const updateTime = () => {
@@ -58,14 +71,23 @@ export function TopBar() {
             ))}
           </nav>
 
-          <div className="px-4 py-2 rounded-full border border-red/40 bg-[linear-gradient(180deg,rgba(255,51,51,0.15),rgba(255,51,51,0.05))] text-red flex items-center gap-3 shadow-[0_10px_30px_-10px_rgba(255,51,51,0.3),inset_0_1px_1px_rgba(255,255,255,0.05)] animate-in fade-in zoom-in duration-500">
-            <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_12px_rgba(255,51,51,1)] animate-pulse" />
-            <span className="text-[11px] font-black tracking-[0.2em] uppercase whitespace-nowrap">{tx.statusCritical}</span>
+          <div className={`px-4 py-2 rounded-full border border-red/40 bg-[linear-gradient(180deg,rgba(255,51,51,0.15),rgba(255,51,51,0.05))] ${statusColor} flex items-center gap-3 shadow-[0_10px_30px_-10px_rgba(255,51,51,0.3),inset_0_1px_1px_rgba(255,255,255,0.05)] animate-in fade-in zoom-in duration-500`}>
+            <div className={`w-2 h-2 rounded-full shadow-[0_0_12px_rgba(255,51,51,1)] ${connected ? "bg-red animate-pulse" : "bg-text-muted"}`} />
+            <span className="text-[11px] font-black tracking-[0.2em] uppercase whitespace-nowrap">{statusLabel}</span>
           </div>
+
+          <button
+            onClick={() => trigger()}
+            disabled={isLoading || !connected}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-orange/40 bg-orange/10 text-orange text-[11px] font-black tracking-[0.15em] uppercase hover:bg-orange/20 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <RadarIcon className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            <span>{isLoading ? "…" : "Analizar"}</span>
+          </button>
 
           <div className="hidden lg:flex items-center gap-3 px-4 py-2 bg-surface/60 border border-white/5 rounded-lg text-[11px] font-bold tracking-[0.15em] text-text-dim backdrop-blur-md">
             <span>{tx.hotspots}</span>
-            <span className="text-orange-soft font-mono text-base leading-none num drop-shadow-[0_0_8px_rgba(255,174,66,0.4)]">2,847</span>
+            <span className="text-orange-soft font-mono text-base leading-none num drop-shadow-[0_0_8px_rgba(255,174,66,0.4)]">{fireCount.toLocaleString()}</span>
           </div>
         </div>
 

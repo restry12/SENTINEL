@@ -18,6 +18,7 @@ import { ActionPlan }       from "@/components/air/action-plan"
 import { AIBriefing }       from "@/components/air/ai-briefing"
 import { IncidentTimeline } from "@/components/air/incident-timeline"
 import { ScenarioControls } from "@/components/air/scenario-controls"
+import { AuthGuard } from "@/components/auth-guard"
 
 const AirMap = dynamic(
   () => import("@/components/air/air-map").then(m => m.AirMap),
@@ -25,6 +26,14 @@ const AirMap = dynamic(
 )
 
 export default function AirPage() {
+  return (
+    <AuthGuard>
+      <AirPageInner />
+    </AuthGuard>
+  )
+}
+
+function AirPageInner() {
   const pathname   = usePathname()
   const { lang, toggle, tx } = useLang()
   const [scenarioId, setScenarioId] = useState<ScenarioId>("none")

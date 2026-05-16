@@ -2,14 +2,16 @@
 
 import { Wind, AlertTriangle } from "lucide-react"
 import { useLang } from "@/contexts/language-context"
+import { useSentinelMetrics } from "@/contexts/sentinel-context"
 
 export function MetricCards() {
   const { tx } = useLang()
-  const riskLevel = "CRITICAL"
-  const windSpeed = 24
-  const windDirection = "NW"
-  const aqi = 187
-  const frp = 847.3
+  const m = useSentinelMetrics()
+  const riskLevel = m.riskLevel
+  const windSpeed = m.windSpeedKmh
+  const windDirection = m.windDir
+  const aqi = m.aqi
+  const frp = m.frpMax
 
   return (
     <div className="border-b border-border bg-background shrink-0 overflow-x-auto scrollbar-none">

@@ -47,18 +47,20 @@ export function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
+      const result = await response.json()
 
-      if (response.ok) {
+      if (response.ok && result.ok && result.token) {
+        localStorage.setItem('sentinel_token', result.token)
+        localStorage.setItem('sentinel_user', JSON.stringify(result.user ?? {}))
         toast.success('Acceso concedido', {
           description: 'Sincronizando con el centro de comando...',
         })
-        // Small delay to show the toast
         setTimeout(() => {
           router.push('/dashboard')
         }, 1000)
       } else {
         toast.error('Error de acceso', {
-          description: 'Credenciales inválidas o cuenta no autorizada.',
+          description: result.error ?? 'Credenciales inválidas o cuenta no autorizada.',
         })
       }
     } catch (error) {
@@ -147,7 +149,10 @@ export function LoginForm() {
         variant="outline"
         type="button"
         disabled={isLoading}
-        onClick={() => router.push('/dashboard')}
+        onClick={() => {
+          localStorage.setItem('sentinel_token', 'demo')
+          router.push('/dashboard')
+        }}
         className="w-full h-11 border border-orange/30 bg-orange/5 hover:bg-orange/10 hover:border-orange/50 text-orange font-mono tracking-widest uppercase text-[10px] transition-all duration-200 shadow-[0_0_20px_rgba(255,126,21,0.08)] hover:shadow-[0_0_24px_rgba(255,126,21,0.18)]"
       >
         Ver Demo →

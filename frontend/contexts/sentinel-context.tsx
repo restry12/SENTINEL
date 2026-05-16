@@ -1,0 +1,58 @@
+"use client"
+
+import { createContext, useContext, type ReactNode } from "react"
+import { useSocket, type SentinelUpdate, type SocketStatus } from "@/hooks/use-socket"
+
+interface SentinelContextValue {
+  sentinelUpdate: SentinelUpdate | null
+  status: SocketStatus
+  connected: boolean
+  trigger: (lat?: number, lon?: number) => void
+}
+
+const SentinelContext = createContext<SentinelContextValue | null>(null)
+
+export function SentinelProvider({ children }: { children: ReactNode }) {
+  const value = useSocket()
+  return <SentinelContext.Provider value={value}>{children}</SentinelContext.Provider>
+}
+
+export function useSentinel(): SentinelContextValue {
+  const ctx = useContext(SentinelContext)
+  if (!ctx) throw new Error("useSentinel must be used within <SentinelProvider>")
+  return ctx
+}
+
+import { degToCompass } from "@/lib/utils"
+
+// Display-ready metrics. When no live update yet, falls back to the demo values
+// so the dashboard never looks empty/broken before the first analysis arrives.
+export function useSentinelMetrics() {
+  const { sentinelUpdate: u, connected, status } = useSentinel()
+  const hasData = u !== null
+
+  const frpMax = u ? u.fires.reduce((m, f) => Math.max(m, f.frp), 0) : 847.3
+  const windSpeedKmh = u ? Math.round(u.weather.speed * 3.6) : 24
+  const windDir = u ? degToCompass(u.weather.deg) : "NW"
+  const aqi = u?.airQuality.aqi ?? 187
+  const humidity = u?.weather.humidity ?? 32
+  const riskLevel = (u?.riskLevel ?? "critical").toUpperCase()
+  const populationAtRisk = u?.report?.poblacion_en_riesgo_estimada ?? null
+  const briefing =
+    u?.report?.resumen_ejecutivo ?? u?.riskAssessment?.resumen ?? null
+
+  return {
+    hasData,
+    connected,
+    status,
+    update: u,
+    frpMax,
+    windSpeedKmh,
+    windDir,
+    aqi,
+    humidity,
+    riskLevel,
+    populationAtRisk,
+    briefing,
+  }
+}

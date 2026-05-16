@@ -57,19 +57,34 @@ export function RegisterForm() {
   async function onSubmit(data: RegisterFormValues) {
     setIsLoading(true)
     try {
-      // Mock API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      
-      toast.success('Cuenta creada', {
-        description: 'Bienvenido al equipo de SENTINEL.',
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          city: data.city,
+          password: data.password,
+        }),
       })
-      
-      setTimeout(() => {
-        router.push('/')
-      }, 1000)
+      const result = await response.json()
+
+      if (response.ok && result.ok) {
+        toast.success('Cuenta creada', {
+          description: 'Cuenta registrada. Inicie sesión para continuar.',
+        })
+        setTimeout(() => {
+          router.push('/login')
+        }, 1200)
+      } else {
+        toast.error('Error de registro', {
+          description: result.error ?? 'No se pudo crear la cuenta.',
+        })
+      }
     } catch (error) {
-      toast.error('Error de registro', {
-        description: 'No se pudo crear la cuenta en este momento.',
+      toast.error('Error de conexión', {
+        description: 'No se pudo contactar el servidor de autenticación.',
       })
     } finally {
       setIsLoading(false)

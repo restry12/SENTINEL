@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Wind, MessageSquare } from "lucide-react"
 import { useLang } from "@/contexts/language-context"
+import { useSentinelMetrics } from "@/contexts/sentinel-context"
 
 function Label({ children, right }: { children: React.ReactNode, right?: string }) {
   return (
@@ -20,9 +21,9 @@ function WindRose({ direction }: { direction: string }) {
       <span className="absolute bottom-[3px] left-1/2 -translate-x-1/2 text-[8px] font-semibold text-text-muted tracking-[0.04em]">S</span>
       <span className="absolute right-[4px] top-1/2 -translate-y-1/2 text-[8px] font-semibold text-text-muted tracking-[0.04em]">E</span>
       <span className="absolute left-[4px] top-1/2 -translate-y-1/2 text-[8px] font-semibold text-text-muted tracking-[0.04em]">W</span>
-      <div 
+      <div
         className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-bottom-[18px] border-bottom-blue filter drop-shadow-[0_0_6px_rgba(56,189,248,0.8)]"
-        style={{ transform: `rotate(${direction === 'NW' ? -45 : 0}deg)` }}
+        style={{ transform: `rotate(${({ N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 } as Record<string, number>)[direction] ?? 0}deg)` }}
       />
     </div>
   )
@@ -30,12 +31,13 @@ function WindRose({ direction }: { direction: string }) {
 
 export function LeftPanel() {
   const { tx } = useLang()
-  const riskLevel = "CRITICAL"
-  const frp = 847.3
-  const windSpeed = 24
-  const windDirection = "NW"
-  const aqi = 187
-  
+  const m = useSentinelMetrics()
+  const riskLevel = m.riskLevel
+  const frp = m.frpMax
+  const windSpeed = m.windSpeedKmh
+  const windDirection = m.windDir
+  const aqi = m.aqi
+
   const frpPct = Math.min((frp / 1000) * 100, 100)
   const aqiMarkerPos = Math.min(95, (aqi / 300) * 100)
 
