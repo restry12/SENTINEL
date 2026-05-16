@@ -90,6 +90,14 @@ export interface NaturalRoutes {
   mensaje_alerta: string
 }
 
+export interface InfrastructurePoint {
+  id: string
+  name: string
+  lat: number
+  lon: number
+  type: "hospital" | "school" | "emergency"
+}
+
 export interface SentinelUpdate {
   timestamp: string
   fires: FireData[]
@@ -103,6 +111,8 @@ export interface SentinelUpdate {
   airAlerts?: AirAlerts
   report?: AuthorityReport
   naturalRoutes?: NaturalRoutes
+  // Optional — populated once Make.com / backend start sending infrastructure
+  infrastructure?: InfrastructurePoint[]
 }
 
 export interface SocketStatus {
