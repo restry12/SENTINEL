@@ -4,7 +4,7 @@ import { Building2 } from "lucide-react"
 import { useLang } from "@/contexts/language-context"
 import { useSentinel } from "@/contexts/sentinel-context"
 import { useFireSelection, type SelectedFireData } from "@/contexts/fire-selection-context"
-import type { SentinelUpdate, InfrastructurePoint } from "@/hooks/use-socket"
+import type { SentinelUpdate, InfrastructurePoint, PerFireExpansion } from "@/hooks/use-socket"
 
 function Label({ children, right }: { children: React.ReactNode; right?: string }) {
   return (
@@ -35,12 +35,87 @@ function infraColor(type: InfrastructurePoint['type']): string {
   return 'text-orange'
 }
 
+function findFireExpansion(fire: SelectedFireData, u: SentinelUpdate | null): PerFireExpansion | null {
+  const expansions = u?.perFireExpansions
+  if (!expansions || expansions.length === 0) return null
+  // Match by coordinates (rounded to 4 decimals to avoid float issues)
+  return expansions.find(e =>
+    Math.abs(e.lat - fire.lat) < 0.001 && Math.abs(e.lon - fire.lon) < 0.001
+  ) ?? null
+}
+
+function FireExpansionCard({ expansion }: { expansion: PerFireExpansion }) {
+  const maxKm2 = expansion.expansion_12h_km2
+  const pct2h = Math.round((expansion.expansion_2h_km2 / maxKm2) * 100)
+  const pct6h = Math.round((expansion.expansion_6h_km2 / maxKm2) * 100)
+
+  return (
+    <div className="space-y-3">
+      <Label>Expansión Proyectada</Label>
+      <div className="p-4 rounded-xl border border-white/8 bg-[linear-gradient(180deg,rgba(239,68,68,0.04),transparent_60%)]">
+        {/* Visual progression bars */}
+        <div className="space-y-3 mb-4">
+          <div className="flex items-center gap-3">
+            <span className="text-[9px] font-black text-red tracking-[0.1em] w-7 shrink-0">2H</span>
+            <div className="flex-1 h-6 rounded-md bg-white/3 border border-white/5 overflow-hidden relative">
+              <div
+                className="h-full rounded-md bg-[linear-gradient(90deg,rgba(239,68,68,0.5),rgba(239,68,68,0.2))] border-r border-red/40 transition-all duration-500"
+                style={{ width: `${pct2h}%` }}
+              />
+              <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-foreground num">
+                {expansion.expansion_2h_km2} km²
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[9px] font-black text-orange tracking-[0.1em] w-7 shrink-0">6H</span>
+            <div className="flex-1 h-6 rounded-md bg-white/3 border border-white/5 overflow-hidden relative">
+              <div
+                className="h-full rounded-md bg-[linear-gradient(90deg,rgba(249,115,22,0.5),rgba(249,115,22,0.2))] border-r border-orange/40 transition-all duration-500"
+                style={{ width: `${pct6h}%` }}
+              />
+              <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-foreground num">
+                {expansion.expansion_6h_km2} km²
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[9px] font-black text-amber tracking-[0.1em] w-7 shrink-0">12H</span>
+            <div className="flex-1 h-6 rounded-md bg-white/3 border border-white/5 overflow-hidden relative">
+              <div
+                className="h-full rounded-md bg-[linear-gradient(90deg,rgba(251,191,36,0.5),rgba(251,191,36,0.2))] border-r border-amber/40 transition-all duration-500"
+                style={{ width: '100%' }}
+              />
+              <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-foreground num">
+                {expansion.expansion_12h_km2} km²
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Speed + Direction footer */}
+        <div className="flex items-center gap-3 pt-3 border-t border-white/6">
+          <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-white/3">
+            <div className="w-2 h-2 rounded-full bg-orange shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+            <span className="text-[10px] font-bold text-text-2">{expansion.velocidad_kmh} <span className="text-text-muted">km/h</span></span>
+          </div>
+          <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-lg bg-white/3">
+            <div className="w-2 h-2 rounded-full bg-blue shadow-[0_0_8px_rgba(56,189,248,0.6)]" />
+            <span className="text-[10px] font-bold text-text-2">Hacia <span className="text-foreground font-black">{expansion.direccion}</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function FireOpsView({ fire, u, tx, onDeselect }: {
   fire: SelectedFireData
   u: SentinelUpdate | null
   tx: Tx
   onDeselect: () => void
 }) {
+  const fireExpansion = findFireExpansion(fire, u)
   const infra = u?.infrastructure ?? []
   const nearby = infra
     .map(pt => ({ ...pt, dist: haversineKm(fire.lat, fire.lon, pt.lat, pt.lon) }))
@@ -57,6 +132,9 @@ function FireOpsView({ fire, u, tx, onDeselect }: {
 
   return (
     <>
+      {/* Per-fire expansion */}
+      {fireExpansion && <FireExpansionCard expansion={fireExpansion} />}
+
       {/* Nearby Infrastructure */}
       <div className="space-y-3">
         <Label>{tx.nearbyInfra}</Label>
