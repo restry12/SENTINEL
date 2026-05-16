@@ -1,5 +1,6 @@
 "use client"
 import dynamic from "next/dynamic"
+import { useSentinel } from "@/contexts/sentinel-context"
 
 const MapboxPanel = dynamic(
   () => import("./mapbox-panel").then((m) => m.MapboxPanel),
@@ -16,6 +17,17 @@ function MapLabel({ label, value }: { label: string, value: string | React.React
 }
 
 export function MapPanel() {
+  const { sentinelUpdate: u } = useSentinel()
+  const fires = u?.fires ?? []
+  const centroid = fires.length > 0
+    ? {
+        lat: fires.reduce((s, f) => s + f.lat, 0) / fires.length,
+        lon: fires.reduce((s, f) => s + f.lon, 0) / fires.length,
+      }
+    : null
+  const latLabel = centroid ? `${Math.abs(centroid.lat).toFixed(2)}° ${centroid.lat < 0 ? "S" : "N"}` : "—"
+  const lonLabel = centroid ? `${Math.abs(centroid.lon).toFixed(2)}° ${centroid.lon < 0 ? "W" : "E"}` : "—"
+
   return (
     <div className="relative flex-1 flex flex-col bg-[#04050a] min-h-0 overflow-hidden">
       {/* Map Header - Refined Sentinel Pass */}
@@ -27,8 +39,8 @@ export function MapPanel() {
           </div>
           <div className="h-4 w-px bg-border" />
           <div className="flex items-center gap-5">
-            <MapLabel label="Lat" value="38.28° S" />
-            <MapLabel label="Lng" value="71.90° W" />
+            <MapLabel label="Lat" value={latLabel} />
+            <MapLabel label="Lng" value={lonLabel} />
           </div>
         </div>
 
@@ -76,7 +88,9 @@ export function MapPanel() {
           {/* Floating Data Chips */}
           <div className="absolute top-6 left-6 px-2.5 py-1.5 bg-[#0a0b0e/75] border border-border-2 rounded-sm backdrop-blur-md flex items-center gap-2">
             <span className="text-[10px] font-mono font-medium text-text-2 tracking-wider">
-              SECTOR <b className="text-foreground font-bold">ALPHA-01</b>
+              {fires.length > 0
+                ? <>TRACKING <b className="text-foreground font-bold">{fires.length}</b> {fires.length === 1 ? "FIRE" : "FIRES"}</>
+                : <b className="text-foreground font-bold">NO ACTIVE FIRES</b>}
             </span>
           </div>
 

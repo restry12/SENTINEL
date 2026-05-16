@@ -32,11 +32,7 @@ export function InfoSections() {
           {briefingText ? (
             <p className="text-[13px] text-text-2 leading-relaxed italic">"{briefingText}"</p>
           ) : (
-            <p className="text-[13px] text-text-2 leading-relaxed italic">
-              "The <span className="text-orange font-semibold not-italic">Cedar Ridge Fire</span> has expanded to
-              <span className="text-foreground font-bold not-italic"> 12,400 acres</span> with
-              <span className="text-foreground font-bold not-italic"> 8% containment</span>. {tx.windNote}"
-            </p>
+            <p className="text-[13px] text-text-muted leading-relaxed italic">{tx.awaitingBriefing}</p>
           )}
         </div>
         
