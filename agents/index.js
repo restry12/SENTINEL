@@ -4,8 +4,8 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const MODELS = {
-  large: 'mistral/mistral-large-latest',
-  small: 'mistral/mistral-small-latest',
+  large: 'mistralai/mistral-large',
+  small: 'mistralai/mistral-large',
 };
 
 async function callAgent(model, systemPrompt, userMessage) {
