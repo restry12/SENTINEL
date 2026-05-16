@@ -48,12 +48,12 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
   })
 }
 
-export async function executeAndBroadcast(io: Server, lat?: number, lon?: number, firms?: unknown[], weather?: unknown): Promise<void> {
+export async function executeAndBroadcast(io: Server, lat?: number, lon?: number, firms?: unknown[], weather?: unknown, pm25?: number): Promise<void> {
   const status: StatusPayload = { state: 'loading' }
   io.emit('status', status)
 
   try {
-    const update = await runAnalysis(lat, lon, firms, weather)
+    const update = await runAnalysis(lat, lon, firms, weather, pm25)
     io.emit('update', update)
     io.emit('status', { state: 'ok' } satisfies StatusPayload)
 

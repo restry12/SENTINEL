@@ -11,7 +11,6 @@ import type {
   AuthorityReport,
   RoutesResult,
 } from '@sentinel/types'
-import { fetchAirQuality } from './openaq'
 
 const DEFAULT_LAT = -38.5
 const DEFAULT_LON = -72.0
@@ -78,11 +77,31 @@ function parseOpenWeatherResponse(v: unknown): WeatherData | null {
   return { speed, deg, humidity, gust: typeof wind.gust === 'number' ? wind.gust : undefined }
 }
 
+function pm25ToAqi(pm25: number): number {
+  const v = Math.max(0, pm25)
+  if (v <= 12) return Math.round((50 / 12) * v)
+  if (v <= 35.4) return Math.round(50 + ((100 - 51) / (35.4 - 12.1)) * (v - 12.1))
+  if (v <= 55.4) return Math.round(100 + ((150 - 101) / (55.4 - 35.5)) * (v - 35.5))
+  if (v <= 150.4) return Math.round(150 + ((200 - 151) / (150.4 - 55.5)) * (v - 55.5))
+  if (v <= 250.4) return Math.round(200 + ((300 - 201) / (250.4 - 150.5)) * (v - 150.5))
+  return Math.round(300 + ((400 - 301) / (350.4 - 250.5)) * (v - 250.5))
+}
+
+function aqiCategory(aqi: number): string {
+  if (aqi <= 50) return 'Good'
+  if (aqi <= 100) return 'Moderate'
+  if (aqi <= 150) return 'Unhealthy for Sensitive Groups'
+  if (aqi <= 200) return 'Unhealthy'
+  if (aqi <= 300) return 'Very Unhealthy'
+  return 'Hazardous'
+}
+
 export async function runAnalysis(
   lat = DEFAULT_LAT,
   lon = DEFAULT_LON,
   externalFirms?: unknown[],
-  externalWeather?: unknown
+  externalWeather?: unknown,
+  externalPm25?: number
 ): Promise<SentinelUpdate> {
   // All data comes from Make.com — no external API fetches
   const fires = externalFirms ? (externalFirms as FireData[]) : []
@@ -95,13 +114,9 @@ export async function runAnalysis(
   if (!isWeatherData(externalWeather) && !parseOpenWeatherResponse(externalWeather))
     console.warn('[orchestrator] no weather data received, using defaults')
 
-  const [airSettled] = await Promise.allSettled([
-    fetchAirQuality(lat, lon),
-  ])
-
-  if (airSettled.status === 'rejected') console.warn('[orchestrator] fetchAirQuality failed:', airSettled.reason)
-
-  const airQuality = airSettled.status === 'fulfilled' ? airSettled.value : EMPTY_AIR
+  const airQuality: AirData = externalPm25 !== undefined
+    ? { pm25: externalPm25, aqi: pm25ToAqi(externalPm25), category: aqiCategory(pm25ToAqi(externalPm25)) }
+    : EMPTY_AIR
 
   // Step 2: call agents in parallel (fire, air, routes) — fault-isolated
   // agent-fire runs A1→A2 internally (sequential), others are independent

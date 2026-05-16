@@ -1,7 +1,7 @@
 import type { AirData } from '@sentinel/types'
 
 export async function fetchAirQuality(lat: number, lon: number): Promise<AirData> {
-  const url = `https://api.openaq.org/v3/locations?coordinates=${lat},${lon}&radius=50000&parameters_ids=2&limit=1`
+  const url = `https://api.openaq.org/v3/locations?coordinates=${lat},${lon}&radius=50000&limit=1`
 
   const res = await fetch(url, {
     headers: { 'X-API-Key': process.env.OPENAQ_API_KEY ?? '' }
