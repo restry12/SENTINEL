@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import mapboxgl from "mapbox-gl"
 import { drawFrame } from "./smoke-engine"
 import { MOCK_ENV } from "./types"
 
-mapboxgl.accessToken =
+const TOKEN =
   "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
 
 const SMOKE_SOURCES = [
@@ -16,85 +15,117 @@ const SMOKE_SOURCES = [
 export function AirMap() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const canvasRef       = useRef<HTMLCanvasElement>(null)
+  const mapRef          = useRef<any>(null)
   const rafRef          = useRef<number>(0)
 
   useEffect(() => {
-    // Capture DOM nodes early — refs go null on unmount but the nodes stay valid
+    // Inject Mapbox CSS from CDN — bypasses any Turbopack resolution issues
+    if (!document.getElementById("mbgl-css")) {
+      const link = document.createElement("link")
+      link.id   = "mbgl-css"
+      link.rel  = "stylesheet"
+      link.href = "https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css"
+      document.head.appendChild(link)
+    }
+
     const el  = mapContainerRef.current
     const cvs = canvasRef.current
     if (!el || !cvs) return
+    // React Strict Mode fires the effect twice; skip second run if map exists
+    if (mapRef.current) return
 
-    const ctx   = cvs.getContext("2d")!
-    const start = performance.now()
+    let cancelled = false
+    const ctx     = cvs.getContext("2d")!
+    const start   = performance.now()
 
-    const map = new mapboxgl.Map({
-      container: el,
-      style:     "mapbox://styles/mapbox/satellite-streets-v12",
-      center:    [-71.90, -38.28],
-      zoom:      9,
-      attributionControl: false,
-    })
+    cvs.width  = window.innerWidth
+    cvs.height = window.innerHeight
 
-    // Use the canvas element's own CSS dimensions (w-full h-full)
-    function syncSize() {
-      cvs.width  = cvs.offsetWidth
-      cvs.height = cvs.offsetHeight
+    const onResize = () => {
+      cvs.width  = window.innerWidth
+      cvs.height = window.innerHeight
     }
-    syncSize()
-    const ro = new ResizeObserver(syncSize)
-    ro.observe(cvs)
+    window.addEventListener("resize", onResize)
 
-    function loop() {
-      const w = cvs.width
-      const h = cvs.height
-      if (w === 0 || h === 0) {
+    // Lazy-import mapbox-gl so module-level errors don't break the page
+    import("mapbox-gl").then(({ default: mapboxgl }) => {
+      if (cancelled) return
+
+      mapboxgl.accessToken = TOKEN
+
+      const map = new mapboxgl.Map({
+        container: el,
+        style:     "mapbox://styles/mapbox/satellite-streets-v12",
+        center:    [-71.90, -38.28],
+        zoom:      9,
+        attributionControl: false,
+      })
+      mapRef.current = map
+
+      function loop() {
+        if (cancelled) return
+
+        const { width: w, height: h } = cvs
+        const elapsed = performance.now() - start
+        ctx.clearRect(0, 0, w, h)
+
+        if (map.loaded()) {
+          // AQI impact halos
+          SMOKE_SOURCES.forEach(src => {
+            const px = map.project([src.lng, src.lat])
+            const r  = 110 * src.intensity
+            const g  = ctx.createRadialGradient(px.x, px.y, 0, px.x, px.y, r * 2.8)
+            g.addColorStop(0,    `rgba(239,68,68,${(0.13 * src.intensity).toFixed(3)})`)
+            g.addColorStop(0.45, `rgba(249,115,22,${(0.08 * src.intensity).toFixed(3)})`)
+            g.addColorStop(1,    "rgba(239,68,68,0)")
+            ctx.beginPath()
+            ctx.arc(px.x, px.y, r * 2.8, 0, Math.PI * 2)
+            ctx.fillStyle = g
+            ctx.fill()
+          })
+
+          // Smoke puffs
+          const sources = SMOKE_SOURCES.map(src => {
+            const px = map.project([src.lng, src.lat])
+            return { id: src.id, x: px.x, y: px.y, intensity: src.intensity }
+          })
+          drawFrame(ctx, sources, MOCK_ENV.wind, elapsed)
+        }
+
         rafRef.current = requestAnimationFrame(loop)
-        return
       }
 
-      const elapsed = performance.now() - start
-      ctx.clearRect(0, 0, w, h)
-
-      // AQI halo around each emission source
-      SMOKE_SOURCES.forEach(src => {
-        const px = map.project([src.lng, src.lat])
-        const r  = 110 * src.intensity
-        const g  = ctx.createRadialGradient(px.x, px.y, 0, px.x, px.y, r * 2.8)
-        g.addColorStop(0,    `rgba(239,68,68,${(0.13 * src.intensity).toFixed(3)})`)
-        g.addColorStop(0.45, `rgba(249,115,22,${(0.08 * src.intensity).toFixed(3)})`)
-        g.addColorStop(1,    "rgba(239,68,68,0)")
-        ctx.beginPath()
-        ctx.arc(px.x, px.y, r * 2.8, 0, Math.PI * 2)
-        ctx.fillStyle = g
-        ctx.fill()
-      })
-
-      const sources = SMOKE_SOURCES.map(src => {
-        const px = map.project([src.lng, src.lat])
-        return { id: src.id, x: px.x, y: px.y, intensity: src.intensity }
-      })
-      drawFrame(ctx, sources, MOCK_ENV.wind, elapsed)
-
-      rafRef.current = requestAnimationFrame(loop)
-    }
-
-    // Start immediately — map.project() works as soon as the map is instantiated
-    loop()
+      loop()
+    }).catch(err => console.error("[AirMap] mapbox-gl load failed:", err))
 
     return () => {
+      cancelled = true
+      window.removeEventListener("resize", onResize)
       cancelAnimationFrame(rafRef.current)
-      ro.disconnect()
-      map.remove()
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+      }
     }
   }, [])
 
   return (
-    <div className="absolute inset-0">
-      <div ref={mapContainerRef} className="absolute inset-0" />
+    <div style={{ position: "absolute", inset: 0 }}>
+      <div
+        ref={mapContainerRef}
+        style={{ position: "absolute", inset: 0 }}
+      />
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: 10, filter: "blur(1.5px)" }}
+        style={{
+          position:      "absolute",
+          inset:         0,
+          width:         "100%",
+          height:        "100%",
+          zIndex:        10,
+          filter:        "blur(1.5px)",
+          pointerEvents: "none",
+        }}
       />
     </div>
   )
