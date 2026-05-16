@@ -13,12 +13,21 @@ export interface Hotspot {
 }
 
 // Aligned with backend/shared/types/index.ts → SentinelUpdate
+export interface FirePerFireWeather {
+  speed: number
+  deg: number
+  humidity: number
+  temp?: number
+}
+
 export interface FireData {
   lat: number
   lon: number
   frp: number
   brightness: number
   timestamp: string
+  weather?: FirePerFireWeather
+  pm25?: number | null
 }
 
 export interface GeoJSONFeature {
