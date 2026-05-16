@@ -9,8 +9,8 @@ import type {
   FireAnalysis,
   AirAlerts,
   AuthorityReport,
+  RoutesResult,
 } from '@sentinel/types'
-import type { RoutesResult } from '../../../agent-routes/src/analyze'
 import { fetchWeather } from './openweather'
 import { fetchFires } from './firms'
 import { fetchAirQuality } from './openaq'
