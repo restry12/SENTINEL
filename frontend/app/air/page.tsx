@@ -39,7 +39,7 @@ export default function AirPage() {
 
       <main className="flex-1 relative overflow-hidden">
         <AirMap />
-        <SmokeAlert fires={MOCK_FIRES} wind={MOCK_ENV.wind} />
+        <SmokeAlert wind={MOCK_ENV.wind} />
         <AQIOverlay info={aqiData} />
         <EnvStatus  env={MOCK_ENV} />
         <AQILegend />

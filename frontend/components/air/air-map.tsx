@@ -1,92 +1,22 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import L from "leaflet"
-import "leaflet/dist/leaflet.css"
-import { drawFrame } from "./smoke-engine"
-import { MOCK_FIRES, MOCK_ENV, MAP_CENTER } from "./types"
+import { drawFrame, type SmokeSource } from "./smoke-engine"
+import { MOCK_ENV } from "./types"
 
-function geoWindVec(fromDeg: number): { lat: number; lng: number } {
-  const toRad = ((fromDeg + 180) % 360) * (Math.PI / 180)
-  return { lat: Math.cos(toRad), lng: Math.sin(toRad) }
-}
-
-const FIRE_ICON_HTML = `
-  <div style="position:relative;width:16px;height:16px">
-    <div style="
-      position:absolute;inset:0;border-radius:50%;
-      background:radial-gradient(circle at 40% 40%,#ffcc00,#ff6600,#cc2200);
-      box-shadow:0 0 10px 3px rgba(255,100,0,.85),0 0 28px 7px rgba(255,50,0,.45);
-      animation:sentinelFirePulse 1.2s ease-in-out infinite alternate;
-    "></div>
-    <div style="
-      position:absolute;inset:-10px;border-radius:50%;
-      border:1.5px solid rgba(255,100,0,.45);
-      animation:sentinelFireRing 2s ease-out infinite;
-    "></div>
-  </div>`
+// Visual positions as fractions of container (0–1)
+const SOURCE_FRACS = [
+  { id: "src-a", xFrac: 0.35, yFrac: 0.30, intensity: 0.75 },
+  { id: "src-b", xFrac: 0.57, yFrac: 0.47, intensity: 1.00 },
+]
 
 export function AirMap() {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef    = useRef<HTMLCanvasElement>(null)
-  const mapRef       = useRef<L.Map | null>(null)
   const rafRef       = useRef<number>(0)
 
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return
-
-    const map = L.map(containerRef.current, {
-      center:             [MAP_CENTER.lat, MAP_CENTER.lng],
-      zoom:               10,
-      zoomControl:        true,
-      attributionControl: false,
-    })
-
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19,
-    }).addTo(map)
-
-    const wVec = geoWindVec(MOCK_ENV.wind.fromDeg)
-    const zones = [
-      { radiusKm:  8, color: "#ef4444", opacity: 0.14 },
-      { radiusKm: 20, color: "#f97316", opacity: 0.09 },
-      { radiusKm: 40, color: "#eab308", opacity: 0.06 },
-      { radiusKm: 70, color: "#22c55e", opacity: 0.03 },
-    ]
-
-    MOCK_FIRES.forEach(fire => {
-      zones.forEach(zone => {
-        const offsetKm  = zone.radiusKm * 0.4
-        const offsetLat = wVec.lat * offsetKm / 111
-        const offsetLng = wVec.lng * offsetKm / (111 * Math.cos(fire.lat * Math.PI / 180))
-        L.circle([fire.lat + offsetLat, fire.lng + offsetLng], {
-          radius:      zone.radiusKm * 1000,
-          color:       "transparent",
-          fillColor:   zone.color,
-          fillOpacity: zone.opacity * fire.intensity,
-        }).addTo(map)
-      })
-    })
-
-    const fireIcon = L.divIcon({
-      html:       FIRE_ICON_HTML,
-      className:  "",
-      iconSize:   [16, 16],
-      iconAnchor: [8, 8],
-    })
-
-    MOCK_FIRES.forEach(fire => {
-      L.marker([fire.lat, fire.lng], { icon: fireIcon })
-        .addTo(map)
-        .bindTooltip(fire.name, {
-          permanent:  true,
-          direction:  "top",
-          offset:     [0, -14],
-          className:  "sentinel-tooltip",
-        })
-    })
-
-    mapRef.current = map
+    if (!containerRef.current) return
 
     const canvas = canvasRef.current!
     const ctx    = canvas.getContext("2d")!
@@ -101,7 +31,14 @@ export function AirMap() {
     ro.observe(containerRef.current!)
 
     function loop() {
-      drawFrame(ctx, map, MOCK_FIRES, MOCK_ENV.wind, performance.now() - start)
+      const { width, height } = canvas
+      const sources: SmokeSource[] = SOURCE_FRACS.map(s => ({
+        id:        s.id,
+        x:         s.xFrac * width,
+        y:         s.yFrac * height,
+        intensity: s.intensity,
+      }))
+      drawFrame(ctx, sources, MOCK_ENV.wind, performance.now() - start)
       rafRef.current = requestAnimationFrame(loop)
     }
     loop()
@@ -109,17 +46,62 @@ export function AirMap() {
     return () => {
       cancelAnimationFrame(rafRef.current)
       ro.disconnect()
-      map.remove()
-      mapRef.current = null
     }
   }, [])
 
   return (
     <div ref={containerRef} className="absolute inset-0">
+
+      {/* ── Tactical grid background ── */}
+      <svg
+        className="absolute inset-0 w-full h-full"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <pattern id="air-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1f1f1f" strokeWidth="0.5" />
+          </pattern>
+          <pattern id="air-grid-lg" width="200" height="200" patternUnits="userSpaceOnUse">
+            <path d="M 200 0 L 0 0 0 200" fill="none" stroke="#2a2a2a" strokeWidth="1" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#air-grid)" />
+        <rect width="100%" height="100%" fill="url(#air-grid-lg)" />
+
+        {/* AQI impact zones — drifted SE (wind from NW) */}
+        <ellipse cx="52%" cy="42%" rx="30%" ry="18%" fill="#ef4444" fillOpacity="0.06" />
+        <ellipse cx="48%" cy="39%" rx="22%" ry="13%" fill="#f97316" fillOpacity="0.07" />
+        <ellipse cx="43%" cy="36%" rx="14%" ry="8%"  fill="#ef4444" fillOpacity="0.09" />
+
+        {/* Emission source markers */}
+        <circle cx="35%" cy="30%" r="4" fill="none" stroke="#737373" strokeWidth="0.8" strokeDasharray="2,2" />
+        <circle cx="35%" cy="30%" r="1.5" fill="#737373" />
+        <circle cx="57%" cy="47%" r="5" fill="none" stroke="#737373" strokeWidth="0.8" strokeDasharray="2,2" />
+        <circle cx="57%" cy="47%" r="2" fill="#737373" />
+      </svg>
+
+      {/* Zone label */}
+      <div className="absolute top-4 left-4 z-10">
+        <div className="px-2 py-1 bg-card/80 border border-border rounded text-xs font-mono text-muted-foreground">
+          ZONA AQI — MONITOREO ACTIVO
+        </div>
+      </div>
+
+      {/* Scale */}
+      <div className="absolute bottom-16 right-4 z-10">
+        <div className="px-3 py-2 bg-card/90 border border-border rounded">
+          <div className="flex items-center gap-2">
+            <div className="w-16 h-0.5 bg-foreground" />
+            <span className="text-xs font-mono text-foreground">5 km</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Smoke canvas */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 pointer-events-none"
-        style={{ zIndex: 450, filter: "blur(1.5px)" }}
+        style={{ zIndex: 10, filter: "blur(1.5px)" }}
       />
     </div>
   )

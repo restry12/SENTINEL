@@ -1,9 +1,8 @@
 "use client"
 
-import type { FirePoint, WindData } from "./types"
+import type { WindData } from "./types"
 
 interface Props {
-  fires: FirePoint[]
   wind: WindData
 }
 
@@ -12,8 +11,7 @@ function bearingName(deg: number): string {
   return BEARING_NAMES[Math.round(deg / 45) % 8]
 }
 
-export function SmokeAlert({ fires, wind }: Props) {
-  const names   = fires.map(f => f.name).join("  ·  ")
+export function SmokeAlert({ wind }: Props) {
   const windDir = bearingName(wind.fromDeg)
 
   return (
@@ -26,7 +24,9 @@ export function SmokeAlert({ fires, wind }: Props) {
         Smoke Propagation Detected
       </span>
       <span className="text-border">|</span>
-      <span className="text-xs text-muted-foreground">{names}</span>
+      <span className="text-xs text-muted-foreground">
+        2 Active Sources
+      </span>
       <span className="text-border">|</span>
       <span className="text-xs text-muted-foreground">
         Wind: {windDir} {wind.speed} km/h
