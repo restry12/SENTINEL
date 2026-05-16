@@ -118,11 +118,15 @@ const data = [
         "Crear archivos fallback en /data/ con respuesta real de cada API"
       ]},
       { id: "f1p3", name: "P3 — Agentes IA", color: "t3", tasks: [
-        "Crear cuenta OpenRouter",
-        "Crear cuenta Context7",
-        "Crear /agents/index.js con 5 prompts base",
-        "Testear Agente 1 y 2 con datos ficticios",
-        "Confirmar output Agente 1 es JSON válido parseable"
+        "Crear cuenta OpenRouter + Context7",
+        "Crear /agents/index.js con estructura base",
+        "── Agente 1 (Evaluador de Riesgo): prompt que recibe datos NASA+clima y retorna JSON con risk_level, zona_afectada, confianza",
+        "── Agente 2 (Predictor de Expansión): prompt que recibe JSON del A1 + viento y retorna polígono GeoJSON con expansión a 2h/6h/12h",
+        "── Agente 3 (Monitor AQI/Salud): prompt que recibe AQI + ubicación y retorna alertas de salud por zona con colores semánticos",
+        "── Agente 4 (Reporte Autoridades): prompt que recibe todo el contexto y genera reporte estructurado para servicios de emergencia",
+        "── Agente 5 (Rutas Seguras): prompt que recibe polígono expansión + red vial y genera rutas de evacuación en lenguaje natural",
+        "Testear Agente 1 con datos ficticios — confirmar output es JSON válido parseable",
+        "Testear Agente 5 con polígono ficticio — confirmar texto de rutas es claro y accionable"
       ]},
       { id: "f1p4", name: "P4 — Pitch / Automatización", color: "t4", tasks: [
         "Crear cuenta Make.com",
@@ -158,11 +162,14 @@ const data = [
         "Testear flujo completo de punta a punta con datos reales"
       ]},
       { id: "f2p3", name: "P3 — Agentes IA", color: "t3", tasks: [
-        "Conectar los 5 agentes a datos reales del backend",
-        "Agente 1 siempre retorna JSON válido con try/catch",
-        "Correr agentes 2-5 en paralelo con Promise.all",
-        "Correr Agente 2 con output de Agente 1 como input",
-        "Conectar Context7 para historial de zona",
+        "── Agente 1: conectar a datos reales NASA+clima, wrap con try/catch, garantizar JSON válido siempre",
+        "── Agente 2: recibir output real de A1, conectar datos de viento reales, verificar polígono GeoJSON válido",
+        "── Agente 3: conectar a OpenAQ real, verificar que colores semánticos aparecen en overlay del mapa",
+        "── Agente 4: conectar todos los datos reales, verificar que reporte es legible y dispara webhook Make.com",
+        "── Agente 5: conectar a OpenRouteService real con avoid_polygons, verificar rutas en lenguaje natural claro",
+        "Correr A3/A4/A5 en paralelo con Promise.all después de que A1 resuelva",
+        "Correr A2 secuencial con output de A1 como input",
+        "Conectar Context7 a A1 para historial de la zona",
         "Verificar panel visible de cada agente en dashboard"
       ]},
       { id: "f2p4", name: "P4 — Pitch / Automatización", color: "t4", tasks: [
