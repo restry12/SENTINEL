@@ -16,8 +16,8 @@ for (const name of REQUIRED_ENV) {
 }
 
 const app = express()
-app.use(express.json())
-app.use(express.text({ type: 'text/plain' }))
+app.use(express.json({ limit: '10mb' }))
+app.use(express.text({ type: 'text/plain', limit: '10mb' }))
 
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
