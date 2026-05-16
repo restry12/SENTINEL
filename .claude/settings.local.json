@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(superpowers:using-git-worktrees)",
+      "Bash(git checkout *)",
+      "Bash(Copy-Item *)"
+    ]
+  }
+}
