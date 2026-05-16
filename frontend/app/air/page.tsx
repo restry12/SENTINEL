@@ -87,6 +87,11 @@ function AirPageInner() {
       <header className="h-12 border-b border-border flex items-center justify-between px-3 sm:px-6 shrink-0 z-[2000] gap-2">
         {/* Left: brand + nav */}
         <div className="flex items-center gap-2 min-w-0">
+          <img
+            src="/sentinel-logo.png"
+            alt="SENTINEL"
+            className="h-7 w-auto object-contain drop-shadow-[0_0_8px_rgba(56,189,248,0.25)]"
+          />
           <span className="hidden sm:block text-xs font-semibold tracking-widest uppercase text-muted-foreground font-mono whitespace-nowrap">
             SENTINEL
           </span>
