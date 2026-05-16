@@ -11,29 +11,23 @@ interface TileProps {
 }
 
 const Tile = ({ label, value, unit, delta, deltaType = 'default', sparklinePoints, sparklineColor }: TileProps) => {
-  let deltaClass = styles.delta;
-  if (deltaType === 'warn') deltaClass = styles.deltaWarn;
-  if (deltaType === 'crit') deltaClass = styles.deltaCrit;
+  let deltaColor = 'text-green-soft';
+  if (deltaType === 'warn') deltaColor = 'text-orange-soft';
+  if (deltaType === 'crit') deltaColor = 'text-red-soft';
 
   return (
-    <div className={styles.tile}>
-      <div className={styles.lbl}>{label}</div>
-      <div className={styles.val}>
+    <div className="p-4 bg-surface/60 border border-white/5 rounded-xl backdrop-blur-xl shadow-lg relative overflow-hidden group hover:border-white/10 transition-all duration-300">
+      <div className="absolute top-0 left-0 w-8 h-[1px] bg-blue shadow-[0_0_8px_var(--blue)] opacity-50" />
+      <div className="text-[9px] font-black tracking-[0.2em] text-text-muted uppercase mb-1.5 group-hover:text-text-dim transition-colors">{label}</div>
+      <div className="text-2xl font-black text-white tracking-tight flex items-baseline gap-1.5">
         {value}
-        {unit && (
-          <span style={{ 
-            fontFamily: 'var(--font-mono)', 
-            fontSize: '14px', 
-            color: 'var(--sentinel-text-2)', 
-            marginLeft: '6px' 
-          }}>
-            {unit}
-          </span>
-        )}
+        {unit && <span className="text-xs font-bold text-text-muted uppercase tracking-widest">{unit}</span>}
       </div>
-      <div className={deltaClass}>{delta}</div>
-      <svg className={styles.spark} viewBox="0 0 60 16" fill="none">
-        <polyline points={sparklinePoints} stroke={sparklineColor} strokeWidth="1.4" />
+      <div className={`text-[10px] font-bold mt-2 flex items-center gap-1.5 ${deltaColor} num`}>
+        {delta}
+      </div>
+      <svg className="absolute right-3 bottom-3 w-16 h-4 opacity-40 group-hover:opacity-80 transition-opacity" viewBox="0 0 60 16" fill="none">
+        <polyline points={sparklinePoints} stroke={sparklineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </div>
   );
@@ -41,37 +35,37 @@ const Tile = ({ label, value, unit, delta, deltaType = 'default', sparklinePoint
 
 export function TelemetryTiles() {
   return (
-    <div className={styles.telemetry}>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
       <Tile
-        label="Focos · 24h"
-        value="2 412"
-        delta="▲ 312 / hr"
+        label="HOTSPOTS · 24H"
+        value="2,412"
+        delta="▲ 312 / HR"
         deltaType="crit"
         sparklinePoints="0,12 8,10 16,11 24,7 32,8 40,4 48,6 60,2"
-        sparklineColor="#FB923C"
+        sparklineColor="#ff3333"
       />
       <Tile
-        label="Cobertura global"
+        label="GLOBAL COVERAGE"
         value="98.4%"
-        delta="▲ Estable · 4 sat"
+        delta="▲ STABLE · 4 SAT"
         sparklinePoints="0,12 10,11 20,12 30,11 40,11 50,10 60,10"
-        sparklineColor="#36D399"
+        sparklineColor="#10b981"
       />
       <Tile
-        label="Alertas enviadas"
-        value="18 906"
-        delta="▲ +6.1% hoy"
+        label="ALERTS DISPATCHED"
+        value="18,906"
+        delta="▲ +6.1% TODAY"
         sparklinePoints="0,13 10,11 20,10 30,9 40,7 50,6 60,4"
-        sparklineColor="#22D3EE"
+        sparklineColor="#38bdf8"
       />
       <Tile
-        label="Latencia FIRMS"
+        label="FIRMS LATENCY"
         value="3.4"
-        unit="min"
-        delta="▼ -12% vs ayer"
+        unit="MIN"
+        delta="▼ -12% OPTIMIZED"
         deltaType="warn"
         sparklinePoints="0,4 10,6 20,7 30,9 40,8 50,10 60,11"
-        sparklineColor="#FB923C"
+        sparklineColor="#ff7e15"
       />
     </div>
   );
