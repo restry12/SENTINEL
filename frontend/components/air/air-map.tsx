@@ -155,7 +155,7 @@ export function AirMap({ wind }: Props) {
       {/* Infrastructure at-risk count overlay */}
       <div
         className="absolute font-mono flex flex-col gap-1.5"
-        style={{ bottom: 56, left: 16, zIndex: 20 }}
+        style={{ bottom: 120, left: 16, zIndex: 20 }}
       >
         <div className="px-2 py-1 bg-black/75 backdrop-blur-sm border border-red-500/40 rounded-sm text-[10px] text-red-400 whitespace-nowrap">
           ⚠ {hospitals} Hospital — AQI impact zone
