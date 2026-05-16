@@ -1,4 +1,4 @@
-import type { FireData, RouteData, NaturalRoutes } from '@sentinel/types'
+import type { FireData, RouteData, NaturalRoutes, RoutesResult } from '@sentinel/types'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
 const EVACUATION_DESTINATIONS: Array<{ name: string; lat: number; lon: number }> = [
@@ -6,11 +6,6 @@ const EVACUATION_DESTINATIONS: Array<{ name: string; lat: number; lon: number }>
   { name: 'Angol', lat: -37.7972, lon: -72.7085 },
   { name: 'Victoria', lat: -38.2333, lon: -72.3333 },
 ]
-
-export interface RoutesResult {
-  routes: RouteData[]
-  naturalRoutes: NaturalRoutes | null
-}
 
 // ORS route fetch (unchanged)
 async function fetchOrsRoute(
