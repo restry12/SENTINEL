@@ -4,6 +4,8 @@ import type { PollingController } from '../controllers/polling'
 import { rateLimit } from 'express-rate-limit'
 import { executeAndBroadcast } from '../socket/handlers'
 import { parseFirmsCSV } from '../utils/parseFirmsCSV'
+import { dedupeFires } from '../utils/dedupeFires'
+import { mapRawFiresToFireData } from '../utils/mapRawFires'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
 import authRouter from './auth'
@@ -65,14 +67,12 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
   })
 
-  // POST /api/fires/filter — recibe CSV de NASA, devuelve los 50 focos con mayor FRP
+  // POST /api/fires/filter — recibe CSV de NASA, devuelve TODOS los focos deduplicados (orden FRP desc)
   app.post('/api/fires/filter', (req, res) => {
     const csv = typeof req.body === 'string' ? req.body : ''
     const all = csv ? parseFirmsCSV(csv) : []
 
-    const fires = [...all]
-      .sort((a, b) => b.frp - a.frp)
-      .slice(0, 50)
+    const fires = dedupeFires(all)
 
     res.json({ fires, total: all.length, dangerous: fires.length })
   })
@@ -83,9 +83,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     const body = req.body as { fires?: unknown[] }
     const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
 
-    const firms = rawFires.map(f => ({
-      lat: f.lat, lon: f.lon, frp: f.frp, brightness: f.brightness, timestamp: f.date ?? f.timestamp,
-    }))
+    const firms = mapRawFiresToFireData(rawFires)
 
     const first = rawFires[0]
     const weather = first
