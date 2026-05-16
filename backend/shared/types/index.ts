@@ -11,6 +11,7 @@ export interface WeatherData {
   deg: number        // meteorological degrees (0=N, 90=E, 180=S, 270=W)
   gust?: number      // optional — not always present in OpenWeather
   humidity: number   // 0-100%
+  temp?: number      // °C — opcional, viene de OpenWeather main.temp
 }
 
 export interface AirData {
