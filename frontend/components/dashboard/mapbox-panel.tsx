@@ -374,85 +374,95 @@ export function MapboxPanel() {
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
-      {/* Wind indicator — shown when fire is selected */}
+      {/* Wind indicator */}
       {selectedFire && (
-        <div className="absolute top-4 right-4 z-20 flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md shadow-xl">
-          <span className="text-[8px] font-mono font-bold tracking-[0.2em] text-white/40 uppercase">Viento</span>
+        <div className="absolute top-4 right-4 z-20 flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl backdrop-blur-md"
+          style={{
+            background: 'rgba(0,0,0,0.78)',
+            border: '1px solid rgba(251,146,60,0.25)',
+            boxShadow: '0 0 24px rgba(251,146,60,0.08)',
+          }}
+        >
+          <span className="text-[9px] font-mono font-bold tracking-[0.25em] text-white/30 uppercase">Viento</span>
           <ArrowUp
-            className="w-5 h-5 text-orange-400"
-            style={{ transform: `rotate(${spreadDeg}deg)`, filter: 'drop-shadow(0 0 6px rgba(251,146,60,0.6))' }}
+            className="w-7 h-7 text-orange-400"
+            style={{ transform: `rotate(${spreadDeg}deg)`, filter: 'drop-shadow(0 0 8px rgba(251,146,60,0.7))' }}
           />
-          <span className="text-[10px] font-mono font-black text-orange-400 tracking-wider">{spreadCardinal}</span>
-          <span className="text-[9px] font-mono text-white/50">{windKmh} km/h</span>
+          <span className="text-[13px] font-mono font-black text-orange-400 tracking-widest">{spreadCardinal}</span>
+          <span className="text-[11px] font-mono text-white/50">{windKmh} km/h</span>
         </div>
       )}
 
       {/* Expansion projection toggle */}
       {selectedFire && (
         <div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-2 py-2 rounded-2xl backdrop-blur-md shadow-2xl"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1.5 rounded-2xl backdrop-blur-md"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(20,5,5,0.9) 100%)',
-            border: '1px solid rgba(239,68,68,0.35)',
-            boxShadow: '0 0 40px rgba(239,68,68,0.15), 0 0 80px rgba(239,68,68,0.05), inset 0 1px 1px rgba(255,255,255,0.05)',
+            background: 'linear-gradient(135deg, rgba(0,0,0,0.88) 0%, rgba(18,4,4,0.92) 100%)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            boxShadow: '0 0 40px rgba(239,68,68,0.12), inset 0 1px 0 rgba(255,255,255,0.04)',
           }}
         >
-          {/* Left info block */}
-          <div className="flex flex-col px-3 gap-0.5 border-r border-white/10 pr-4 mr-1">
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_6px_#ef4444]" />
-              <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-red-400/80 uppercase whitespace-nowrap">
-                ZONA PELIGRO · {selectedFire.id}
-              </span>
+          {/* Fire badge */}
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]" />
+            <div className="flex flex-col leading-none">
+              <span className="text-[10px] font-mono font-black tracking-[0.18em] text-red-400 uppercase">{selectedFire.id}</span>
+              <span className="text-[9px] font-mono text-orange-400/80 mt-0.5">▶ {spreadCardinal} · {windKmh} km/h</span>
             </div>
-            <span className="text-[10px] font-mono font-black text-orange-400 whitespace-nowrap tracking-wide">
-              ▶ {spreadCardinal} · {windKmh} km/h
-            </span>
           </div>
 
-          {/* Timeframe buttons */}
+          <div className="w-px h-8 bg-white/10" />
+
+          {/* Timeframe cards */}
           {expansionOptions.map(({ key, label, color }) => {
             const isActive = activeExpansion === key
             const area = areas[key]
+            const km2Str = area.km2 >= 1000
+              ? `${(area.km2 / 1000).toFixed(1)}k km²`
+              : `${area.km2} km²`
+            const haStr = area.ha >= 10000
+              ? `${Math.round(area.ha / 1000)}k ha`
+              : `${area.ha.toLocaleString()} ha`
+
             return (
               <button
                 key={key}
                 onClick={() => setActiveExpansion(prev => prev === key ? null : key)}
-                className="relative flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all duration-200"
+                className="relative rounded-xl transition-all duration-200 overflow-hidden"
                 style={{
-                  color: isActive ? '#fff' : `${color}cc`,
-                  background: isActive
-                    ? `linear-gradient(135deg, ${color}cc, ${color}88)`
-                    : `${color}12`,
-                  border: `1px solid ${color}${isActive ? 'cc' : '40'}`,
-                  boxShadow: isActive
-                    ? `0 0 20px ${color}60, 0 0 40px ${color}20, inset 0 1px 1px rgba(255,255,255,0.15)`
-                    : 'none',
+                  background: isActive ? `linear-gradient(135deg, ${color}bb, ${color}77)` : 'transparent',
+                  border: `1px solid ${isActive ? color : `${color}35`}`,
+                  boxShadow: isActive ? `0 0 24px ${color}50, inset 0 1px 0 rgba(255,255,255,0.12)` : 'none',
+                  minWidth: isActive ? 140 : 52,
                 }}
               >
-                <span
-                  className="text-[11px] font-mono font-black tracking-[0.15em] uppercase"
-                  style={{ textShadow: isActive ? `0 0 12px ${color}` : 'none' }}
-                >
-                  {label}
-                </span>
-                <span className="text-[8px] font-mono opacity-80 whitespace-nowrap">
-                  {area.km2 >= 100
-                    ? `${(area.km2 / 1000).toFixed(1)}k km²`
-                    : `${area.km2} km²`}
-                </span>
-                <span className="text-[8px] font-mono opacity-60 whitespace-nowrap">
-                  {area.ha >= 10000
-                    ? `${Math.round(area.ha / 1000)}k ha`
-                    : `${area.ha.toLocaleString()} ha`}
-                </span>
+                {isActive ? (
+                  /* Expanded active state — all info visible */
+                  <div className="flex items-center gap-3 px-4 py-2.5">
+                    <span className="text-[15px] font-mono font-black text-white tracking-wider" style={{ textShadow: `0 0 16px ${color}` }}>
+                      {label}
+                    </span>
+                    <div className="flex flex-col items-start leading-tight">
+                      <span className="text-[11px] font-mono font-black text-white">{km2Str}</span>
+                      <span className="text-[10px] font-mono text-white/60">{haStr}</span>
+                    </div>
+                  </div>
+                ) : (
+                  /* Compact inactive */
+                  <div className="flex items-center justify-center px-4 py-2.5">
+                    <span className="text-[13px] font-mono font-black tracking-wider" style={{ color: `${color}99` }}>{label}</span>
+                  </div>
+                )}
               </button>
             )
           })}
 
+          <div className="w-px h-8 bg-white/10" />
+
           <button
             onClick={() => { setSelectedFire(null); setActiveExpansion(null) }}
-            className="ml-1 w-7 h-7 flex items-center justify-center rounded-lg text-[10px] font-mono text-white/20 hover:text-white/50 hover:bg-white/5 transition-all"
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-[11px] font-mono text-white/25 hover:text-white/60 hover:bg-white/5 transition-all"
           >
             ✕
           </button>
