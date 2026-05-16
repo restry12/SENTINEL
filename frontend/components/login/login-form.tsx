@@ -54,7 +54,7 @@ export function LoginForm() {
         })
         // Small delay to show the toast
         setTimeout(() => {
-          router.push('/')
+          router.push('/dashboard')
         }, 1000)
       } else {
         toast.error('Error de acceso', {
@@ -141,15 +141,16 @@ export function LoginForm() {
         </form>
       </Form>
 
-      <div className={styles.divider}>O acceso rápido</div>
+      <div className={styles.divider}>O continúa sin cuenta</div>
 
       <Button
         variant="outline"
         type="button"
         disabled={isLoading}
-        className="border-sentinel-line-strong hover:bg-sentinel-line text-sentinel-text-2 font-mono tracking-widest uppercase text-[10px] h-11"
+        onClick={() => router.push('/dashboard')}
+        className="w-full h-11 border border-orange/30 bg-orange/5 hover:bg-orange/10 hover:border-orange/50 text-orange font-mono tracking-widest uppercase text-[10px] transition-all duration-200 shadow-[0_0_20px_rgba(255,126,21,0.08)] hover:shadow-[0_0_24px_rgba(255,126,21,0.18)]"
       >
-        Solicitar Acceso Temporal
+        Ver Demo →
       </Button>
     </div>
   )
