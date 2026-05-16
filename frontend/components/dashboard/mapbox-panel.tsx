@@ -214,6 +214,8 @@ export function MapboxPanel() {
           lat: f.lat, lon: f.lon, frp: f.frp,
           brightness: f.brightness,
           intensity: sentinelUpdate.riskLevel,
+          weather: f.weather,
+          pm25: f.pm25,
         }))
       : []
 

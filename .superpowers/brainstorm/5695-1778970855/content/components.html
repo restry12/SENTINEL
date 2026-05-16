@@ -1,0 +1,86 @@
+<h2>Arquitectura de Componentes</h2>
+<p class="subtitle">Estructura de archivos y responsabilidad de cada componente</p>
+
+<div class="mockup">
+  <div class="mockup-header">Árbol de Componentes — Vista FIRE</div>
+  <div class="mockup-body" style="padding:24px;background:#080c14;font-family:ui-monospace,monospace;">
+
+    <div style="font-size:12px;color:rgba(255,255,255,0.8);line-height:2.2;">
+      <div><span style="color:#38bdf8;">app/dashboard/page.tsx</span> <span style="color:rgba(255,255,255,0.3);">— layout principal</span></div>
+      <div style="padding-left:20px;"><span style="color:#fbbf24;">├</span> <span style="color:#34d399;">TopBar</span> <span style="color:rgba(255,255,255,0.3);">— brand + selector modo + status</span></div>
+      <div style="padding-left:20px;"><span style="color:#fbbf24;">├</span> <span style="color:#34d399;">FireListPanel</span> <span style="color:rgba(255,255,255,0.25);">← NUEVO (reemplaza LeftPanel)</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">├</span> <span style="color:#ff7e15;">FireListHeader</span> <span style="color:rgba(255,255,255,0.3);">— conteo + ordenamiento</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">├</span> <span style="color:#ff7e15;">FireListItem</span> <span style="color:rgba(255,255,255,0.3);">— cada foco en la lista</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">└</span> <span style="color:#ff7e15;">FireSummaryFooter</span> <span style="color:rgba(255,255,255,0.3);">— resumen del foco seleccionado (FRP, viento, coords)</span></div>
+      <div style="padding-left:20px;"><span style="color:#fbbf24;">├</span> <span style="color:#34d399;">FireMapView</span> <span style="color:rgba(255,255,255,0.25);">← NUEVO (reemplaza MapPanel + MapboxPanel)</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">├</span> <span style="color:#ff7e15;">ExpansionControl</span> <span style="color:rgba(255,255,255,0.3);">— botones 2H/6H/12H flotantes</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">└</span> <span style="color:#ff7e15;">MapboxEngine</span> <span style="color:rgba(255,255,255,0.3);">— mapa + marcadores + polígonos</span></div>
+      <div style="padding-left:20px;"><span style="color:#fbbf24;">└</span> <span style="color:#34d399;">FireIntelPanel</span> <span style="color:rgba(255,255,255,0.25);">← NUEVO (reemplaza RightPanel)</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">├</span> <span style="color:#ff7e15;">ExpansionImpact</span> <span style="color:rgba(255,255,255,0.3);">— área afectada según rango</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">├</span> <span style="color:#ff7e15;">NearbyInfrastructure</span> <span style="color:rgba(255,255,255,0.3);">— hospitales, escuelas, etc.</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">├</span> <span style="color:#ff7e15;">PriorityZones</span> <span style="color:rgba(255,255,255,0.3);">— zonas de evacuación</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">├</span> <span style="color:#ff7e15;">Recommendations</span> <span style="color:rgba(255,255,255,0.3);">— acciones recomendadas</span></div>
+      <div style="padding-left:44px;"><span style="color:#fbbf24;">└</span> <span style="color:#ff7e15;">SafeRouteCard</span> <span style="color:rgba(255,255,255,0.3);">— ruta segura más cercana</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Context / State -->
+<div class="mockup" style="margin-top:20px;">
+  <div class="mockup-header">Estado Global — FireViewContext</div>
+  <div class="mockup-body" style="padding:24px;background:#080c14;">
+
+    <div style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.8;font-family:ui-monospace,monospace;">
+      <div style="color:#38bdf8;margin-bottom:8px;">// contexts/fire-view-context.tsx (evoluciona fire-selection-context)</div>
+      <div style="color:rgba(255,255,255,0.8);">interface FireViewState {</div>
+      <div style="padding-left:20px;">
+        <span style="color:#34d399;">selectedFire:</span> <span style="color:#fbbf24;">SelectedFireData</span> <span style="color:rgba(255,255,255,0.3);">// siempre hay uno seleccionado</span><br>
+        <span style="color:#34d399;">expansionRange:</span> <span style="color:#fbbf24;">'2h' | '6h' | '12h'</span> <span style="color:rgba(255,255,255,0.3);">// default '2h'</span><br>
+        <span style="color:#34d399;">fires:</span> <span style="color:#fbbf24;">SelectedFireData[]</span> <span style="color:rgba(255,255,255,0.3);">// todos los focos ordenados por FRP desc</span><br>
+        <span style="color:#34d399;">viewMode:</span> <span style="color:#fbbf24;">'fire' | 'risk-zones'</span> <span style="color:rgba(255,255,255,0.3);">// preparado para futuro</span><br>
+      </div>
+      <div style="color:rgba(255,255,255,0.8);">}</div>
+      <div style="margin-top:12px;color:rgba(255,255,255,0.8);">interface FireViewActions {</div>
+      <div style="padding-left:20px;">
+        <span style="color:#34d399;">selectFire:</span> <span style="color:#fbbf24;">(id: string) => void</span><br>
+        <span style="color:#34d399;">setExpansionRange:</span> <span style="color:#fbbf24;">(range: '2h' | '6h' | '12h') => void</span><br>
+        <span style="color:#34d399;">setViewMode:</span> <span style="color:#fbbf24;">(mode: 'fire' | 'risk-zones') => void</span><br>
+      </div>
+      <div style="color:rgba(255,255,255,0.8);">}</div>
+    </div>
+
+    <div style="margin-top:20px;padding:14px;background:rgba(255,126,21,0.06);border:1px solid rgba(255,126,21,0.2);border-radius:8px;">
+      <div style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:#ff7e15;margin-bottom:8px;">REGLA CLAVE</div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.6;">
+        <strong style="color:#fff;">Siempre hay un foco seleccionado.</strong> Al cargar, se auto-selecciona el de mayor FRP. No existe estado "sin selección". Esto elimina todos los null checks y estados vacíos.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Data Flow -->
+<div class="mockup" style="margin-top:20px;">
+  <div class="mockup-header">Flujo de Datos</div>
+  <div class="mockup-body" style="padding:24px;background:#080c14;">
+
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="padding:8px 14px;background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);border-radius:8px;font-size:10px;font-weight:800;color:#34d399;white-space:nowrap;">SentinelUpdate (socket)</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.3);">→</div>
+        <div style="padding:8px 14px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);border-radius:8px;font-size:10px;font-weight:800;color:#38bdf8;white-space:nowrap;">FireViewContext</div>
+        <div style="font-size:14px;color:rgba(255,255,255,0.3);">→</div>
+        <div style="padding:8px 14px;background:rgba(255,126,21,0.1);border:1px solid rgba(255,126,21,0.3);border-radius:8px;font-size:10px;font-weight:800;color:#ff7e15;white-space:nowrap;">Componentes</div>
+      </div>
+
+      <div style="padding:14px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:8px;font-size:11px;color:rgba(255,255,255,0.5);line-height:1.6;">
+        <strong style="color:#fff;">FireViewContext</strong> consume <code style="color:#34d399;">useSentinel()</code> internamente y expone los datos ya procesados:
+        <ul style="margin:8px 0 0 16px;padding:0;">
+          <li>Transforma <code style="color:#34d399;">fires[]</code> → <code style="color:#fbbf24;">SelectedFireData[]</code> con expansión calculada</li>
+          <li>Ordena por FRP desc</li>
+          <li>Auto-selecciona el top si no hay selección previa</li>
+          <li>Mantiene selección si el foco sigue en el nuevo update</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
