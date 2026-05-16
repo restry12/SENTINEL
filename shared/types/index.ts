@@ -36,7 +36,7 @@ export interface GeoJSONFeature {
   type: 'Feature'
   geometry: {
     type: string
-    coordinates: unknown
+    coordinates: number[] | number[][] | number[][][]
   }
   properties: Record<string, unknown>
 }
@@ -77,8 +77,6 @@ export interface AgentRequest {
   polygon?: GeoJSONFeature
 }
 
-export interface AgentResponse<T = unknown> {
-  success: boolean
-  data: T
-  error?: string
-}
+export type AgentResponse<T = unknown> =
+  | { success: true; data: T }
+  | { success: false; data: null; error: string }
