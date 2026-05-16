@@ -7,7 +7,7 @@ import dynamic from "next/dynamic"
 import { useLang } from "@/contexts/language-context"
 import { useSentinel } from "@/contexts/sentinel-context"
 import {
-  aqiInfo, computeThreatLevel, visibilityFromAQI,
+  aqiInfo, computeThreatLevel,
   type EnvData, type FirePoint, type InfrastructurePoint,
 } from "@/components/air/types"
 import { SmokeAlert }       from "@/components/air/smoke-alert"
@@ -45,7 +45,7 @@ function AirPageInner() {
     wind:         { speed: u ? Math.round(u.weather.speed * 3.6) : 0, fromDeg: u?.weather.deg ?? 0 },
     humidity:     u?.weather.humidity ?? 0,
     tempC:        u?.weather.temp ?? 0,
-    visibilityKm: visibilityFromAQI(u?.airQuality.aqi ?? 0),
+    visibilityKm: u?.weather.visibility != null ? Math.round(u.weather.visibility / 100) / 10 : null,
   }
 
   // Real fires from NASA FIRMS data (FireData uses .lon, FirePoint uses .lng)
