@@ -25,9 +25,6 @@ export function drawFrame(
   wind: WindData,
   elapsed: number
 ): void {
-  const { width, height } = ctx.canvas
-  ctx.clearRect(0, 0, width, height)
-
   const { dx, dy } = windCanvasVec(wind)
   const windMag = wind.speed / 24
 
