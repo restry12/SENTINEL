@@ -3,29 +3,27 @@
 import { useEffect, useRef } from "react"
 import type { Map as MapboxMap } from "mapbox-gl"
 import { drawFrame }         from "./smoke-engine"
-import { MOCK_INFRASTRUCTURE, type WindData } from "./types"
+import { MOCK_INFRASTRUCTURE, type WindData, type FirePoint } from "./types"
 
 const TOKEN =
   "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
 
-const SMOKE_SOURCES = [
-  { id: "src-a", lng: -71.73, lat: -38.14, intensity: 0.75 },
-  { id: "src-b", lng: -72.08, lat: -38.42, intensity: 1.00 },
-]
-
 const INFRA_COLORS = { hospital: "#ef4444", school: "#f97316", emergency: "#3b82f6" } as const
 
-interface Props { wind: WindData }
+interface Props { wind: WindData; fires: FirePoint[] }
 
-export function AirMap({ wind }: Props) {
+export function AirMap({ wind, fires }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const canvasRef       = useRef<HTMLCanvasElement>(null)
   const mapRef          = useRef<MapboxMap | null>(null)
   const rafRef          = useRef<number>(0)
   const windRef         = useRef<WindData>(wind)
+  const firesRef        = useRef<FirePoint[]>(fires)
 
   // Keep wind ref current so the RAF loop always uses latest wind
   useEffect(() => { windRef.current = wind }, [wind])
+  // Keep fires ref current so the RAF loop always uses latest fires
+  useEffect(() => { firesRef.current = fires }, [fires])
 
   useEffect(() => {
     // Inject Mapbox CSS from CDN — bypasses any Turbopack resolution issues
@@ -105,9 +103,22 @@ export function AirMap({ wind }: Props) {
 
         ctx.clearRect(0, 0, w, h)
 
+        // Skip smoke rendering when no live fire data yet
+        if (firesRef.current.length === 0) {
+          rafRef.current = requestAnimationFrame(loop)
+          return
+        }
+
+        const smokeSources = firesRef.current.map(f => ({
+          id:        f.id,
+          lng:       f.lng,
+          lat:       f.lat,
+          intensity: f.intensity,
+        }))
+
         if (map.loaded()) {
           // AQI impact halos
-          SMOKE_SOURCES.forEach(src => {
+          smokeSources.forEach(src => {
             const px = map.project([src.lng, src.lat])
             const r  = 110 * src.intensity
             const g  = ctx.createRadialGradient(px.x, px.y, 0, px.x, px.y, r * 2.8)
@@ -121,7 +132,7 @@ export function AirMap({ wind }: Props) {
           })
 
           // Smoke puffs
-          const sources = SMOKE_SOURCES.map(src => {
+          const sources = smokeSources.map(src => {
             const px = map.project([src.lng, src.lat])
             return { id: src.id, x: px.x, y: px.y, intensity: src.intensity }
           })

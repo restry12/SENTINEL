@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { THREAT_COLORS, type ThreatLevel, type ScenarioId } from "./types"
+import { THREAT_COLORS, type ThreatLevel } from "./types"
 import { useLang } from "@/contexts/language-context"
 
-interface Props { scenarioId: ScenarioId }
+interface Props {
+  alerts?: Array<{ zona: string; aqi: number; nivel: string; recomendacion: string }> | null
+}
 
 interface Event {
   id:      string
@@ -13,7 +15,7 @@ interface Event {
   level:   ThreatLevel
 }
 
-export function IncidentTimeline({ scenarioId }: Props) {
+export function IncidentTimeline({ alerts }: Props) {
   const { tx } = useLang()
 
   const BASE_EVENTS: Event[] = [
@@ -25,24 +27,14 @@ export function IncidentTimeline({ scenarioId }: Props) {
     { id: "e6", time: "13:58", message: tx.events.base[5], level: "HIGH"     },
   ]
 
-  const SCENARIO_EVENTS: Record<Exclude<ScenarioId, "none">, Event[]> = {
-    wind: [
-      { id: "w1", time: "14:02", message: tx.events.wind[0], level: "CRITICAL" },
-      { id: "w2", time: "14:05", message: tx.events.wind[1], level: "CRITICAL" },
-    ],
-    humidity: [
-      { id: "h1", time: "14:02", message: tx.events.humidity[0], level: "CRITICAL" },
-      { id: "h2", time: "14:05", message: tx.events.humidity[1], level: "CRITICAL" },
-    ],
-    worst: [
-      { id: "x1", time: "14:02", message: tx.events.worst[0], level: "CRITICAL" },
-      { id: "x2", time: "14:04", message: tx.events.worst[1], level: "CRITICAL" },
-      { id: "x3", time: "14:06", message: tx.events.worst[2], level: "CRITICAL" },
-    ],
-  }
+  const liveEvents: Event[] = (alerts ?? []).map((a, i) => ({
+    id:      `live-${i}`,
+    time:    new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+    message: `${a.zona} — AQI ${a.aqi} (${a.nivel})`,
+    level:   a.aqi > 150 ? "CRITICAL" : a.aqi > 100 ? "HIGH" : a.aqi > 50 ? "MODERATE" : "LOW",
+  }))
 
-  const extra  = scenarioId !== "none" ? (SCENARIO_EVENTS[scenarioId] ?? []) : []
-  const events = [...BASE_EVENTS, ...extra].slice(-7)
+  const events = liveEvents.length > 0 ? liveEvents : BASE_EVENTS
   const [open, setOpen] = useState(true)
 
   return (
