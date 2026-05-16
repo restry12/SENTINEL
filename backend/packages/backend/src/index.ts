@@ -17,6 +17,7 @@ for (const name of REQUIRED_ENV) {
 
 const app = express()
 app.use(express.json())
+app.use(express.text({ type: 'text/plain' }))
 
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
