@@ -70,7 +70,7 @@ export default function AirPage() {
 
         <div className="absolute top-14 right-4 z-[1000] w-64 flex flex-col gap-3 max-h-[calc(100vh-120px)] overflow-y-auto scrollbar-none">
           <ActionPlan threat={threat} aqi={rawAQI} />
-          <AIBriefing threat={threat} env={scenario.env} />
+          <AIBriefing threat={threat} />
           <IncidentTimeline scenarioId={scenarioId} />
         </div>
 

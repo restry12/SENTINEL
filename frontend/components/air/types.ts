@@ -113,6 +113,11 @@ export const THREAT_COLORS: Record<ThreatLevel, string> = {
   CRITICAL: "#ef4444",
 }
 
+const BEARING_NAMES = ["N","NE","E","SE","S","SW","W","NW"]
+export function bearingName(deg: number): string {
+  return BEARING_NAMES[Math.round(deg / 45) % 8]
+}
+
 export function aqiColor(aqi: number): string {
   return (AQI_THRESHOLDS.find(t => aqi <= t.max) ?? AQI_THRESHOLDS[AQI_THRESHOLDS.length - 1]).color
 }

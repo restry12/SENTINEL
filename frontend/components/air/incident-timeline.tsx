@@ -20,7 +20,7 @@ const BASE_EVENTS: Event[] = [
   { id: "e6", time: "13:58", message: "32K population in exposure corridor",           level: "HIGH"     },
 ]
 
-const SCENARIO_EVENTS: Record<string, Event[]> = {
+const SCENARIO_EVENTS: Record<Exclude<ScenarioId, "none">, Event[]> = {
   wind: [
     { id: "w1", time: "14:02", message: "Wind intensification detected — 52 km/h",    level: "CRITICAL" },
     { id: "w2", time: "14:05", message: "Smoke drift velocity escalated significantly",level: "CRITICAL" },

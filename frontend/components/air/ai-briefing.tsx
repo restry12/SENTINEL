@@ -1,11 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import type { ThreatLevel, EnvData } from "./types"
+import type { ThreatLevel } from "./types"
 
 interface Props {
   threat: ThreatLevel
-  env: EnvData
 }
 
 const BRIEFINGS: Record<ThreatLevel, string[]> = {
@@ -33,21 +32,22 @@ const BRIEFINGS: Record<ThreatLevel, string[]> = {
   ],
 }
 
-export function AIBriefing({ threat, env }: Props) {
+export function AIBriefing({ threat }: Props) {
   const briefings = BRIEFINGS[threat]
   const [index, setIndex] = useState(0)
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>
     const iv = setInterval(() => {
       setVisible(false)
-      setTimeout(() => {
-        setIndex(i => (i + 1) % briefings.length)
+      timeoutId = setTimeout(() => {
+        setIndex(i => (i + 1) % BRIEFINGS[threat].length)
         setVisible(true)
       }, 350)
     }, 5500)
-    return () => clearInterval(iv)
-  }, [briefings.length])
+    return () => { clearInterval(iv); clearTimeout(timeoutId) }
+  }, [threat])
 
   useEffect(() => {
     setIndex(0)

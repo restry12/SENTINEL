@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import type { Map as MapboxMap } from "mapbox-gl"
 import { drawFrame }         from "./smoke-engine"
 import { MOCK_INFRASTRUCTURE, type WindData } from "./types"
 
@@ -19,7 +20,7 @@ interface Props { wind: WindData }
 export function AirMap({ wind }: Props) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const canvasRef       = useRef<HTMLCanvasElement>(null)
-  const mapRef          = useRef<any>(null)
+  const mapRef          = useRef<MapboxMap | null>(null)
   const rafRef          = useRef<number>(0)
   const windRef         = useRef<WindData>(wind)
 

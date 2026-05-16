@@ -70,7 +70,7 @@ export function ActionPlan({ threat, aqi }: Props) {
       <div className="flex flex-col gap-2">
         {actions.map((action, i) => (
           <div
-            key={action}
+            key={i}
             className="flex items-start gap-2"
             style={{ animation: `fadeInUp 0.3s ease-out ${i * 0.05}s both` }}
           >

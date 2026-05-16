@@ -1,14 +1,9 @@
 "use client"
 
 import { Wind, Droplets, Thermometer, Eye } from "lucide-react"
-import type { EnvData } from "./types"
+import { bearingName, type EnvData } from "./types"
 
 interface Props { env: EnvData }
-
-const BEARING_NAMES = ["N","NE","E","SE","S","SW","W","NW"]
-function bearingName(deg: number): string {
-  return BEARING_NAMES[Math.round(deg / 45) % 8]
-}
 
 export function EnvStatus({ env }: Props) {
   const windDir  = bearingName(env.wind.fromDeg)

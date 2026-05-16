@@ -1,14 +1,9 @@
 "use client"
 
-import type { WindData } from "./types"
+import { bearingName, type WindData } from "./types"
 
 interface Props {
   wind: WindData
-}
-
-const BEARING_NAMES = ["N","NE","E","SE","S","SW","W","NW"]
-function bearingName(deg: number): string {
-  return BEARING_NAMES[Math.round(deg / 45) % 8]
 }
 
 export function SmokeAlert({ wind }: Props) {
