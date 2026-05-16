@@ -6,13 +6,13 @@ import { analyzeWeather, type WeatherAnalysis } from './analyze'
 const app = express()
 app.use(express.json())
 
-app.post('/analyze', (req, res) => {
+app.post('/analyze', async (req, res) => {
   const body = req.body as AgentRequest
   const weather = body.weather ?? { speed: 0, deg: 0, humidity: 0 }
   const fires = body.firms ?? []
 
   try {
-    const data = analyzeWeather(weather, fires)
+    const data = await analyzeWeather(weather, fires)
     const response: AgentResponse<WeatherAnalysis> = { success: true, data }
     res.json(response)
   } catch (err) {
