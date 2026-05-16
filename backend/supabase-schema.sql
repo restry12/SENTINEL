@@ -107,3 +107,25 @@ CREATE POLICY "history_insert_service" ON fire_incidents
 CREATE INDEX IF NOT EXISTS fire_incidents_timestamp     ON fire_incidents (timestamp DESC);
 CREATE INDEX IF NOT EXISTS fire_incidents_risk_level    ON fire_incidents (risk_level);
 CREATE INDEX IF NOT EXISTS fire_incidents_centroid      ON fire_incidents (centroid_lat, centroid_lon);
+
+-- ============================================================
+-- Snapshot del último SentinelUpdate completo (memoria de la página)
+-- Una sola fila (id='global'). El dashboard la usa para hidratar al cargar
+-- sin esperar el próximo disparo de Make.com.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS last_snapshot (
+  id          TEXT PRIMARY KEY,
+  data        JSONB NOT NULL,
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE last_snapshot ENABLE ROW LEVEL SECURITY;
+
+-- Lectura pública (datos no sensibles: focos, clima, riesgo)
+CREATE POLICY "last_snapshot_read_all" ON last_snapshot
+  FOR SELECT USING (TRUE);
+
+-- Solo el service role (backend) escribe
+CREATE POLICY "last_snapshot_write_service" ON last_snapshot
+  FOR ALL USING (auth.role() = 'service_role')
+  WITH CHECK (auth.role() = 'service_role');
