@@ -4,6 +4,7 @@ import { useState, useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
+import { useLang } from "@/contexts/language-context"
 import {
   MAP_CENTER, computeAQI, aqiInfo, computeThreatLevel,
   SCENARIOS, type ScenarioId,
@@ -25,6 +26,7 @@ const AirMap = dynamic(
 
 export default function AirPage() {
   const pathname = usePathname()
+  const { lang, toggle, tx } = useLang()
   const [scenarioId, setScenarioId] = useState<ScenarioId>("none")
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const scenario = SCENARIOS[scenarioId]
@@ -51,8 +53,8 @@ export default function AirPage() {
           <span className="text-border">|</span>
           <nav className="flex items-center gap-1">
             {[
-              { href: '/dashboard', label: 'DASHBOARD' },
-              { href: '/air',       label: 'AIR QUALITY' },
+              { href: '/dashboard', label: tx.navDashboard },
+              { href: '/air',       label: tx.navAir },
             ].map(({ href, label }) => (
               <Link
                 key={href}
@@ -77,6 +79,12 @@ export default function AirPage() {
             />
             <span className="text-xs font-mono text-muted-foreground">LIVE</span>
           </div>
+          <button
+            onClick={toggle}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono font-bold text-muted-foreground hover:text-foreground transition-all"
+          >
+            🌐 {lang.toUpperCase()}
+          </button>
         </div>
       </header>
 

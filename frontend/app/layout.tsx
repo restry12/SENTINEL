@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { LanguageProvider } from '@/contexts/language-context'
 import './globals.css'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
@@ -38,7 +39,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="bg-background">
       <body className="font-sans antialiased">
-        {children}
+        <LanguageProvider>
+          {children}
+        </LanguageProvider>
         <div className="fixed inset-0 z-[9999] pointer-events-none scanline-overlay" />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
