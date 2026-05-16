@@ -12,7 +12,7 @@ export function EnvStatus({ env }: Props) {
   const highWind = env.wind.speed > 40
   const lowHumid = env.humidity < 15
   const highTemp = env.tempC > 35
-  const lowVis   = env.visibilityKm < 1.5
+  const lowVis   = env.visibilityKm != null && env.visibilityKm < 1.5
 
   const chips = [
     {
@@ -39,7 +39,7 @@ export function EnvStatus({ env }: Props) {
     {
       Icon:  Eye,
       label: tx.visibility,
-      value: `${env.visibilityKm} km`,
+      value: env.visibilityKm != null ? `${env.visibilityKm} km` : "—",
       alert: lowVis,
       color: lowVis ? "#ef4444" : undefined,
     },

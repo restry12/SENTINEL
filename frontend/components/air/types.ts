@@ -15,7 +15,7 @@ export interface EnvData {
   wind: WindData
   humidity: number      // %
   tempC: number
-  visibilityKm: number
+  visibilityKm: number | null  // null when no live data
 }
 
 export interface AQIInfo {
@@ -37,63 +37,14 @@ export interface InfrastructurePoint {
   type: "hospital" | "school" | "emergency"
 }
 
-export type ScenarioId = "none" | "wind" | "humidity" | "worst"
-
-export interface Scenario {
-  id: ScenarioId
-  label: string
-  env: EnvData
-  fires: FirePoint[]
-}
-
-// ── Mock data ────────────────────────────────────────────────────
-export const MOCK_FIRES: FirePoint[] = [
-  { id: "fire-001", lat: -38.14, lng: -71.73, intensity: 0.75, name: "FIRE-001" },
-  { id: "fire-002", lat: -38.42, lng: -72.08, intensity: 1.00, name: "FIRE-002 (PRIMARY)" },
-]
-
-export const MOCK_ENV: EnvData = {
-  wind:         { speed: 24, fromDeg: 315 },
-  humidity:     23,
-  tempC:        31,
-  visibilityKm: 2.1,
-}
-
 export const MAP_CENTER = { lat: -38.28, lng: -71.90 }
 
-export const MOCK_INFRASTRUCTURE: InfrastructurePoint[] = [
-  { id: "h-001", name: "Hosp. Hernán Henríquez", lat: -38.24, lng: -72.35, type: "hospital"  },
-  { id: "s-001", name: "Escuela La Araucanía",    lat: -38.18, lng: -71.62, type: "school"    },
-  { id: "s-002", name: "Liceo Técnico Curacautín",lat: -38.44, lng: -71.89, type: "school"    },
-  { id: "s-003", name: "Colegio Los Volcanes",     lat: -38.35, lng: -72.12, type: "school"    },
-  { id: "e-001", name: "Bomberos Lonquimay",       lat: -38.44, lng: -71.24, type: "emergency" },
-]
-
-// ── Scenarios ────────────────────────────────────────────────────
-export const SCENARIOS: Record<ScenarioId, Scenario> = {
-  none: {
-    id: "none", label: "Current",
-    env: MOCK_ENV,
-    fires: MOCK_FIRES,
-  },
-  wind: {
-    id: "wind", label: "Wind Intensifies",
-    env: { ...MOCK_ENV, wind: { speed: 52, fromDeg: 315 } },
-    fires: MOCK_FIRES,
-  },
-  humidity: {
-    id: "humidity", label: "Humidity Drops",
-    env: { ...MOCK_ENV, humidity: 8, tempC: 37 },
-    fires: MOCK_FIRES,
-  },
-  worst: {
-    id: "worst", label: "Worst Case",
-    env: { wind: { speed: 65, fromDeg: 315 }, humidity: 5, tempC: 42, visibilityKm: 0.8 },
-    fires: [
-      { id: "fire-001", lat: -38.14, lng: -71.73, intensity: 1.00, name: "FIRE-001"          },
-      { id: "fire-002", lat: -38.42, lng: -72.08, intensity: 1.00, name: "FIRE-002 (PRIMARY)" },
-    ],
-  },
+// Fallback env used when no live data has arrived yet
+export const FALLBACK_ENV: EnvData = {
+  wind:         { speed: 0, fromDeg: 0 },
+  humidity:     0,
+  tempC:        0,
+  visibilityKm: null,
 }
 
 // ── AQI thresholds ───────────────────────────────────────────────
@@ -112,6 +63,7 @@ export const THREAT_COLORS: Record<ThreatLevel, string> = {
   HIGH:     "#f97316",
   CRITICAL: "#ef4444",
 }
+
 
 const BEARING_NAMES = ["N","NE","E","SE","S","SW","W","NW"]
 export function bearingName(deg: number): string {

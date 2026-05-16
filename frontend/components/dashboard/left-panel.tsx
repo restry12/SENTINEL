@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Wind, MessageSquare } from "lucide-react"
 import { useLang } from "@/contexts/language-context"
-import { useSentinelMetrics } from "@/contexts/sentinel-context"
+import { useSentinel, useSentinelMetrics } from "@/contexts/sentinel-context"
 
 function Label({ children, right }: { children: React.ReactNode, right?: string }) {
   return (
@@ -31,6 +31,7 @@ function WindRose({ direction }: { direction: string }) {
 
 export function LeftPanel() {
   const { tx } = useLang()
+  const { sentinelUpdate: u } = useSentinel()
   const m = useSentinelMetrics()
   const riskLevel = m.riskLevel
   const frp = m.frpMax
@@ -69,9 +70,11 @@ export function LeftPanel() {
               {riskLevel}
             </div>
           </div>
-          <p className="mt-3 text-[11px] font-semibold text-red-soft tracking-wide">
-            {tx.immediateAction}
-          </p>
+          {(riskLevel === "HIGH" || riskLevel === "CRITICAL") && (
+            <p className="mt-3 text-[11px] font-semibold text-red-soft tracking-wide">
+              {tx.immediateAction}
+            </p>
+          )}
         </div>
 
         {/* Fire Radiative Power */}
@@ -81,9 +84,6 @@ export function LeftPanel() {
             <div className="flex items-baseline justify-between">
               <div className="text-3xl font-bold tracking-tight text-orange-soft num drop-shadow-[0_0_8px_rgba(255,174,66,0.3)]">
                 {frp.toFixed(1)} <span className="text-xs text-text-dim font-sans font-bold ml-1 uppercase">MW</span>
-              </div>
-              <div className="text-[10px] font-bold px-2 py-0.5 rounded border border-red/40 bg-red/10 text-red num">
-                +12%
               </div>
             </div>
             <div className="h-[6px] bg-black/40 border border-border/50 rounded-full relative overflow-hidden">
@@ -134,21 +134,30 @@ export function LeftPanel() {
           </div>
         </div>
 
-        {/* SMS Alert */}
-        <div className="p-4 bg-[linear-gradient(180deg,rgba(56,189,248,0.15),rgba(56,189,248,0.05))] border border-blue/30 rounded-xl shadow-[0_10px_25px_-10px_rgba(56,189,248,0.2)]">
-          <div className="flex items-center gap-2 mb-3 text-[10px] font-bold tracking-[0.2em] text-blue uppercase">
-            <MessageSquare className="h-4 w-4" />
-            <span>{tx.activeBroadcast}</span>
+        {/* SMS Alert — only when a real high/critical broadcast exists */}
+        {(m.riskLevel === "HIGH" || m.riskLevel === "CRITICAL") && (
+          <div className="p-4 bg-[linear-gradient(180deg,rgba(56,189,248,0.15),rgba(56,189,248,0.05))] border border-blue/30 rounded-xl shadow-[0_10px_25px_-10px_rgba(56,189,248,0.2)]">
+            <div className="flex items-center gap-2 mb-3 text-[10px] font-bold tracking-[0.2em] text-blue uppercase">
+              <MessageSquare className="h-4 w-4" />
+              <span>{tx.activeBroadcast}</span>
+            </div>
+            <div className="text-[13px] text-foreground leading-relaxed font-medium">
+              {u?.riskAssessment?.resumen ?? u?.airAlerts?.resumen_general ?? (
+                <>
+                  <span className="text-amber font-bold">{tx.wildfireAlert}</span>&nbsp;
+                  {tx.evacuationOrder}
+                </>
+              )}
+            </div>
+            <div className="mt-3.5 text-[10px] font-bold text-text-muted tracking-wide uppercase border-t border-blue/10 pt-3">
+              <span className="num opacity-70">
+                {u?.timestamp
+                  ? new Date(u.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"
+                  : "— UTC"}
+              </span>
+            </div>
           </div>
-          <div className="text-[13px] text-foreground leading-relaxed font-medium">
-            <span className="text-amber font-bold">{tx.wildfireAlert}</span>&nbsp;
-            {tx.evacuationOrder}
-          </div>
-          <div className="mt-3.5 flex justify-between items-center text-[10px] font-bold text-text-muted tracking-wide uppercase border-t border-blue/10 pt-3">
-            <span className="num opacity-70">14:23 UTC</span>
-            <span className="text-blue num shadow-blue/20 drop-shadow-sm">47,832 {tx.recipients}</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   )

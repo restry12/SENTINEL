@@ -7,13 +7,11 @@ import { RightPanel } from "@/components/dashboard/right-panel"
 import { MetricCards } from "@/components/dashboard/metric-cards"
 import { SafeRoute } from "@/components/dashboard/safe-route"
 import { InfoSections } from "@/components/dashboard/info-sections"
-import { SentinelProvider } from "@/contexts/sentinel-context"
 import { AuthGuard } from "@/components/auth-guard"
 
 export default function Dashboard() {
   return (
     <AuthGuard>
-    <SentinelProvider>
     <div className="h-screen flex flex-col bg-background overflow-hidden relative selection:bg-orange/30">
       <TopBar />
 
@@ -36,7 +34,6 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
-    </SentinelProvider>
     </AuthGuard>
   )
 }

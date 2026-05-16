@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { LanguageProvider } from '@/contexts/language-context'
 import { Toaster } from 'sonner'
+import { SentinelProvider } from '@/contexts/sentinel-context'
 import './globals.css'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
@@ -23,10 +24,6 @@ export const metadata: Metadata = {
         url: '/icon-dark-32x32.png',
         media: '(prefers-color-scheme: dark)',
       },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
     ],
     apple: '/apple-icon.png',
   },
@@ -41,7 +38,9 @@ export default function RootLayout({
     <html lang="en" className="bg-background">
       <body className="font-sans antialiased">
         <LanguageProvider>
-          {children}
+          <SentinelProvider>
+            {children}
+          </SentinelProvider>
         </LanguageProvider>
         <Toaster position="top-right" richColors />
         <div className="fixed inset-0 z-[9999] pointer-events-none scanline-overlay" />
