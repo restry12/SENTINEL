@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Avance — Hackathon</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #0d0d0d; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; padding: 24px; }
@@ -235,10 +236,26 @@ const data = [
   }
 ];
 
-// ─── STORAGE ─────────────────────────────────────────────────────────────────
-const key = (phaseId, trackId, idx) => `hack_${phaseId}_${trackId}_${idx}`;
-const load = (p, t, i) => localStorage.getItem(key(p, t, i)) === "1";
-const save = (p, t, i, v) => localStorage.setItem(key(p, t, i), v ? "1" : "0");
+// ─── SUPABASE ─────────────────────────────────────────────────────────────────
+const SUPA_URL = "https://sjaufigbsiafyzyaaomq.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqYXVmaWdic2lhZnl6eWFhb21xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxODc2OTAsImV4cCI6MjA5MDc2MzY5MH0.EJBK4Yjnoi8kL-2wtLBCXodYY6L2eSdE6yawTnygNso";
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// Estado local (cache)
+const state = {};
+
+const taskKey = (p, t, i) => `hack_${p}_${t}_${i}`;
+const load = (p, t, i) => !!state[taskKey(p, t, i)];
+const save = async (p, t, i, v) => {
+  const k = taskKey(p, t, i);
+  state[k] = v;
+  await sb.from("hackathon_tasks").upsert({ task_key: k, done: v, updated_at: new Date().toISOString() });
+};
+
+async function loadAllFromDB() {
+  const { data } = await sb.from("hackathon_tasks").select("task_key, done");
+  if (data) data.forEach(r => { state[r.task_key] = r.done; });
+}
 
 // ─── ICONS ───────────────────────────────────────────────────────────────────
 const CHECK_SVG = `<svg viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -343,11 +360,11 @@ function render() {
   });
 
   // Single delegated listener
-  container.addEventListener("change", e => {
+  container.addEventListener("change", async e => {
     if (e.target.type !== "checkbox") return;
     const { phase, track, idx } = e.target.dataset;
     const checked = e.target.checked;
-    save(phase, track, parseInt(idx), checked);
+    await save(phase, track, parseInt(idx), checked);
     e.target.closest(".task").classList.toggle("done", checked);
     updateTrack(phase, track);
     updatePhase(phase);
@@ -357,7 +374,41 @@ function render() {
   updateGlobal();
 }
 
-render();
+function applyRemoteChange(taskKey, done) {
+  state[taskKey] = done;
+  // find which phase/track/idx owns this key and update the DOM
+  const parts = taskKey.replace("hack_", "").split("_");
+  // key format: hack_f1_f1p1_0 → parts = ["f1","f1p1","0"]
+  const phaseId = parts[0];
+  const trackId = parts[0] + parts[1]; // wrong, need to re-parse properly
+  // reparse: hack_{phaseId}_{trackId}_{idx}
+  const match = taskKey.match(/^hack_(f\d+)_(f\d+p\d+)_(\d+)$/);
+  if (!match) return;
+  const [, p, t, i] = match;
+  const checkbox = document.querySelector(`input[data-phase="${p}"][data-track="${t}"][data-idx="${i}"]`);
+  if (checkbox) {
+    checkbox.checked = done;
+    checkbox.closest(".task").classList.toggle("done", done);
+  }
+  updateTrack(p, t);
+  updatePhase(p);
+  updateGlobal();
+}
+
+async function init() {
+  await loadAllFromDB();
+  render();
+
+  // Realtime: sync changes from other browsers
+  sb.channel("hackathon_tasks")
+    .on("postgres_changes", { event: "*", schema: "public", table: "hackathon_tasks" }, payload => {
+      const { task_key, done } = payload.new;
+      applyRemoteChange(task_key, done);
+    })
+    .subscribe();
+}
+
+init();
 </script>
 </body>
 </html>
