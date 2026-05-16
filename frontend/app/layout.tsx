@@ -39,6 +39,7 @@ export default function RootLayout({
     <html lang="en" className="bg-background">
       <body className="font-sans antialiased">
         {children}
+        <div className="fixed inset-0 z-[9999] pointer-events-none scanline-overlay" />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
