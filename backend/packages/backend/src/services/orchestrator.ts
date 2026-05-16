@@ -64,6 +64,20 @@ function isWeatherData(v: unknown): v is WeatherData {
   return typeof w.speed === 'number' && typeof w.deg === 'number' && typeof w.humidity === 'number'
 }
 
+// OpenWeather raw response → WeatherData interno
+function parseOpenWeatherResponse(v: unknown): WeatherData | null {
+  if (typeof v !== 'object' || v === null) return null
+  const w = v as Record<string, unknown>
+  const wind = w.wind as Record<string, unknown> | undefined
+  const main = w.main as Record<string, unknown> | undefined
+  if (!wind || !main) return null
+  const speed = typeof wind.speed === 'number' ? wind.speed : null
+  const deg = typeof wind.deg === 'number' ? wind.deg : 0
+  const humidity = typeof main.humidity === 'number' ? main.humidity : 0
+  if (speed === null) return null
+  return { speed, deg, humidity, gust: typeof wind.gust === 'number' ? wind.gust : undefined }
+}
+
 export async function runAnalysis(
   lat = DEFAULT_LAT,
   lon = DEFAULT_LON,
@@ -72,10 +86,14 @@ export async function runAnalysis(
 ): Promise<SentinelUpdate> {
   // All data comes from Make.com — no external API fetches
   const fires = externalFirms ? (externalFirms as FireData[]) : []
-  const weather = isWeatherData(externalWeather) ? externalWeather : EMPTY_WEATHER
+  // Acepta WeatherData interno o respuesta cruda de OpenWeather API
+  const weather = isWeatherData(externalWeather)
+    ? externalWeather
+    : parseOpenWeatherResponse(externalWeather) ?? EMPTY_WEATHER
 
   if (fires.length === 0) console.warn('[orchestrator] no FIRMS data received')
-  if (!isWeatherData(externalWeather)) console.warn('[orchestrator] no weather data received, using defaults')
+  if (!isWeatherData(externalWeather) && !parseOpenWeatherResponse(externalWeather))
+    console.warn('[orchestrator] no weather data received, using defaults')
 
   const [airSettled] = await Promise.allSettled([
     fetchAirQuality(lat, lon),
