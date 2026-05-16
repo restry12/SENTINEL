@@ -25,11 +25,11 @@ export function MapboxPanel() {
     
     map.on('style.load', () => { 
       map.setFog({
-        color: 'rgb(7, 8, 10)', // Matches --background
-        'high-color': 'rgb(16, 17, 21)', // Matches --surface
-        'horizon-blend': 0.15,
-        'space-color': 'rgb(2, 2, 3)',
-        'star-intensity': 0.8 // More intense stars for that orbital feel
+        'color': 'rgba(56, 189, 248, 0.15)', // Electric cyan aura
+        'high-color': 'rgba(10, 11, 14, 0.8)', // Deep space blend
+        'horizon-blend': 0.2, // Sharper, more defined atmosphere
+        'space-color': 'rgb(2, 2, 5)',
+        'star-intensity': 0.9 // Brilliant orbital stars
       })
     })
 
