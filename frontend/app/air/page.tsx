@@ -30,7 +30,7 @@ export default function AirPage() {
     [scenario]
   )
   const aqiData = useMemo(() => aqiInfo(rawAQI, 127_450), [rawAQI])
-  const threat  = computeThreatLevel(rawAQI)
+  const threat  = useMemo(() => computeThreatLevel(rawAQI), [rawAQI])
 
   return (
     <div

@@ -114,12 +114,12 @@ export const THREAT_COLORS: Record<ThreatLevel, string> = {
 }
 
 export function aqiColor(aqi: number): string {
-  return AQI_THRESHOLDS.find(t => aqi <= t.max)!.color
+  return (AQI_THRESHOLDS.find(t => aqi <= t.max) ?? AQI_THRESHOLDS[AQI_THRESHOLDS.length - 1]).color
 }
 
 export function aqiInfo(rawAqi: number, population: number): AQIInfo {
   const clamped = Math.min(500, rawAqi)
-  const t = AQI_THRESHOLDS.find(t => clamped <= t.max)!
+  const t = AQI_THRESHOLDS.find(threshold => clamped <= threshold.max) ?? AQI_THRESHOLDS[AQI_THRESHOLDS.length - 1]
   return {
     current:            Math.round(clamped),
     predicted2h:        Math.round(clamped * 1.25),
