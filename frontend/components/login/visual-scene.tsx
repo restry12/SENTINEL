@@ -1,13 +1,41 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import styles from '@/app/login/login.module.css';
 import { TelemetryTiles } from './telemetry-tiles';
 import { GlobeCanvas } from './globe-canvas';
 import { ShieldAlert, Activity, Globe } from 'lucide-react';
 
 export function VisualScene() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const mouse      = useRef({ x: 0, y: 0 });
+  const current    = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      mouse.current = {
+        x: (e.clientX / window.innerWidth  - 0.5) * 24,
+        y: (e.clientY / window.innerHeight - 0.5) * 14,
+      };
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+
+    let raf: number;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      current.current.x += (mouse.current.x - current.current.x) * 0.06;
+      current.current.y += (mouse.current.y - current.current.y) * 0.06;
+      if (sectionRef.current) {
+        sectionRef.current.style.transform =
+          `translate(${current.current.x}px, ${current.current.y}px)`;
+      }
+    };
+    tick();
+    return () => { window.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf); };
+  }, []);
+
   return (
-    <section className={styles.scene}>
+    <section ref={sectionRef} className={styles.scene}>
       {/* Header */}
       <div className={styles.sceneHeader}>
         <div className="flex items-center gap-3">

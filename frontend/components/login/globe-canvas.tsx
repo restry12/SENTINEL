@@ -68,8 +68,8 @@ export function GlobeCanvas() {
     // --- Mouse tracking ---
     const onMouseMove = (e: MouseEvent) => {
       targetRef.current = {
-        x:  (e.clientY / window.innerHeight - 0.5) * 0.5,
-        y: -(e.clientX / window.innerWidth  - 0.5) * 0.5,
+        x:  (e.clientY / window.innerHeight - 0.5) * 1.8,
+        y: -(e.clientX / window.innerWidth  - 0.5) * 1.8,
       };
     };
     window.addEventListener('mousemove', onMouseMove, { passive: true });
@@ -83,13 +83,12 @@ export function GlobeCanvas() {
       mouseRef.current.x += (targetRef.current.x - mouseRef.current.x) * 0.05;
       mouseRef.current.y += (targetRef.current.y - mouseRef.current.y) * 0.05;
 
-      earth.rotation.x = mouseRef.current.x;
+      earth.rotation.x = mouseRef.current.x * 0.5;
       earth.rotation.y += 0.0012; // slow auto-spin
-      earth.rotation.y += (mouseRef.current.y - earth.rotation.y % (Math.PI * 2)) * 0; // only tilt via X
 
-      // Apply Y tilt via camera slight offset instead
-      camera.position.x = mouseRef.current.y * 0.5;
-      camera.position.y = -mouseRef.current.x * 0.5;
+      // Exaggerated camera parallax
+      camera.position.x = mouseRef.current.y * 1.1;
+      camera.position.y = -mouseRef.current.x * 1.1;
       camera.lookAt(scene.position);
 
       renderer.render(scene, camera);
