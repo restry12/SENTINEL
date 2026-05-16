@@ -58,7 +58,7 @@ async function callAgent<T>(url: string, body: AgentRequest): Promise<AgentRespo
 }
 
 function calculateRiskLevel(fires: FireData[], weather: WeatherData, air: AirData): SentinelUpdate['riskLevel'] {
-  const highFrp = fires.filter(f => f.frp > 100).length
+  const highFrp = fires.filter(f => f.frp > 35).length
   const strongWind = weather.speed > 10
   const badAir = air.aqi > 150
 
