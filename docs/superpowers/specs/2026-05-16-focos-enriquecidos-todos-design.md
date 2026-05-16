@@ -24,9 +24,11 @@ aire, visibles en el frontend.
 
 - **Deduplicación:** NASA FIRMS reporta el mismo incendio en múltiples pasadas
   de satélite (filas distintas, coordenada casi idéntica). Se deduplica
-  agrupando por coordenada redondeada (~3 decimales ≈ 110 m) y conservando, de
-  cada grupo, la detección con **mayor FRP**. Resultado: un marcador por foco
-  real.
+  agrupando por coordenada redondeada a **2 decimales (~1.1 km)** y conservando,
+  de cada grupo, la detección con **mayor FRP**. Resultado: un marcador por foco
+  real. (Se eligió 2 decimales y no 3: la resolución de píxel de NASA VIIRS es
+  ~375 m y el mismo incendio se corre cientos de metros entre pasadas; redondear
+  a ~110 m dejaría pasadas del mismo foco sin colapsar.)
 - **Sin tope de focos.** El usuario tiene créditos de sobra en Make.com; no se
   agrega cap. (Se podría añadir una env `MAX_FIRES` en el futuro si hiciera
   falta, fuera de alcance ahora.)
