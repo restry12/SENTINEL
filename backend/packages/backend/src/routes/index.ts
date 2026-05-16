@@ -55,7 +55,13 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
 
     const lat = typeof first?.lat === 'number' ? first.lat : undefined
     const lon = typeof first?.lon === 'number' ? first.lon : undefined
-    const pm25 = typeof first?.pm25 === 'number' ? first.pm25 : undefined
+
+    // pm25 más alto entre todos los focos — el peor aire es el más relevante para riesgo
+    // Make.com manda null cuando OpenAQ no tiene estación cerca → el filtro lo descarta
+    const pm25Values = rawFires
+      .map(f => f.pm25)
+      .filter((v): v is number => typeof v === 'number')
+    const pm25 = pm25Values.length > 0 ? Math.max(...pm25Values) : undefined
 
     try {
       await executeAndBroadcast(io, lat, lon, firms, weather, pm25)
