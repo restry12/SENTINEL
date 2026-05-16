@@ -220,5 +220,60 @@
 }
 
 /* Hide scrollbar utility */
-.scrollbar-none::-webkit-scrollbar { display: none; }
-.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+/* ── Tactical Mapbox Popups ─────────────────────────────── */
+.mapboxgl-popup-content {
+  background: rgba(10, 10, 10, 0.9) !important;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(249, 115, 22, 0.4);
+  border-radius: 2px !important;
+  padding: 0 !important;
+  color: #e8e6e0 !important;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(249, 115, 22, 0.1) !important;
+}
+
+.mapboxgl-popup-tip {
+  border-top-color: rgba(249, 115, 22, 0.4) !important;
+}
+
+.mapboxgl-popup-close-button {
+  color: #737373 !important;
+  padding: 4px 8px !important;
+  font-size: 16px !important;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background-color: transparent !important;
+  color: #ef4444 !important;
+}
+
+.tactical-popup-header {
+  background: rgba(249, 115, 22, 0.1);
+  border-bottom: 1px solid rgba(249, 115, 22, 0.2);
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tactical-popup-body {
+  padding: 12px;
+  font-family: 'Geist Mono', monospace;
+}
+
+.tactical-stat-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.tactical-stat-label {
+  color: #737373;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tactical-stat-value {
+  color: #e8e6e0;
+  font-weight: 600;
+}

@@ -8,7 +8,10 @@ import { InfoSections } from "@/components/dashboard/info-sections"
 
 export default function Dashboard() {
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden relative">
+      {/* Cinematic Scanline Overlay */}
+      <div className="absolute inset-0 scanline-overlay z-50 pointer-events-none opacity-[0.03]" />
+      
       <TopBar />
       
       {/* Desktop Layout */}
