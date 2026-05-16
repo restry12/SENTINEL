@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { THREAT_COLORS, type ThreatLevel, type ScenarioId } from "./types"
+import { useLang } from "@/contexts/language-context"
 
 interface Props { scenarioId: ScenarioId }
 
@@ -12,32 +13,34 @@ interface Event {
   level:   ThreatLevel
 }
 
-const BASE_EVENTS: Event[] = [
-  { id: "e1", time: "13:42", message: "Pollution source detected — AQI rising",          level: "HIGH"     },
-  { id: "e2", time: "13:47", message: "PM2.5 dispersion identified — NW sector",          level: "HIGH"     },
-  { id: "e3", time: "13:51", message: "AQI threshold exceeded — zone B critical",         level: "CRITICAL" },
-  { id: "e4", time: "13:53", message: "AQI deterioration forecasted — 2h projection",     level: "MODERATE" },
-  { id: "e5", time: "13:55", message: "Emergency health alerts dispatched",                level: "HIGH"     },
-  { id: "e6", time: "13:58", message: "32K population in exposure corridor",              level: "HIGH"     },
-]
-
-const SCENARIO_EVENTS: Record<Exclude<ScenarioId, "none">, Event[]> = {
-  wind: [
-    { id: "w1", time: "14:02", message: "Wind intensification — 52 km/h detected",        level: "CRITICAL" },
-    { id: "w2", time: "14:05", message: "Dispersion velocity escalated significantly",     level: "CRITICAL" },
-  ],
-  humidity: [
-    { id: "h1", time: "14:02", message: "Relative humidity critical — 8%",                level: "CRITICAL" },
-    { id: "h2", time: "14:05", message: "AQI critical risk elevated — all sectors",        level: "CRITICAL" },
-  ],
-  worst: [
-    { id: "x1", time: "14:02", message: "Worst-case atmospheric conditions active",        level: "CRITICAL" },
-    { id: "x2", time: "14:04", message: "All AQI parameters at critical threshold",        level: "CRITICAL" },
-    { id: "x3", time: "14:06", message: "Emergency health evacuation recommended",         level: "CRITICAL" },
-  ],
-}
-
 export function IncidentTimeline({ scenarioId }: Props) {
+  const { tx } = useLang()
+
+  const BASE_EVENTS: Event[] = [
+    { id: "e1", time: "13:42", message: tx.events.base[0], level: "HIGH"     },
+    { id: "e2", time: "13:47", message: tx.events.base[1], level: "HIGH"     },
+    { id: "e3", time: "13:51", message: tx.events.base[2], level: "CRITICAL" },
+    { id: "e4", time: "13:53", message: tx.events.base[3], level: "MODERATE" },
+    { id: "e5", time: "13:55", message: tx.events.base[4], level: "HIGH"     },
+    { id: "e6", time: "13:58", message: tx.events.base[5], level: "HIGH"     },
+  ]
+
+  const SCENARIO_EVENTS: Record<Exclude<ScenarioId, "none">, Event[]> = {
+    wind: [
+      { id: "w1", time: "14:02", message: tx.events.wind[0], level: "CRITICAL" },
+      { id: "w2", time: "14:05", message: tx.events.wind[1], level: "CRITICAL" },
+    ],
+    humidity: [
+      { id: "h1", time: "14:02", message: tx.events.humidity[0], level: "CRITICAL" },
+      { id: "h2", time: "14:05", message: tx.events.humidity[1], level: "CRITICAL" },
+    ],
+    worst: [
+      { id: "x1", time: "14:02", message: tx.events.worst[0], level: "CRITICAL" },
+      { id: "x2", time: "14:04", message: tx.events.worst[1], level: "CRITICAL" },
+      { id: "x3", time: "14:06", message: tx.events.worst[2], level: "CRITICAL" },
+    ],
+  }
+
   const extra  = scenarioId !== "none" ? (SCENARIO_EVENTS[scenarioId] ?? []) : []
   const events = [...BASE_EVENTS, ...extra].slice(-7)
   const [open, setOpen] = useState(true)
@@ -49,7 +52,7 @@ export function IncidentTimeline({ scenarioId }: Props) {
         className="flex items-center gap-2 w-full text-left"
       >
         <span className="text-[10px] tracking-widest uppercase text-muted-foreground font-semibold">
-          INCIDENT LOG
+          {tx.incidentLog}
         </span>
         <div className="flex-1 h-px" style={{ backgroundColor: "rgba(255,255,255,0.4)" }} />
         <svg

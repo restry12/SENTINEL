@@ -2,15 +2,9 @@
 
 import type { AQIInfo } from "./types"
 import { aqiColor } from "./types"
+import { useLang } from "@/contexts/language-context"
 
 interface Props { info: AQIInfo }
-
-const RECOMMENDATIONS: Record<AQIInfo["riskLevel"], string[]> = {
-  "LOW":       ["Monitor air quality", "Normal activities OK", "Stay informed"],
-  "MODERATE":  ["Avoid outdoor exercise", "Close windows and doors", "Sensitive groups stay in"],
-  "HIGH":      ["Wear N95 mask outdoors", "Close windows and doors", "Avoid outdoor exercise", "Sensitive groups stay in"],
-  "VERY HIGH": ["Evacuate if possible", "Wear N95 mask at all times", "Do not go outdoors", "Emergency services on alert"],
-}
 
 function formatPop(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -19,9 +13,11 @@ function formatPop(n: number): string {
 }
 
 export function AQIOverlay({ info }: Props) {
+  const { tx } = useLang()
   const barPct    = Math.min(100, (info.current / 300) * 100)
   const pred2hCol = aqiColor(info.predicted2h)
-  const recs      = RECOMMENDATIONS[info.riskLevel]
+  const recsKey   = info.riskLevel === "VERY HIGH" ? "very_high" : info.riskLevel.toLowerCase() as keyof typeof tx.recs
+  const recs      = tx.recs[recsKey]
 
   // Exposure growth: affectedPopulation is the 2h projected max
   const popNow  = Math.round(info.affectedPopulation * 0.25)
@@ -56,14 +52,14 @@ export function AQIOverlay({ info }: Props) {
       <div className="h-px bg-white/10" />
 
       <div className="flex justify-between items-center">
-        <span className="text-[10px] text-muted-foreground uppercase">+2h Forecast</span>
+        <span className="text-[10px] text-muted-foreground uppercase">{tx.forecast2h}</span>
         <span className="text-sm font-bold tabular-nums" style={{ color: pred2hCol }}>
           {info.predicted2h}
         </span>
       </div>
 
       <div className="flex justify-between items-center">
-        <span className="text-[10px] text-muted-foreground uppercase">Risk Level</span>
+        <span className="text-[10px] text-muted-foreground uppercase">{tx.riskLevelLabel}</span>
         <span className="text-xs font-semibold" style={{ color: info.colorHex }}>
           {info.riskLevel}
         </span>
@@ -73,7 +69,7 @@ export function AQIOverlay({ info }: Props) {
 
       {/* Population Exposure Projection */}
       <div>
-        <p className="text-[10px] text-muted-foreground uppercase mb-2">Exposure Projection</p>
+        <p className="text-[10px] text-muted-foreground uppercase mb-2">{tx.exposureProj}</p>
         <div className="flex flex-col gap-1.5">
           {[
             { label: "NOW", pop: popNow },
@@ -97,7 +93,7 @@ export function AQIOverlay({ info }: Props) {
       <div className="h-px bg-white/10" />
 
       <div>
-        <p className="text-[10px] text-muted-foreground uppercase mb-2">Recommendations</p>
+        <p className="text-[10px] text-muted-foreground uppercase mb-2">{tx.recommendations}</p>
         <div className="flex flex-col gap-1.5">
           {recs.map(rec => (
             <div key={rec} className="flex items-start gap-1.5">

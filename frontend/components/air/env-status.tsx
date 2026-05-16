@@ -2,10 +2,12 @@
 
 import { Wind, Droplets, Thermometer, Eye } from "lucide-react"
 import { bearingName, type EnvData } from "./types"
+import { useLang } from "@/contexts/language-context"
 
 interface Props { env: EnvData }
 
 export function EnvStatus({ env }: Props) {
+  const { tx } = useLang()
   const windDir  = bearingName(env.wind.fromDeg)
   const highWind = env.wind.speed > 40
   const lowHumid = env.humidity < 15
@@ -15,28 +17,28 @@ export function EnvStatus({ env }: Props) {
   const chips = [
     {
       Icon:  Wind,
-      label: "WIND",
+      label: tx.wind,
       value: `${env.wind.speed} km/h ${windDir}`,
       alert: highWind,
       color: highWind ? "#ef4444" : undefined,
     },
     {
       Icon:  Droplets,
-      label: "HUMIDITY",
+      label: tx.humidity,
       value: `${env.humidity}%`,
       alert: lowHumid,
       color: lowHumid ? "#f97316" : undefined,
     },
     {
       Icon:  Thermometer,
-      label: "TEMP",
+      label: tx.temperature,
       value: `${env.tempC}°C`,
       alert: highTemp,
       color: highTemp ? "#f97316" : undefined,
     },
     {
       Icon:  Eye,
-      label: "VISIBILITY",
+      label: tx.visibility,
       value: `${env.visibilityKm} km`,
       alert: lowVis,
       color: lowVis ? "#ef4444" : undefined,

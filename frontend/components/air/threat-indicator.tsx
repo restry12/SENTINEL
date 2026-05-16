@@ -1,20 +1,22 @@
 "use client"
 
 import { THREAT_COLORS, type ThreatLevel } from "./types"
+import { useLang } from "@/contexts/language-context"
 
 interface Props { level: ThreatLevel }
 
-const LABELS: Record<ThreatLevel, string> = {
-  LOW:      "THREAT: LOW",
-  MODERATE: "THREAT: MODERATE",
-  HIGH:     "THREAT: HIGH",
-  CRITICAL: "THREAT: CRITICAL",
-}
-
 export function ThreatIndicator({ level }: Props) {
+  const { tx } = useLang()
   const color      = THREAT_COLORS[level]
   const isCritical = level === "CRITICAL"
   const isHigh     = level === "HIGH"
+
+  const LABELS: Record<ThreatLevel, string> = {
+    LOW:      tx.threatLow,
+    MODERATE: tx.threatModerate,
+    HIGH:     tx.threatHigh,
+    CRITICAL: tx.threatCritical,
+  }
 
   return (
     <div

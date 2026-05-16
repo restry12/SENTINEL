@@ -1,23 +1,26 @@
 "use client"
 
 import type { ScenarioId } from "./types"
+import { useLang } from "@/contexts/language-context"
 
 interface Props {
   active:   ScenarioId
   onSelect: (id: ScenarioId) => void
 }
 
-const BUTTONS: { id: Exclude<ScenarioId, "none">; label: string; danger: boolean }[] = [
-  { id: "wind",     label: "Wind Intensifies",  danger: false },
-  { id: "humidity", label: "Humidity Drops",     danger: false },
-  { id: "worst",    label: "⚠ Worst Case",       danger: true  },
-]
-
 export function ScenarioControls({ active, onSelect }: Props) {
+  const { tx } = useLang()
+
+  const BUTTONS: { id: Exclude<ScenarioId, "none">; label: string; danger: boolean }[] = [
+    { id: "wind",     label: tx.scenarioWind,     danger: false },
+    { id: "humidity", label: tx.scenarioHumidity, danger: false },
+    { id: "worst",    label: tx.scenarioWorst,    danger: true  },
+  ]
+
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] flex flex-wrap justify-center items-center gap-2 font-mono px-4 max-w-[calc(100vw-32px)]">
       <span className="text-[9px] text-muted-foreground tracking-widest uppercase mr-1 select-none">
-        SIMULATE
+        {tx.simulate}
       </span>
       {BUTTONS.map(btn => {
         const isActive    = active === btn.id

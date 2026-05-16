@@ -1,12 +1,14 @@
 "use client"
 
 import { bearingName, type WindData } from "./types"
+import { useLang } from "@/contexts/language-context"
 
 interface Props {
   wind: WindData
 }
 
 export function SmokeAlert({ wind }: Props) {
+  const { tx } = useLang()
   const windDir = bearingName(wind.fromDeg)
 
   return (
@@ -16,15 +18,15 @@ export function SmokeAlert({ wind }: Props) {
         style={{ animation: "smokeAlertBlink 1.2s ease-in-out infinite" }}
       />
       <span className="text-xs font-semibold tracking-widest uppercase text-red-400">
-        Smoke Propagation Detected
+        {tx.smokePropagation}
       </span>
       <span className="text-border">|</span>
       <span className="text-xs text-muted-foreground">
-        2 Active Sources
+        2 {tx.activeSources}
       </span>
       <span className="text-border">|</span>
       <span className="text-xs text-muted-foreground">
-        Wind: {windDir} {wind.speed} km/h
+        {tx.windLabel} {windDir} {wind.speed} km/h
       </span>
     </div>
   )

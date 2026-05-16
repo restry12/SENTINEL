@@ -1,6 +1,7 @@
 "use client"
 
 import { AlertTriangle, Wind, MessageSquare } from "lucide-react"
+import { useLang } from "@/contexts/language-context"
 
 function Label({ children, right }: { children: React.ReactNode, right?: string }) {
   return (
@@ -28,6 +29,7 @@ function WindRose({ direction }: { direction: string }) {
 }
 
 export function LeftPanel() {
+  const { tx } = useLang()
   const riskLevel = "CRITICAL"
   const frp = 847.3
   const windSpeed = 24
@@ -44,7 +46,7 @@ export function LeftPanel() {
 
       {/* Header */}
       <div className="p-[18px] border-b border-border flex items-center bg-surface/30">
-        <Label>Threat Assessment</Label>
+        <Label>{tx.threatAssessment}</Label>
       </div>
 
       {/* Content */}
@@ -53,7 +55,7 @@ export function LeftPanel() {
         <div className="relative p-[18px] rounded-xl border border-red/40 bg-[radial-gradient(120%_90%_at_50%_0%,rgba(255,51,51,0.2),transparent_70%)] bg-[#1a0e0f] shadow-[0_15px_35px_-15px_rgba(255,51,51,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-soft">
-              Current Risk Level
+              {tx.currentRisk}
             </span>
             <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_15px_rgba(255,51,51,1)] animate-pulse" />
           </div>
@@ -66,13 +68,13 @@ export function LeftPanel() {
             </div>
           </div>
           <p className="mt-3 text-[11px] font-semibold text-red-soft tracking-wide">
-            Immediate Action Required · Sector 7A
+            {tx.immediateAction}
           </p>
         </div>
 
         {/* Fire Radiative Power */}
         <div className="sentinel-card sentinel-card-glow-orange p-4">
-          <Label right="MW">Fire Radiative Power</Label>
+          <Label right="MW">{tx.fireRadiativePower}</Label>
           <div className="mt-4 flex flex-col gap-2.5">
             <div className="flex items-baseline justify-between">
               <div className="text-3xl font-bold tracking-tight text-orange-soft num drop-shadow-[0_0_8px_rgba(255,174,66,0.3)]">
@@ -93,7 +95,7 @@ export function LeftPanel() {
 
         {/* Wind Conditions */}
         <div className="sentinel-card p-4">
-          <Label>Wind Conditions</Label>
+          <Label>{tx.windConditions}</Label>
           <div className="mt-4 flex items-center gap-4">
             <WindRose direction={windDirection} />
             <div className="flex-1">
@@ -109,14 +111,14 @@ export function LeftPanel() {
 
         {/* Air Quality Index */}
         <div className="sentinel-card sentinel-card-glow-red p-4">
-          <Label>Air Quality Index</Label>
+          <Label>{tx.airQualityIndex}</Label>
           <div className="mt-4 flex flex-col gap-2.5">
             <div className="flex items-baseline justify-between">
               <div className="text-3xl font-bold tracking-tight text-red-soft num drop-shadow-[0_0_8px_rgba(251,113,133,0.3)]">
                 {aqi} <span className="text-[10px] text-text-dim font-sans font-bold ml-1 uppercase">AQI</span>
               </div>
               <div className="text-[10px] font-bold px-2 py-0.5 rounded border border-red/50 bg-red/10 text-red font-mono uppercase tracking-widest">
-                UNHEALTHY
+                {tx.aqiUnhealthy}
               </div>
             </div>
             <div className="h-2 rounded-full bg-[linear-gradient(90deg,#10b981_0%,#10b981_22%,#fbbf24_48%,#ff7e15_68%,#ff3333_92%)] relative mt-2 shadow-inner">
@@ -134,15 +136,15 @@ export function LeftPanel() {
         <div className="p-4 bg-[linear-gradient(180deg,rgba(56,189,248,0.15),rgba(56,189,248,0.05))] border border-blue/30 rounded-xl shadow-[0_10px_25px_-10px_rgba(56,189,248,0.2)]">
           <div className="flex items-center gap-2 mb-3 text-[10px] font-bold tracking-[0.2em] text-blue uppercase">
             <MessageSquare className="h-4 w-4" />
-            <span>Active Broadcast</span>
+            <span>{tx.activeBroadcast}</span>
           </div>
           <div className="text-[13px] text-foreground leading-relaxed font-medium">
-            <span className="text-amber font-bold">⚠ WILDFIRE ALERT:</span>&nbsp;
-            Immediate evacuation ordered for Zone 7A–C. Proceed to shelter at Lincoln High School via Route 42.
+            <span className="text-amber font-bold">{tx.wildfireAlert}</span>&nbsp;
+            {tx.evacuationOrder}
           </div>
           <div className="mt-3.5 flex justify-between items-center text-[10px] font-bold text-text-muted tracking-wide uppercase border-t border-blue/10 pt-3">
             <span className="num opacity-70">14:23 UTC</span>
-            <span className="text-blue num shadow-blue/20 drop-shadow-sm">47,832 Recipients</span>
+            <span className="text-blue num shadow-blue/20 drop-shadow-sm">47,832 {tx.recipients}</span>
           </div>
         </div>
       </div>

@@ -1,8 +1,10 @@
 "use client"
 
 import { Wind, AlertTriangle } from "lucide-react"
+import { useLang } from "@/contexts/language-context"
 
 export function MetricCards() {
+  const { tx } = useLang()
   const riskLevel = "CRITICAL"
   const windSpeed = 24
   const windDirection = "NW"
@@ -15,7 +17,7 @@ export function MetricCards() {
         {/* Risk Level Card */}
         <div className="p-3 rounded-md border border-red/30 bg-[#1a0e0f] min-w-[140px] flex flex-col gap-2">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-red-soft/70">
-            Risk Level
+            {tx.riskLevel}
           </div>
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-soft" />
@@ -28,7 +30,7 @@ export function MetricCards() {
         {/* AQI Card */}
         <div className="sentinel-card p-3 min-w-[120px] flex flex-col gap-2">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-            Air Quality
+            {tx.airQuality}
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-xl font-medium tracking-tight text-red-soft num">
@@ -41,7 +43,7 @@ export function MetricCards() {
         {/* Wind Card */}
         <div className="sentinel-card p-3 min-w-[120px] flex flex-col gap-2">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-            Wind
+            {tx.wind}
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-xl font-medium tracking-tight text-foreground num">
@@ -54,7 +56,7 @@ export function MetricCards() {
         {/* FRP Card */}
         <div className="sentinel-card p-3 min-w-[120px] flex flex-col gap-2">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-            Fire Power
+            {tx.firePower}
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-xl font-medium tracking-tight text-orange-soft num">

@@ -2,38 +2,15 @@
 
 import { useEffect, useState } from "react"
 import type { ThreatLevel } from "./types"
+import { useLang } from "@/contexts/language-context"
 
 interface Props {
   threat: ThreatLevel
 }
 
-const BRIEFINGS: Record<ThreatLevel, string[]> = {
-  LOW: [
-    "Air quality remains within acceptable parameters across all monitored zones.",
-    "PM2.5 density is minimal. No immediate risk to public health detected.",
-    "Wind conditions are favorable. Dispersion rates are adequate.",
-  ],
-  MODERATE: [
-    "PM2.5 propagation identified, moving toward residential sectors at 24 km/h.",
-    "AQI levels are approaching concerning thresholds in northwest districts.",
-    "Sensitive populations should begin precautionary indoor measures.",
-  ],
-  HIGH: [
-    "PM2.5 density is increasing toward populated sectors northwest of emission sources.",
-    "Projected AQI deterioration may affect vulnerable populations within 2 hours.",
-    "Wind vectoring at 315° is accelerating smoke drift toward the Temuco corridor.",
-    "Healthcare facilities in the affected radius have been placed on standby.",
-  ],
-  CRITICAL: [
-    "CRITICAL: PM2.5 concentration has exceeded safe exposure thresholds.",
-    "Emergency response teams have been activated across all affected zones.",
-    "Population in the primary exposure corridor must seek shelter immediately.",
-    "Air quality is projected to remain critical for the next 4–6 hours.",
-  ],
-}
-
 export function AIBriefing({ threat }: Props) {
-  const briefings = BRIEFINGS[threat]
+  const { tx } = useLang()
+  const briefings = tx.briefings[threat.toLowerCase() as keyof typeof tx.briefings]
   const [index, setIndex] = useState(0)
   const [visible, setVisible] = useState(true)
   const [open, setOpen] = useState(true)
@@ -43,12 +20,12 @@ export function AIBriefing({ threat }: Props) {
     const iv = setInterval(() => {
       setVisible(false)
       timeoutId = setTimeout(() => {
-        setIndex(i => (i + 1) % BRIEFINGS[threat].length)
+        setIndex(i => (i + 1) % briefings.length)
         setVisible(true)
       }, 350)
     }, 5500)
     return () => { clearInterval(iv); clearTimeout(timeoutId) }
-  }, [threat])
+  }, [threat, briefings.length])
 
   useEffect(() => {
     setIndex(0)
@@ -62,7 +39,7 @@ export function AIBriefing({ threat }: Props) {
         className="flex items-center gap-2 w-full text-left"
       >
         <span className="text-[10px] tracking-widest uppercase text-muted-foreground font-semibold">
-          AI INTELLIGENCE
+          {tx.aiIntelligence}
         </span>
         <div className="flex-1 h-px" style={{ backgroundColor: "rgba(255,255,255,0.4)" }} />
         <span

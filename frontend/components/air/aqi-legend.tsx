@@ -1,14 +1,16 @@
 "use client"
 
 import { AQI_THRESHOLDS } from "./types"
+import { useLang } from "@/contexts/language-context"
 
 const RANGES = ["0 – 50", "51 – 100", "101 – 150", "151+"]
 
 export function AQILegend() {
+  const { tx } = useLang()
   return (
     <div className="absolute bottom-4 right-4 z-[1000] bg-black/75 backdrop-blur-md border border-white/10 rounded-sm px-3 py-2 font-mono">
       <p className="text-[10px] text-muted-foreground tracking-widest uppercase mb-2">
-        AQI Scale
+        {tx.aqiScale}
       </p>
       <div className="flex flex-col gap-1.5">
         {AQI_THRESHOLDS.map((t, i) => (

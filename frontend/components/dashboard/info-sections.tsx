@@ -1,6 +1,7 @@
 "use client"
 
 import { Users, FileText } from "lucide-react"
+import { useLang } from "@/contexts/language-context"
 
 function Label({ children, right }: { children: React.ReactNode, right?: string }) {
   return (
@@ -13,6 +14,7 @@ function Label({ children, right }: { children: React.ReactNode, right?: string 
 }
 
 export function InfoSections() {
+  const { tx } = useLang()
   const evacPct = 66
 
   return (
@@ -20,22 +22,22 @@ export function InfoSections() {
       {/* Municipal Briefing */}
       <div className="sentinel-card p-4">
         <div className="mb-4">
-          <Label right="15:00 UTC">Municipal Briefing</Label>
+          <Label right="15:00 UTC">{tx.municipalBriefing}</Label>
         </div>
         
         <div className="p-4 bg-surface-2 border border-border rounded-md">
           <p className="text-[13px] text-text-2 leading-relaxed italic">
             "The <span className="text-orange font-semibold not-italic">Cedar Ridge Fire</span> has expanded to 
             <span className="text-foreground font-bold not-italic"> 12,400 acres</span> with 
-            <span className="text-foreground font-bold not-italic"> 8% containment</span>. NW winds pushing toward sectors 7A–C."
+            <span className="text-foreground font-bold not-italic"> 8% containment</span>. {tx.windNote}"
           </p>
         </div>
         
         <div className="grid grid-cols-3 gap-3 mt-4">
           {[
-            { label: "Personnel", value: "1,247" },
-            { label: "Vehicles", value: "89" },
-            { label: "Aircraft", value: "12" },
+            { label: tx.personnel, value: "1,247" },
+            { label: tx.vehicles, value: "89" },
+            { label: tx.aircraft, value: "12" },
           ].map((item) => (
             <div key={item.label} className="p-2.5 bg-background border border-border rounded-sm text-center">
               <div className="text-base font-medium text-foreground num leading-none mb-1">{item.value}</div>
@@ -46,7 +48,7 @@ export function InfoSections() {
         
         <div className="p-2 border border-orange/20 bg-orange/5 rounded mt-4">
           <p className="text-[10px] font-bold text-orange-soft uppercase tracking-[0.14em] text-center">
-            Next briefing: 18:00 UTC
+            {tx.nextBriefing}
           </p>
         </div>
       </div>
@@ -54,15 +56,15 @@ export function InfoSections() {
       {/* Social Impact */}
       <div className="sentinel-card p-4">
         <div className="mb-4">
-          <Label>Social Impact</Label>
+          <Label>{tx.socialImpact}</Label>
         </div>
         
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "At Risk", value: "127,450", color: "text-red-soft" },
-            { label: "Evacuated", value: "84,230", color: "text-green-soft" },
-            { label: "In Shelters", value: "23,847", color: "text-blue" },
-            { label: "Structures", value: "4,892", color: "text-orange-soft" },
+            { label: tx.atRisk, value: "127,450", color: "text-red-soft" },
+            { label: tx.evacuated, value: "84,230", color: "text-green-soft" },
+            { label: tx.inShelters, value: "23,847", color: "text-blue" },
+            { label: tx.structures, value: "4,892", color: "text-orange-soft" },
           ].map((item) => (
             <div key={item.label} className="p-3 bg-background border border-border rounded-md">
               <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">{item.label}</div>
@@ -75,7 +77,7 @@ export function InfoSections() {
         <div className="mt-4 pt-4 border-t border-border">
           <div className="flex justify-between items-center mb-2">
             <span className="text-[10px] font-semibold text-text-dim uppercase tracking-wider">
-              Evacuation Progress
+              {tx.evacuationProgress}
             </span>
             <span className="text-sm font-medium text-green-soft num">{evacPct}%</span>
           </div>
