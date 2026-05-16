@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useSentinel } from '@/contexts/sentinel-context'
@@ -14,11 +14,15 @@ const FALLBACK_FIRES = [
   { lat: -38.32, lon: -71.95, frp: 95, intensity: 'medium' as const, id: 'FIRE-003' },
 ]
 
+type ExpansionKey = '2h' | '6h' | '12h'
+
 export function MapboxPanel() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
   const { sentinelUpdate } = useSentinel()
+  const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
+  const [selectedFireId, setSelectedFireId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -120,6 +124,12 @@ export function MapboxPanel() {
         </div>
       `)
 
+      el.addEventListener('click', () => {
+        map.flyTo({ center: [inc.lon, inc.lat], zoom: 13, duration: 1200, essential: true })
+        setSelectedFireId(inc.id)
+        setActiveExpansion('2h')
+      })
+
       return new mapboxgl.Marker(el)
         .setLngLat([inc.lon, inc.lat])
         .setPopup(popup)
@@ -151,12 +161,12 @@ export function MapboxPanel() {
         map.addLayer({ id: polyId + '-line', type: 'line', source: polyId, paint: { 'line-color': '#ef4444', 'line-width': 2 } })
       }
 
-      // Expansion forecast (2h / 6h / 12h)
+      // Expansion forecast — add all sources but hide non-active
       const exp = sentinelUpdate.expansion
-      const expLayers: Array<[string, { coordinates: number[][][] } | undefined, string]> = [
-        ['exp-12h', exp?.expansion_12h, '#fbbf24'],
-        ['exp-6h', exp?.expansion_6h, '#fb923c'],
-        ['exp-2h', exp?.expansion_2h, '#f97316'],
+      const expLayers: Array<[string, { coordinates: number[][][] } | undefined, string, ExpansionKey]> = [
+        ['exp-12h', exp?.expansion_12h, '#fbbf24', '12h'],
+        ['exp-6h',  exp?.expansion_6h,  '#fb923c', '6h'],
+        ['exp-2h',  exp?.expansion_2h,  '#f97316', '2h'],
       ]
       for (const [id, poly, color] of expLayers) {
         if (map.getLayer(id)) map.removeLayer(id)
@@ -167,6 +177,7 @@ export function MapboxPanel() {
             data: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: poly.coordinates } } as any,
           })
           map.addLayer({ id, type: 'line', source: id, paint: { 'line-color': color, 'line-width': 1.5, 'line-dasharray': [2, 2] } })
+          map.setLayoutProperty(id, 'visibility', 'none')
         }
       }
 
@@ -191,5 +202,58 @@ export function MapboxPanel() {
     else map.once('style.load', apply)
   }, [sentinelUpdate])
 
-  return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+  // Toggle expansion layer visibility
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !map.isStyleLoaded()) return
+    const keys: ExpansionKey[] = ['2h', '6h', '12h']
+    for (const k of keys) {
+      const id = `exp-${k}`
+      if (map.getLayer(id)) {
+        map.setLayoutProperty(id, 'visibility', activeExpansion === k ? 'visible' : 'none')
+      }
+    }
+  }, [activeExpansion])
+
+  const expansionOptions: Array<{ key: ExpansionKey; label: string; color: string }> = [
+    { key: '2h',  label: '2H',  color: '#f97316' },
+    { key: '6h',  label: '6H',  color: '#fb923c' },
+    { key: '12h', label: '12H', color: '#fbbf24' },
+  ]
+
+  return (
+    <div className="absolute inset-0 w-full h-full">
+      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+
+      {/* Expansion projection toggle — shown when a fire is selected */}
+      {selectedFireId && sentinelUpdate?.expansion && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md shadow-2xl">
+          <span className="px-3 text-[9px] font-mono font-bold tracking-[0.2em] text-white/40 uppercase whitespace-nowrap">
+            Proyección fuego
+          </span>
+          {expansionOptions.map(({ key, label, color }) => (
+            <button
+              key={key}
+              onClick={() => setActiveExpansion(prev => prev === key ? null : key)}
+              className="relative px-4 py-2 rounded-lg text-[11px] font-mono font-black tracking-[0.15em] uppercase transition-all duration-200"
+              style={{
+                color: activeExpansion === key ? '#000' : color,
+                background: activeExpansion === key ? color : `${color}15`,
+                border: `1px solid ${color}${activeExpansion === key ? 'ff' : '50'}`,
+                boxShadow: activeExpansion === key ? `0 0 16px ${color}80` : 'none',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            onClick={() => { setSelectedFireId(null); setActiveExpansion(null) }}
+            className="ml-1 px-2 py-2 rounded-lg text-[10px] font-mono text-white/30 hover:text-white/60 transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
