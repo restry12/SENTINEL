@@ -62,11 +62,17 @@ function calculateRiskLevel(fires: FireData[], weather: WeatherData, air: AirDat
 
 export async function runAnalysis(
   lat = DEFAULT_LAT,
-  lon = DEFAULT_LON
+  lon = DEFAULT_LON,
+  externalFirms?: unknown[]
 ): Promise<SentinelUpdate> {
   // Step 1: fetch external APIs — fault-isolated
+  // If Make.com already sent FIRMS data, skip the NASA fetch
+  const firesPromise = externalFirms
+    ? Promise.resolve(externalFirms as FireData[])
+    : fetchFires(DEFAULT_AREA.latSouth, DEFAULT_AREA.lonWest, DEFAULT_AREA.latNorth, DEFAULT_AREA.lonEast)
+
   const [firesSettled, weatherSettled, airSettled] = await Promise.allSettled([
-    fetchFires(DEFAULT_AREA.latSouth, DEFAULT_AREA.lonWest, DEFAULT_AREA.latNorth, DEFAULT_AREA.lonEast),
+    firesPromise,
     fetchWeather(lat, lon),
     fetchAirQuality(lat, lon),
   ])
