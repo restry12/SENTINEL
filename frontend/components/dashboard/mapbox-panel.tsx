@@ -73,10 +73,13 @@ function makeFireSpreadPolygon(
   }
 }
 
-const EXP_CONFIG: Record<ExpansionKey, { hours: number; color: string; fillOpacity: number }> = {
-  '2h':  { hours: 2,  color: '#f97316', fillOpacity: 0.14 },
-  '6h':  { hours: 6,  color: '#fb923c', fillOpacity: 0.10 },
-  '12h': { hours: 12, color: '#fbbf24', fillOpacity: 0.07 },
+const EXP_CONFIG: Record<ExpansionKey, {
+  hours: number
+  colorCore: string; colorMid: string; colorOuter: string
+}> = {
+  '2h':  { hours: 2,  colorCore: '#dc2626', colorMid: '#ef4444', colorOuter: '#f87171' },
+  '6h':  { hours: 6,  colorCore: '#c2410c', colorMid: '#ea580c', colorOuter: '#fb923c' },
+  '12h': { hours: 12, colorCore: '#b45309', colorMid: '#d97706', colorOuter: '#fbbf24' },
 }
 
 export function MapboxPanel() {
@@ -239,36 +242,89 @@ export function MapboxPanel() {
     else map.once('style.load', apply)
   }, [sentinelUpdate])
 
-  // Draw expansion polygon for selected fire + active timeframe
+  // Draw expansion — 3 concentric danger zones + glowing border + direction arrow
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
 
+    const EXP_LAYER_IDS = [
+      'exp-outer-fill', 'exp-outer-glow', 'exp-outer-line',
+      'exp-mid-fill',
+      'exp-core-fill', 'exp-core-line',
+      'exp-arrow',
+    ]
+    const EXP_SOURCE_IDS = ['exp-outer', 'exp-mid', 'exp-core', 'exp-arrow-src']
+
     const drawExpansion = () => {
-      if (map.getLayer('exp-active-fill')) map.removeLayer('exp-active-fill')
-      if (map.getLayer('exp-active-line')) map.removeLayer('exp-active-line')
-      if (map.getSource('exp-active')) map.removeSource('exp-active')
+      EXP_LAYER_IDS.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) })
+      EXP_SOURCE_IDS.forEach(id => { if (map.getSource(id)) map.removeSource(id) })
 
       if (!selectedFire || !activeExpansion) return
 
       const cfg = EXP_CONFIG[activeExpansion]
+      const windDeg = sentinelUpdate?.weather?.deg ?? 315
+      const windSpeedMs = sentinelUpdate?.weather?.speed ?? 6.7
       const exp = sentinelUpdate?.expansion
       const backendPoly = activeExpansion === '2h' ? exp?.expansion_2h
         : activeExpansion === '6h' ? exp?.expansion_6h
         : exp?.expansion_12h
 
-      let geoJson
-      if (backendPoly?.coordinates) {
-        geoJson = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: backendPoly.coordinates } }
-      } else {
-        const windDeg = sentinelUpdate?.weather?.deg ?? 315
-        const windSpeed = sentinelUpdate?.weather?.speed ?? 6.7  // ~24 km/h
-        geoJson = makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeed, cfg.hours)
-      }
+      // Outer polygon = full timeframe (or backend data)
+      const outerGeo = backendPoly?.coordinates
+        ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: backendPoly.coordinates } }
+        : makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours)
 
-      map.addSource('exp-active', { type: 'geojson', data: geoJson as any })
-      map.addLayer({ id: 'exp-active-fill', type: 'fill', source: 'exp-active', paint: { 'fill-color': cfg.color, 'fill-opacity': cfg.fillOpacity } })
-      map.addLayer({ id: 'exp-active-line', type: 'line', source: 'exp-active', paint: { 'line-color': cfg.color, 'line-width': 2, 'line-dasharray': [3, 2] } })
+      // Mid and core = 55% / 25% of hours (same shape, smaller)
+      const midGeo = makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours * 0.55)
+      const coreGeo = makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours * 0.25)
+
+      // Direction arrow: fire origin → downwind tip of outer polygon
+      const spreadRad = ((windDeg + 180) % 360) * Math.PI / 180
+      const sinS = Math.sin(spreadRad)
+      const cosS = Math.cos(spreadRad)
+      const windKmhVal = windSpeedMs * 3.6
+      const ros_f = 0.5 + windKmhVal * 0.15 + windKmhVal * windKmhVal * 0.002
+      const tipKm = ros_f * cfg.hours
+      const cosLat = Math.cos(selectedFire.lat * Math.PI / 180)
+      const tipLon = selectedFire.lon + sinS * tipKm / (111 * cosLat)
+      const tipLat = selectedFire.lat + cosS * tipKm / 111
+
+      // Sources
+      map.addSource('exp-outer', { type: 'geojson', data: outerGeo as any })
+      map.addSource('exp-mid',   { type: 'geojson', data: midGeo   as any })
+      map.addSource('exp-core',  { type: 'geojson', data: coreGeo  as any })
+      map.addSource('exp-arrow-src', {
+        type: 'geojson',
+        data: {
+          type: 'Feature', properties: {},
+          geometry: { type: 'LineString', coordinates: [[selectedFire.lon, selectedFire.lat], [tipLon, tipLat]] },
+        } as any,
+      })
+
+      // Outer glow (wide dim line for bloom effect)
+      map.addLayer({ id: 'exp-outer-glow', type: 'line', source: 'exp-outer',
+        paint: { 'line-color': cfg.colorOuter, 'line-width': 14, 'line-opacity': 0.08, 'line-blur': 4 } })
+      // Outer fill — low opacity danger zone
+      map.addLayer({ id: 'exp-outer-fill', type: 'fill', source: 'exp-outer',
+        paint: { 'fill-color': cfg.colorOuter, 'fill-opacity': 0.07 } })
+      // Outer dashed border
+      map.addLayer({ id: 'exp-outer-line', type: 'line', source: 'exp-outer',
+        paint: { 'line-color': cfg.colorOuter, 'line-width': 1.5, 'line-opacity': 0.7, 'line-dasharray': [4, 3] } })
+
+      // Mid fill — medium intensity
+      map.addLayer({ id: 'exp-mid-fill', type: 'fill', source: 'exp-mid',
+        paint: { 'fill-color': cfg.colorMid, 'fill-opacity': 0.14 } })
+
+      // Core fill — hottest / most dangerous zone
+      map.addLayer({ id: 'exp-core-fill', type: 'fill', source: 'exp-core',
+        paint: { 'fill-color': cfg.colorCore, 'fill-opacity': 0.28 } })
+      // Core solid glowing border
+      map.addLayer({ id: 'exp-core-line', type: 'line', source: 'exp-core',
+        paint: { 'line-color': cfg.colorCore, 'line-width': 2.5, 'line-opacity': 0.9 } })
+
+      // Direction arrow — bold line from fire origin to downwind tip
+      map.addLayer({ id: 'exp-arrow', type: 'line', source: 'exp-arrow-src',
+        paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-opacity': 0.5, 'line-dasharray': [6, 4] } })
     }
 
     if (map.isStyleLoaded()) drawExpansion()
@@ -276,9 +332,9 @@ export function MapboxPanel() {
   }, [selectedFire, activeExpansion, sentinelUpdate])
 
   const expansionOptions: Array<{ key: ExpansionKey; label: string; color: string }> = [
-    { key: '2h',  label: '2H',  color: '#f97316' },
-    { key: '6h',  label: '6H',  color: '#fb923c' },
-    { key: '12h', label: '12H', color: '#fbbf24' },
+    { key: '2h',  label: '2H',  color: '#ef4444' },
+    { key: '6h',  label: '6H',  color: '#ea580c' },
+    { key: '12h', label: '12H', color: '#d97706' },
   ]
 
   // Wind display values
@@ -307,33 +363,55 @@ export function MapboxPanel() {
 
       {/* Expansion projection toggle */}
       {selectedFire && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md shadow-2xl">
-          <div className="flex flex-col px-3 gap-0.5">
-            <span className="text-[8px] font-mono font-bold tracking-[0.2em] text-white/40 uppercase whitespace-nowrap">
-              Expansión {selectedFire.id}
-            </span>
-            <span className="text-[9px] font-mono text-orange-400 whitespace-nowrap">
-              → {spreadCardinal} · {windKmh} km/h
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-2 py-2 rounded-2xl backdrop-blur-md shadow-2xl"
+          style={{
+            background: 'linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(20,5,5,0.9) 100%)',
+            border: '1px solid rgba(239,68,68,0.35)',
+            boxShadow: '0 0 40px rgba(239,68,68,0.15), 0 0 80px rgba(239,68,68,0.05), inset 0 1px 1px rgba(255,255,255,0.05)',
+          }}
+        >
+          {/* Left info block */}
+          <div className="flex flex-col px-3 gap-0.5 border-r border-white/10 pr-4 mr-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shadow-[0_0_6px_#ef4444]" />
+              <span className="text-[9px] font-mono font-bold tracking-[0.2em] text-red-400/80 uppercase whitespace-nowrap">
+                ZONA PELIGRO · {selectedFire.id}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-black text-orange-400 whitespace-nowrap tracking-wide">
+              ▶ {spreadCardinal} · {windKmh} km/h
             </span>
           </div>
-          {expansionOptions.map(({ key, label, color }) => (
-            <button
-              key={key}
-              onClick={() => setActiveExpansion(prev => prev === key ? null : key)}
-              className="relative px-4 py-2 rounded-lg text-[11px] font-mono font-black tracking-[0.15em] uppercase transition-all duration-200"
-              style={{
-                color: activeExpansion === key ? '#000' : color,
-                background: activeExpansion === key ? color : `${color}15`,
-                border: `1px solid ${color}${activeExpansion === key ? 'ff' : '50'}`,
-                boxShadow: activeExpansion === key ? `0 0 16px ${color}80` : 'none',
-              }}
-            >
-              {label}
-            </button>
-          ))}
+
+          {/* Timeframe buttons */}
+          {expansionOptions.map(({ key, label, color }) => {
+            const isActive = activeExpansion === key
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveExpansion(prev => prev === key ? null : key)}
+                className="relative px-4 py-2 rounded-xl text-[11px] font-mono font-black tracking-[0.15em] uppercase transition-all duration-200"
+                style={{
+                  color: isActive ? '#fff' : `${color}cc`,
+                  background: isActive
+                    ? `linear-gradient(135deg, ${color}cc, ${color}88)`
+                    : `${color}12`,
+                  border: `1px solid ${color}${isActive ? 'cc' : '40'}`,
+                  boxShadow: isActive
+                    ? `0 0 20px ${color}60, 0 0 40px ${color}20, inset 0 1px 1px rgba(255,255,255,0.15)`
+                    : 'none',
+                  textShadow: isActive ? `0 0 12px ${color}` : 'none',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+
           <button
             onClick={() => { setSelectedFire(null); setActiveExpansion(null) }}
-            className="ml-1 px-2 py-2 rounded-lg text-[10px] font-mono text-white/30 hover:text-white/60 transition-colors"
+            className="ml-1 w-7 h-7 flex items-center justify-center rounded-lg text-[10px] font-mono text-white/20 hover:text-white/50 hover:bg-white/5 transition-all"
           >
             ✕
           </button>
