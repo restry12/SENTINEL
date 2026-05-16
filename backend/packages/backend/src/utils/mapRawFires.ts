@@ -20,7 +20,8 @@ export function mapRawFiresToFireData(raw: Record<string, unknown>[]): FireData[
             temp: typeof f.temp === 'number' ? f.temp : undefined,
           }
         : undefined,
-      pm25: typeof f.pm25 === 'number' ? f.pm25 : null,
+      // number = valor real; null = OpenAQ sin estación; undefined = foco sin enriquecer (no vino de Make)
+      pm25: typeof f.pm25 === 'number' ? f.pm25 : f.pm25 === null ? null : undefined,
     }
   })
 }

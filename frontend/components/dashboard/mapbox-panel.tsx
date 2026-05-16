@@ -125,10 +125,11 @@ export function MapboxPanel() {
               <span class="tactical-stat-label">Temp</span>
               <span class="tactical-stat-value num">${(inc as any).weather.temp.toFixed(1)}°C</span>
             </div>` : ''}
+            ${(inc as any).pm25 !== undefined ? `
             <div class="tactical-stat-row">
               <span class="tactical-stat-label">PM2.5</span>
-              <span class="tactical-stat-value num">${(inc as any).pm25 == null ? 's/d' : (inc as any).pm25 + ' µg/m³'}</span>
-            </div>
+              <span class="tactical-stat-value num">${(inc as any).pm25 === null ? 's/d' : (inc as any).pm25 + ' µg/m³'}</span>
+            </div>` : ''}
           </div>
         </div>
       `)
