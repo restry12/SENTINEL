@@ -1,5 +1,5 @@
 import type { Server, Socket } from 'socket.io'
-import type { StatusPayload, AlertPayload } from '@sentinel/types'
+import type { StatusPayload, AlertPayload, SentinelUpdate } from '@sentinel/types'
 import type { PollingController } from '../controllers/polling'
 import { runAnalysis } from '../services/orchestrator'
 import { triggerMakeWebhook } from '../services/alert'
@@ -101,7 +101,9 @@ export async function executeAndBroadcast(io: Server, lat?: number, lon?: number
         timestamp: update.timestamp,
       }
       io.emit('alert', alert)
-      await triggerMakeWebhook(alert)
+      const centLat = lat ?? DEFAULT_LAT
+      const centLon = lon ?? DEFAULT_LON
+      await triggerMakeWebhook(update as SentinelUpdate, centLat, centLon)
       alertsSent = true
     }
 
