@@ -15,7 +15,7 @@ export interface EnvData {
   wind: WindData
   humidity: number      // %
   tempC: number
-  visibilityKm: number
+  visibilityKm: number | null  // null when no live data
 }
 
 export interface AQIInfo {
@@ -44,7 +44,7 @@ export const FALLBACK_ENV: EnvData = {
   wind:         { speed: 0, fromDeg: 0 },
   humidity:     0,
   tempC:        0,
-  visibilityKm: 10,
+  visibilityKm: null,
 }
 
 // ── AQI thresholds ───────────────────────────────────────────────
@@ -64,12 +64,6 @@ export const THREAT_COLORS: Record<ThreatLevel, string> = {
   CRITICAL: "#ef4444",
 }
 
-export function visibilityFromAQI(aqi: number): number {
-  if (aqi < 50)  return 10
-  if (aqi < 100) return 6
-  if (aqi < 150) return 2.5
-  return 0.8
-}
 
 const BEARING_NAMES = ["N","NE","E","SE","S","SW","W","NW"]
 export function bearingName(deg: number): string {

@@ -102,7 +102,7 @@ export interface SentinelUpdate {
   timestamp: string
   fires: FireData[]
   polygon: GeoJSONFeature
-  weather: { speed: number; deg: number; humidity: number; temp?: number }
+  weather: { speed: number; deg: number; humidity: number; temp?: number; visibility?: number }
   airQuality: { pm25: number; aqi: number; category: string }
   routes: Array<{ id: string; geometry: { type: "LineString"; coordinates: [number, number][] }; distance: number; duration: number }>
   riskLevel: "low" | "medium" | "high" | "critical"
