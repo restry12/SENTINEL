@@ -5,6 +5,7 @@ import { Server } from 'socket.io'
 import { PollingController } from './controllers/polling'
 import { registerRoutes } from './routes/index'
 import { registerSocketHandlers, executeAndBroadcast } from './socket/handlers'
+import { loadLastUpdateFromDb } from './services/last-update'
 
 // Validate required env vars at startup — fail fast rather than on first request
 const REQUIRED_ENV = ['AGENT_FIRE_URL', 'AGENT_WEATHER_URL', 'AGENT_AIR_URL', 'AGENT_ROUTES_URL']
@@ -35,6 +36,9 @@ registerSocketHandlers(io, polling)
 const PORT = process.env.PORT ?? 3000
 httpServer.listen(PORT, () => {
   console.log(`[backend] running on port ${PORT}`)
+  // Restore page-memory snapshot so a freshly booted instance already has
+  // the last analysis (Render free tier loses RAM on cold start).
+  void loadLastUpdateFromDb()
 })
 
 export { io }

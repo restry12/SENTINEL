@@ -5,6 +5,7 @@ import { runAnalysis } from '../services/orchestrator'
 import { triggerMakeWebhook } from '../services/alert'
 import { acquireLock, releaseLock, isLocked } from '../services/analysis-lock'
 import { saveIncident } from '../services/history'
+import { getLastUpdate, setLastUpdate } from '../services/last-update'
 
 const MIN_POLL_INTERVAL_MS = 10000
 
@@ -15,6 +16,14 @@ const socketLastTrigger = new Map<string, number>()
 export function registerSocketHandlers(io: Server, polling: PollingController): void {
   io.on('connection', (socket: Socket) => {
     console.log(`[socket] client connected: ${socket.id}`)
+
+    // Replay the last known analysis so the dashboard has memory immediately,
+    // without waiting for the next Make.com trigger.
+    const last = getLastUpdate()
+    if (last) {
+      socket.emit('update', last)
+      socket.emit('status', { state: 'ok' } satisfies StatusPayload)
+    }
 
     socket.on('trigger', (data: { lat?: number; lon?: number }) => {
       // Per-socket rate limit
@@ -90,6 +99,7 @@ export async function executeAndBroadcast(io: Server, lat?: number, lon?: number
 
   try {
     const update = await runAnalysis(lat, lon, firms, weather, pm25)
+    setLastUpdate(update)
     io.emit('update', update)
     io.emit('status', { state: 'ok' } satisfies StatusPayload)
 

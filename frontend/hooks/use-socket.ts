@@ -110,6 +110,26 @@ export interface SocketStatus {
   message?: string
 }
 
+const LS_KEY = "sentinel_last_update"
+
+function readCachedUpdate(): SentinelUpdate | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(LS_KEY)
+    return raw ? (JSON.parse(raw) as SentinelUpdate) : null
+  } catch {
+    return null
+  }
+}
+
+function cacheUpdate(u: SentinelUpdate): void {
+  try {
+    window.localStorage.setItem(LS_KEY, JSON.stringify(u))
+  } catch {
+    /* localStorage full or unavailable — non-critical */
+  }
+}
+
 export function useSocket() {
   const [sentinelUpdate, setSentinelUpdate] = useState<SentinelUpdate | null>(null)
   const [status, setStatus] = useState<SocketStatus>({ state: "idle" })
@@ -117,6 +137,27 @@ export function useSocket() {
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
+    // 1. Instant paint from the browser's own cache of the last analysis.
+    const cached = readCachedUpdate()
+    if (cached) {
+      setSentinelUpdate(cached)
+      setStatus({ state: "ok" })
+    }
+
+    // 2. Hydrate from the backend's last snapshot (covers a fresh browser).
+    fetch("/api/last")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.ok && d.update) {
+          setSentinelUpdate(d.update as SentinelUpdate)
+          cacheUpdate(d.update as SentinelUpdate)
+          setStatus({ state: "ok" })
+        }
+      })
+      .catch(() => {
+        /* backend unreachable — socket replay still covers it */
+      })
+
     const url = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000"
     const socket: Socket = io(url, { transports: ["websocket"] })
     socketRef.current = socket
@@ -124,7 +165,10 @@ export function useSocket() {
     socket.on("connect", () => setConnected(true))
     socket.on("disconnect", () => setConnected(false))
 
-    socket.on("update", (data: SentinelUpdate) => setSentinelUpdate(data))
+    socket.on("update", (data: SentinelUpdate) => {
+      setSentinelUpdate(data)
+      cacheUpdate(data)
+    })
 
     socket.on("status", (s: { state: "loading" | "ok" | "error"; message?: string }) =>
       setStatus(s)
