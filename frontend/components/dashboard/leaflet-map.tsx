@@ -38,7 +38,7 @@ export function LeafletMap({ hotspots }: LeafletMapProps) {
       <TileLayer
         url={TILE_URL}
         attribution='&copy; <a href="https://earthdata.nasa.gov">NASA GIBS</a>'
-        maxZoom={9}
+        maxNativeZoom={9}
       />
       {hotspots.map((spot) => (
         <CircleMarker
