@@ -4,6 +4,7 @@ import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { degToCompass } from '@/lib/utils'
+import { useGeolocation } from '@/hooks/use-geolocation'
 
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
@@ -177,6 +178,7 @@ export function MapboxPanel() {
   const { sentinelUpdate } = useSentinel()
   const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
   const [selectedFire, setSelectedFire] = useState<SelectedFire | null>(null)
+  const userCoords = useGeolocation()
 
   // Init map
   useEffect(() => {
@@ -201,6 +203,38 @@ export function MapboxPanel() {
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
+
+  // User GPS position marker
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !userCoords) return
+    const apply = () => {
+      const data = {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'Point' as const, coordinates: [userCoords.lon, userCoords.lat] },
+      }
+      const src = map.getSource('user-loc') as mapboxgl.GeoJSONSource | undefined
+      if (src) {
+        src.setData(data)
+      } else {
+        map.addSource('user-loc', { type: 'geojson', data })
+        map.addLayer({
+          id: 'user-loc-halo', type: 'circle', source: 'user-loc',
+          paint: { 'circle-radius': 20, 'circle-color': '#3b82f6', 'circle-opacity': 0.18, 'circle-blur': 1 },
+        })
+        map.addLayer({
+          id: 'user-loc-dot', type: 'circle', source: 'user-loc',
+          paint: {
+            'circle-radius': 7, 'circle-color': '#3b82f6',
+            'circle-stroke-width': 2, 'circle-stroke-color': 'rgba(255,255,255,0.9)',
+          },
+        })
+      }
+    }
+    if (map.isStyleLoaded()) apply()
+    else map.once('style.load', apply)
+  }, [userCoords])
 
   // Fire markers
   useEffect(() => {
@@ -272,7 +306,7 @@ export function MapboxPanel() {
 
       // Delegated listener — survives setHTML updates
       popup.on('open', () => {
-        popup.getElement().addEventListener('click', (e) => {
+        popup.getElement()?.addEventListener('click', (e) => {
           const btn = (e.target as HTMLElement).closest('[data-sentinel-key]')
           if (!btn) return
           const key = btn.getAttribute('data-sentinel-key') as ExpansionKey
