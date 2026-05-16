@@ -120,3 +120,26 @@ No requiere tocar ningún agente — la infraestructura no se analiza, solo se m
 >    Si no llega, devolver `[]`.
 >
 > No hay que tocar los agentes. La infraestructura solo se muestra, no se analiza.
+
+---
+
+## PENDIENTE EXTRA — Visibilidad (`/air`)
+
+La página `/air` muestra un chip de "Visibilidad". Antes se estimaba con una tabla
+fija según el AQI (valores inventados). Ya se eliminó: ahora muestra `—` hasta que
+llegue el dato real.
+
+**OpenWeather ya entrega visibilidad** — viene en su respuesta como el campo
+`visibility` (en metros, máximo 10000). Solo falta pasarlo:
+
+1. **Make.com** — al armar el payload de `/api/trigger/full`, incluir el campo
+   `visibility` de la respuesta de OpenWeather dentro del objeto `weather` (o por foco,
+   igual que `speed`/`deg`/`humidity`).
+
+2. **Backend** — en `orchestrator.ts`, la función `parseOpenWeatherResponse` ya recibe
+   la respuesta de OpenWeather pero solo extrae `speed`, `deg`, `humidity`, `gust`.
+   Agregar también `visibility` (number, en metros) al objeto `WeatherData` y dejarlo
+   pasar al `SentinelUpdate.weather`.
+
+El frontend ya lee `SentinelUpdate.weather.visibility` (en metros) y lo convierte a km.
+Si no llega, muestra `—`.
