@@ -1,6 +1,7 @@
 import type { Express } from 'express'
 import type { Server } from 'socket.io'
 import type { PollingController } from '../controllers/polling'
+import { rateLimit } from 'express-rate-limit'
 import { executeAndBroadcast } from '../socket/handlers'
 import { parseFirmsCSV } from '../utils/parseFirmsCSV'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
@@ -8,6 +9,15 @@ import { getLastUpdate } from '../services/last-update'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
+
+// Max 10 analysis requests per IP every 15 minutes
+const triggerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Demasiadas solicitudes. Intenta de nuevo en 15 minutos.' },
+})
 
 export function registerRoutes(app: Express, io: Server, polling: PollingController): void {
   // Auth, geo, history
@@ -30,10 +40,10 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     })
   })
 
-  // POST /api/trigger — manual single analysis run
+  // POST /api/trigger — manual single analysis run (rate limited)
   // Accepts optional `firms` (FireData[]) or `firmsCSV` (raw NASA CSV string)
   // Data is broadcast to all socket subscribers; HTTP caller receives confirmation only
-  app.post('/api/trigger', async (req, res) => {
+  app.post('/api/trigger', triggerLimiter, async (req, res) => {
     if (isLocked()) {
       res.status(429).json({ ok: false, error: 'Analysis in progress — try again shortly' })
       return
@@ -67,9 +77,9 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     res.json({ fires, total: all.length, dangerous: fires.length })
   })
 
-  // POST /api/trigger/full — recibe fires[] de Make.com
+  // POST /api/trigger/full — recibe fires[] de Make.com (rate limited)
   // Cada fire trae: { lat, lon, frp, brightness, speed, deg, humidity, date, pm25 }
-  app.post('/api/trigger/full', async (req, res) => {
+  app.post('/api/trigger/full', triggerLimiter, async (req, res) => {
     const body = req.body as { fires?: unknown[] }
     const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
 
@@ -102,9 +112,9 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     })
   })
 
-  // POST /api/trigger/csv — recibe CSV crudo de NASA FIRMS (text/plain)
+  // POST /api/trigger/csv — recibe CSV crudo de NASA FIRMS (text/plain) (rate limited)
   // Header opcional X-Weather-Data: JSON string con WeatherData
-  app.post('/api/trigger/csv', async (req, res) => {
+  app.post('/api/trigger/csv', triggerLimiter, async (req, res) => {
     const csv = typeof req.body === 'string' ? req.body : ''
     const firms = csv ? parseFirmsCSV(csv) : undefined
     const weatherHeader = req.headers['x-weather-data']
