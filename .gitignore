@@ -19,10 +19,9 @@ node_modules/
 # IDE / tools
 .claude/
 
-# Local only — backend monorepo lives in hackaindies, not here
-packages/
-shared/
-tsconfig.base.json
+# Build artifacts
+dist/
+*.tsbuildinfo
 
 # Duplicate test files (use zavu/ folder)
 test-zavu.js
