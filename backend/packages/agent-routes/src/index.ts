@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
-import type { AgentRequest, AgentResponse, RouteData } from '@sentinel/types'
+import type { AgentRequest, AgentResponse, NaturalRoutes } from '@sentinel/types'
 import { calculateEvacuationRoutes } from './analyze'
 
 const app = express()
@@ -12,11 +12,10 @@ app.post('/analyze', async (req, res) => {
 
   try {
     const data = await calculateEvacuationRoutes(fires)
-    const response: AgentResponse<RouteData[]> = { success: true, data }
-    res.json(response)
+    res.json({ success: true, data } satisfies AgentResponse<typeof data>)
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error'
-    res.status(500).json({ success: false, data: null, error } satisfies AgentResponse<RouteData[]>)
+    res.status(500).json({ success: false, data: null, error } satisfies AgentResponse<NaturalRoutes>)
   }
 })
 
