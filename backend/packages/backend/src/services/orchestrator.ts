@@ -37,7 +37,7 @@ function requireEnv(name: string): string {
 }
 
 async function callAgent<T>(url: string, body: AgentRequest): Promise<AgentResponse<T>> {
-  const retryDelays = [0, 15000, 20000] // 0s, 15s, 20s — cold start de Render free tier
+  const retryDelays = [0, 20000, 40000] // 0s, 20s, 40s — cold start de Render free tier (~60s total)
   for (let attempt = 0; attempt < retryDelays.length; attempt++) {
     if (retryDelays[attempt] > 0) {
       console.warn(`[orchestrator] retrying ${url} in ${retryDelays[attempt] / 1000}s (attempt ${attempt + 1})...`)
