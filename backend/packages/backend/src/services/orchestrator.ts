@@ -11,8 +11,6 @@ import type {
   AuthorityReport,
   RoutesResult,
 } from '@sentinel/types'
-import { fetchWeather } from './openweather'
-import { fetchFires } from './firms'
 import { fetchAirQuality } from './openaq'
 
 const DEFAULT_LAT = -38.5
@@ -60,29 +58,31 @@ function calculateRiskLevel(fires: FireData[], weather: WeatherData, air: AirDat
   return 'low'
 }
 
+function isWeatherData(v: unknown): v is WeatherData {
+  if (typeof v !== 'object' || v === null) return false
+  const w = v as Record<string, unknown>
+  return typeof w.speed === 'number' && typeof w.deg === 'number' && typeof w.humidity === 'number'
+}
+
 export async function runAnalysis(
   lat = DEFAULT_LAT,
   lon = DEFAULT_LON,
-  externalFirms?: unknown[]
+  externalFirms?: unknown[],
+  externalWeather?: unknown
 ): Promise<SentinelUpdate> {
-  // Step 1: fetch external APIs — fault-isolated
-  // If Make.com already sent FIRMS data, skip the NASA fetch
-  const firesPromise = externalFirms
-    ? Promise.resolve(externalFirms as FireData[])
-    : fetchFires(DEFAULT_AREA.latSouth, DEFAULT_AREA.lonWest, DEFAULT_AREA.latNorth, DEFAULT_AREA.lonEast)
+  // All data comes from Make.com — no external API fetches
+  const fires = externalFirms ? (externalFirms as FireData[]) : []
+  const weather = isWeatherData(externalWeather) ? externalWeather : EMPTY_WEATHER
 
-  const [firesSettled, weatherSettled, airSettled] = await Promise.allSettled([
-    firesPromise,
-    fetchWeather(lat, lon),
+  if (fires.length === 0) console.warn('[orchestrator] no FIRMS data received')
+  if (!isWeatherData(externalWeather)) console.warn('[orchestrator] no weather data received, using defaults')
+
+  const [airSettled] = await Promise.allSettled([
     fetchAirQuality(lat, lon),
   ])
 
-  if (firesSettled.status === 'rejected') console.warn('[orchestrator] fetchFires failed:', firesSettled.reason)
-  if (weatherSettled.status === 'rejected') console.warn('[orchestrator] fetchWeather failed:', weatherSettled.reason)
   if (airSettled.status === 'rejected') console.warn('[orchestrator] fetchAirQuality failed:', airSettled.reason)
 
-  const fires = firesSettled.status === 'fulfilled' ? firesSettled.value : []
-  const weather = weatherSettled.status === 'fulfilled' ? weatherSettled.value : EMPTY_WEATHER
   const airQuality = airSettled.status === 'fulfilled' ? airSettled.value : EMPTY_AIR
 
   // Step 2: call agents in parallel (fire, air, routes) — fault-isolated
