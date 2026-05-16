@@ -140,6 +140,18 @@ export function MapboxPanel() {
         }))
       : FALLBACK_FIRES
 
+    // Compute wind + spread info once for all popups
+    const wDeg   = sentinelUpdate?.weather?.deg   ?? 315
+    const wSpeed = sentinelUpdate?.weather?.speed ?? 6.7
+    const sDeg   = (wDeg + 180) % 360
+    const sDirLabel = degToCompass(sDeg)
+    const wKmh  = Math.round(wSpeed * 3.6)
+    const a2  = computeFireSpreadArea(wSpeed, 2)
+    const a6  = computeFireSpreadArea(wSpeed, 6)
+    const a12 = computeFireSpreadArea(wSpeed, 12)
+    const fmtKm2 = (v: number) => v >= 1000 ? `${(v/1000).toFixed(1)}k km²` : `${v} km²`
+    const fmtHa  = (v: number) => v >= 10000 ? `${Math.round(v/1000)}k ha` : `${v.toLocaleString()} ha`
+
     markersRef.current = fires.map(inc => {
       const el = document.createElement('div')
       el.className = 'relative flex items-center justify-center cursor-pointer group'
@@ -176,25 +188,49 @@ export function MapboxPanel() {
       core.appendChild(flicker)
       el.appendChild(core)
 
-      const popup = new mapboxgl.Popup({ offset: 12, closeButton: false, anchor: 'bottom' }).setHTML(`
-        <div class="tactical-popup">
-          <div class="tactical-popup-header">
-            <div class="w-1.5 h-1.5 rounded-full pulse-dot" style="background-color: ${color}; box-shadow: 0 0 6px ${color}"></div>
-            <span class="text-[11px] font-bold tracking-[0.16em] uppercase text-[#f4f5f7]">${inc.id}</span>
+      const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '300px' }).setHTML(`
+        <div style="font-family:ui-monospace,monospace;background:linear-gradient(160deg,#0d1117,#0a0608);border:1px solid rgba(239,68,68,0.3);border-radius:14px;overflow:hidden;box-shadow:0 0 40px rgba(239,68,68,0.12),0 20px 60px rgba(0,0,0,0.6);">
+
+          <!-- Header -->
+          <div style="padding:12px 14px 10px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:8px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:${color};box-shadow:0 0 10px ${color};flex-shrink:0;animation:pulse 2s infinite;"></div>
+            <span style="font-size:12px;font-weight:900;letter-spacing:0.18em;color:#f8fafc;">${inc.id}</span>
+            <span style="margin-left:auto;font-size:9px;font-weight:700;letter-spacing:0.15em;color:${color};background:${color}22;border:1px solid ${color}44;border-radius:5px;padding:2px 7px;">${String(inc.intensity).toUpperCase()}</span>
           </div>
-          <div class="tactical-popup-body">
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Intensity</span>
-              <span class="tactical-stat-value" style="color: ${color}">${String(inc.intensity).toUpperCase()}</span>
+
+          <!-- Fire stats -->
+          <div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px;border-bottom:1px solid rgba(255,255,255,0.06);">
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;">
+              <div style="font-size:8px;letter-spacing:0.18em;color:rgba(255,255,255,0.35);margin-bottom:3px;">POTENCIA</div>
+              <div style="font-size:16px;font-weight:900;color:#fff;">${inc.frp.toFixed(0)}<span style="font-size:9px;color:rgba(255,255,255,0.4);margin-left:2px;">MW</span></div>
             </div>
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Coordinates</span>
-              <span class="tactical-stat-value num text-text-2">${inc.lat.toFixed(4)}°, ${inc.lon.toFixed(4)}°</span>
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;">
+              <div style="font-size:8px;letter-spacing:0.18em;color:rgba(255,255,255,0.35);margin-bottom:3px;">VIENTO</div>
+              <div style="font-size:16px;font-weight:900;color:#fb923c;">${sDirLabel}<span style="font-size:9px;color:rgba(255,255,255,0.4);margin-left:3px;">${wKmh} km/h</span></div>
             </div>
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Power (MW)</span>
-              <span class="tactical-stat-value num">${inc.frp.toFixed(1)}</span>
+          </div>
+
+          <!-- Expansion forecast -->
+          <div style="padding:10px 14px 12px;">
+            <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:8px;">PROYECCIÓN DE EXPANSIÓN</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+              <div style="background:rgba(220,38,38,0.12);border:1px solid rgba(220,38,38,0.35);border-radius:8px;padding:8px 6px;text-align:center;">
+                <div style="font-size:10px;font-weight:900;color:#ef4444;letter-spacing:0.1em;">2H</div>
+                <div style="font-size:11px;font-weight:800;color:#fff;margin-top:3px;">${fmtKm2(a2.km2)}</div>
+                <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:1px;">${fmtHa(a2.ha)}</div>
+              </div>
+              <div style="background:rgba(194,65,12,0.12);border:1px solid rgba(194,65,12,0.35);border-radius:8px;padding:8px 6px;text-align:center;">
+                <div style="font-size:10px;font-weight:900;color:#fb923c;letter-spacing:0.1em;">6H</div>
+                <div style="font-size:11px;font-weight:800;color:#fff;margin-top:3px;">${fmtKm2(a6.km2)}</div>
+                <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:1px;">${fmtHa(a6.ha)}</div>
+              </div>
+              <div style="background:rgba(180,83,9,0.12);border:1px solid rgba(180,83,9,0.35);border-radius:8px;padding:8px 6px;text-align:center;">
+                <div style="font-size:10px;font-weight:900;color:#fbbf24;letter-spacing:0.1em;">12H</div>
+                <div style="font-size:11px;font-weight:800;color:#fff;margin-top:3px;">${fmtKm2(a12.km2)}</div>
+                <div style="font-size:9px;color:rgba(255,255,255,0.4);margin-top:1px;">${fmtHa(a12.ha)}</div>
+              </div>
             </div>
+            <div style="margin-top:8px;font-size:8px;color:rgba(255,255,255,0.2);text-align:center;letter-spacing:0.1em;">${inc.lat.toFixed(4)}° ${inc.lon.toFixed(4)}°</div>
           </div>
         </div>
       `)
