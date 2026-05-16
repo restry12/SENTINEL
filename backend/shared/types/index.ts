@@ -147,6 +147,11 @@ export interface NaturalRoutes {
   mensaje_alerta: string
 }
 
+export interface RoutesResult {
+  routes: RouteData[]
+  naturalRoutes: NaturalRoutes | null
+}
+
 // Agent contract — POST /analyze
 export interface AgentRequest {
   firms?: FireData[]
