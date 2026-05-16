@@ -1,18 +1,215 @@
 "use client"
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useSentinel } from '@/contexts/sentinel-context'
+import { degToCompass } from '@/lib/utils'
+import { useGeolocation } from '@/hooks/use-geolocation'
 
-const TOKEN = "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
+const TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
+  "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
 
+
+type ExpansionKey = '2h' | '6h' | '12h'
+interface SelectedFire { lat: number; lon: number; id: string }
+
+// Elliptical fire spread model (simplified Rothermel).
+// Fire origin sits at the REAR of the ellipse — spread is clearly one-directional.
+// windDegFrom: meteorological bearing fire comes FROM (0=N, 90=E…)
+function makeFireSpreadPolygon(
+  lat: number, lon: number,
+  windDegFrom: number, windSpeedMs: number,
+  hours: number
+) {
+  const windKmh = windSpeedMs * 3.6
+  const spreadRad = ((windDegFrom + 180) % 360) * (Math.PI / 180)
+  const sinS = Math.sin(spreadRad)  // east component of spread direction
+  const cosS = Math.cos(spreadRad)  // north component of spread direction
+
+  // Rate of spread (km/h)
+  const ros_forward = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
+  const ros_backing = 0.3
+  const ros_flank = Math.sqrt(ros_forward * ros_backing)
+
+  // Distances after `hours`
+  const d_forward = ros_forward * hours
+  const d_backing = ros_backing * hours
+  const d_flank = Math.max(ros_flank * hours, 0.3)
+
+  // Ellipse axes — fire origin at rear focus, not center
+  const a = (d_forward + d_backing) / 2
+  const b = d_flank
+  const center_offset = (d_forward - d_backing) / 2
+
+  const cosLat = Math.cos(lat * Math.PI / 180)
+  const kmToDegLat = 1 / 111
+  const kmToDegLon = 1 / (111 * cosLat)
+
+  // Shift ellipse center downwind from fire origin
+  const centerLat = lat + cosS * center_offset * kmToDegLat
+  const centerLon = lon + sinS * center_offset * kmToDegLon
+
+  const coords: number[][] = []
+  for (let i = 0; i <= 64; i++) {
+    const angle = (i / 64) * Math.PI * 2
+    const localAlong = a * Math.cos(angle)   // along spread axis
+    const localPerp = b * Math.sin(angle)    // perpendicular to spread
+    // Rotate to geographic spread direction
+    const east = localAlong * sinS + localPerp * (-cosS)
+    const north = localAlong * cosS + localPerp * sinS
+    coords.push([centerLon + east * kmToDegLon, centerLat + north * kmToDegLat])
+  }
+
+  return {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: { type: 'Polygon' as const, coordinates: [coords] },
+  }
+}
+
+// Area of spread ellipse in km² (π·a·b), 1 ha = 0.01 km²
+function computeFireSpreadArea(windSpeedMs: number, hours: number) {
+  const windKmh = windSpeedMs * 3.6
+  const ros_f = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
+  const ros_b = 0.3
+  const ros_l = Math.sqrt(ros_f * ros_b)
+  const a = (ros_f * hours + ros_b * hours) / 2
+  const b = Math.max(ros_l * hours, 0.3)
+  const km2 = Math.PI * a * b
+  return { km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) }
+}
+
+const EXP_CONFIG: Record<ExpansionKey, {
+  hours: number
+  colorCore: string; colorMid: string; colorOuter: string
+}> = {
+  '2h':  { hours: 2,  colorCore: '#dc2626', colorMid: '#ef4444', colorOuter: '#f87171' },
+  '6h':  { hours: 6,  colorCore: '#c2410c', colorMid: '#ea580c', colorOuter: '#fb923c' },
+  '12h': { hours: 12, colorCore: '#b45309', colorMid: '#d97706', colorOuter: '#fbbf24' },
+}
+
+interface FireArea { km2: number; ha: number }
+interface PopupData {
+  id: string; color: string; intensity: string; frp: number
+  lat: number; lon: number
+  sDirLabel: string; wKmh: number
+  a2: FireArea; a6: FireArea; a12: FireArea
+  weather?: { speed: number; deg: number; humidity: number; temp?: number }
+  pm25?: number | null
+}
+
+function fmtKm2(v: number) { return v >= 1000 ? `${(v/1000).toFixed(1)}k km²` : `${v} km²` }
+function fmtHa(v: number)  { return v >= 10000 ? `${Math.round(v/1000)}k ha` : `${v.toLocaleString()} ha` }
+
+function buildPopupHTML(d: PopupData, active: ExpansionKey | null): string {
+  const areas: Record<ExpansionKey, FireArea> = { '2h': d.a2, '6h': d.a6, '12h': d.a12 }
+  const expColors: Record<ExpansionKey, string> = { '2h': '#ef4444', '6h': '#fb923c', '12h': '#fbbf24' }
+  const expBg: Record<ExpansionKey, string> = {
+    '2h': 'rgba(220,38,38,', '6h': 'rgba(194,65,12,', '12h': 'rgba(180,83,9,'
+  }
+
+  const activeArea = active ? areas[active] : null
+  const activeColor = active ? expColors[active] : d.color
+  const activeBg = active ? expBg[active] : 'rgba(239,68,68,'
+
+  return `
+    <div style="font-family:ui-monospace,monospace;background:linear-gradient(160deg,#0d1117,#0a0608);border:1px solid ${activeColor}44;border-radius:16px;overflow:hidden;box-shadow:0 0 50px ${activeColor}18,0 24px 60px rgba(0,0,0,0.7);min-width:280px;">
+
+      <!-- Header -->
+      <div style="padding:14px 16px 12px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px;">
+        <div style="width:9px;height:9px;border-radius:50%;background:${d.color};box-shadow:0 0 12px ${d.color};flex-shrink:0;"></div>
+        <span style="font-size:13px;font-weight:900;letter-spacing:0.18em;color:#f8fafc;">${d.id}</span>
+        <span style="margin-left:auto;font-size:9px;font-weight:700;letter-spacing:0.15em;color:${d.color};background:${d.color}22;border:1px solid ${d.color}44;border-radius:6px;padding:3px 8px;">${d.intensity.toUpperCase()}</span>
+      </div>
+
+      <!-- Stats row -->
+      <div style="padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:8px;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;">
+          <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:4px;">POTENCIA</div>
+          <div style="font-size:20px;font-weight:900;color:#fff;line-height:1;">${d.frp.toFixed(0)}<span style="font-size:10px;color:rgba(255,255,255,0.35);margin-left:3px;">MW</span></div>
+        </div>
+        <div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;">
+          <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:4px;">PROPAGACIÓN</div>
+          <div style="font-size:20px;font-weight:900;color:#fb923c;line-height:1;">${d.sDirLabel}<span style="font-size:10px;color:rgba(255,255,255,0.35);margin-left:3px;">${d.wKmh}km/h</span></div>
+        </div>
+      </div>
+
+      <!-- Per-fire weather + air quality -->
+      ${d.weather ? `
+      <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:8px;">CLIMA + AIRE EN EL FOCO</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:7px 10px;">
+            <div style="font-size:8px;letter-spacing:0.16em;color:rgba(255,255,255,0.3);">VIENTO</div>
+            <div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px;">${d.weather.speed.toFixed(1)}<span style="font-size:9px;color:rgba(255,255,255,0.35);"> m/s · ${d.weather.deg}°</span></div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:7px 10px;">
+            <div style="font-size:8px;letter-spacing:0.16em;color:rgba(255,255,255,0.3);">HUMEDAD</div>
+            <div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px;">${d.weather.humidity}<span style="font-size:9px;color:rgba(255,255,255,0.35);"> %</span></div>
+          </div>
+          ${typeof d.weather.temp === 'number' ? `
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:7px 10px;">
+            <div style="font-size:8px;letter-spacing:0.16em;color:rgba(255,255,255,0.3);">TEMP</div>
+            <div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px;">${d.weather.temp.toFixed(1)}<span style="font-size:9px;color:rgba(255,255,255,0.35);"> °C</span></div>
+          </div>` : ''}
+          ${d.pm25 !== undefined ? `
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:7px 10px;">
+            <div style="font-size:8px;letter-spacing:0.16em;color:rgba(255,255,255,0.3);">PM2.5</div>
+            <div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px;">${d.pm25 === null ? 's/d' : `${d.pm25}<span style="font-size:9px;color:rgba(255,255,255,0.35);"> µg/m³</span>`}</div>
+          </div>` : ''}
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Active expansion hero block -->
+      ${activeArea ? `
+      <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:8px;">ZONA AFECTADA EN <span style="color:${activeColor};font-weight:900;">${active!.toUpperCase()}</span></div>
+        <div style="background:${activeBg}0.14);border:1px solid ${activeColor}50;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
+          <div>
+            <div style="font-size:26px;font-weight:900;color:#fff;line-height:1;text-shadow:0 0 20px ${activeColor};">${fmtKm2(activeArea.km2)}</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.45);margin-top:4px;">${fmtHa(activeArea.ha)}</div>
+          </div>
+          <div style="margin-left:auto;font-size:36px;font-weight:900;color:${activeColor};opacity:0.5;line-height:1;">${active!.replace('h','')}<span style="font-size:14px;">H</span></div>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- All 3 timeframes grid -->
+      <div style="padding:12px 16px 14px;">
+        ${!activeArea ? `<div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:8px;">PROYECCIÓN DE EXPANSIÓN</div>` : `<div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.25);margin-bottom:8px;">OTRAS PROYECCIONES</div>`}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;">
+          ${(['2h','6h','12h'] as ExpansionKey[]).map(k => {
+            const isAct = k === active
+            const c = expColors[k]
+            const bg = expBg[k]
+            const ar = areas[k]
+            return `<button data-sentinel-key="${k}" style="cursor:pointer;all:unset;display:block;width:100%;box-sizing:border-box;background:${bg}${isAct ? '0.22' : '0.08'});border:1px solid ${c}${isAct ? '70' : '30'};border-radius:8px;padding:10px 6px;text-align:center;${isAct ? `box-shadow:0 0 14px ${c}30;` : ''}transition:all 0.15s;">
+              <div style="font-size:11px;font-weight:900;color:${c};letter-spacing:0.1em;${isAct ? `text-shadow:0 0 8px ${c};` : 'opacity:0.7;'}">${k.toUpperCase()}</div>
+              <div style="font-size:12px;font-weight:800;color:${isAct ? '#fff' : 'rgba(255,255,255,0.6)'};margin-top:4px;">${fmtKm2(ar.km2)}</div>
+              <div style="font-size:10px;color:rgba(255,255,255,${isAct ? '0.45' : '0.25'});margin-top:2px;">${fmtHa(ar.ha)}</div>
+            </button>`
+          }).join('')}
+        </div>
+        <div style="margin-top:8px;font-size:8px;color:rgba(255,255,255,0.18);text-align:center;letter-spacing:0.08em;">${d.lat.toFixed(4)}° ${d.lon.toFixed(4)}°</div>
+      </div>
+    </div>
+  `
+}
+
+interface MarkerEntry { marker: mapboxgl.Marker; popup: mapboxgl.Popup; data: PopupData }
 
 export function MapboxPanel() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<mapboxgl.Marker[]>([])
+  const markersRef = useRef<MarkerEntry[]>([])
   const { sentinelUpdate } = useSentinel()
+  const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
+  const [selectedFire, setSelectedFire] = useState<SelectedFire | null>(null)
+  const userCoords = useGeolocation()
 
+  // Init map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
     mapboxgl.accessToken = TOKEN
@@ -23,7 +220,6 @@ export function MapboxPanel() {
       zoom: 9,
       projection: 'globe' as any,
     })
-
     map.on('style.load', () => {
       map.setFog({
         'color': 'rgba(56, 189, 248, 0.15)',
@@ -33,28 +229,66 @@ export function MapboxPanel() {
         'star-intensity': 0.9,
       })
     })
-
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
+
+  // User GPS position marker
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !userCoords) return
+    const apply = () => {
+      const data = {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'Point' as const, coordinates: [userCoords.lon, userCoords.lat] },
+      }
+      const src = map.getSource('user-loc') as mapboxgl.GeoJSONSource | undefined
+      if (src) {
+        src.setData(data)
+      } else {
+        map.addSource('user-loc', { type: 'geojson', data })
+        map.addLayer({
+          id: 'user-loc-halo', type: 'circle', source: 'user-loc',
+          paint: { 'circle-radius': 20, 'circle-color': '#3b82f6', 'circle-opacity': 0.18, 'circle-blur': 1 },
+        })
+        map.addLayer({
+          id: 'user-loc-dot', type: 'circle', source: 'user-loc',
+          paint: {
+            'circle-radius': 7, 'circle-color': '#3b82f6',
+            'circle-stroke-width': 2, 'circle-stroke-color': 'rgba(255,255,255,0.9)',
+          },
+        })
+      }
+    }
+    if (map.isStyleLoaded()) apply()
+    else map.once('style.load', apply)
+  }, [userCoords])
 
   // Fire markers
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    markersRef.current.forEach(m => m.remove())
+    markersRef.current.forEach(e => e.marker.remove())
 
     const fires = sentinelUpdate
       ? sentinelUpdate.fires.map((f, i) => ({
           id: `FIRE-${String(i + 1).padStart(3, '0')}`,
-          lat: f.lat,
-          lon: f.lon,
-          frp: f.frp,
+          lat: f.lat, lon: f.lon, frp: f.frp,
           intensity: sentinelUpdate.riskLevel,
           weather: f.weather,
           pm25: f.pm25,
         }))
       : []
+
+    const wDeg   = sentinelUpdate?.weather?.deg   ?? 315
+    const wSpeed = sentinelUpdate?.weather?.speed ?? 6.7
+    const sDeg   = (wDeg + 180) % 360
+    const sDirLabel = degToCompass(sDeg)
+    const wKmh  = Math.round(wSpeed * 3.6)
+    const a2  = computeFireSpreadArea(wSpeed, 2)
+    const a6  = computeFireSpreadArea(wSpeed, 6)
+    const a12 = computeFireSpreadArea(wSpeed, 12)
 
     markersRef.current = fires.map(inc => {
       const el = document.createElement('div')
@@ -92,55 +326,41 @@ export function MapboxPanel() {
       core.appendChild(flicker)
       el.appendChild(core)
 
-      const popup = new mapboxgl.Popup({ offset: 12, closeButton: false, anchor: 'bottom' }).setHTML(`
-        <div class="tactical-popup">
-          <div class="tactical-popup-header">
-            <div class="w-1.5 h-1.5 rounded-full pulse-dot" style="background-color: ${color}; box-shadow: 0 0 6px ${color}"></div>
-            <span class="text-[11px] font-bold tracking-[0.16em] uppercase text-[#f4f5f7]">${inc.id}</span>
-          </div>
-          <div class="tactical-popup-body">
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Intensity</span>
-              <span class="tactical-stat-value" style="color: ${color}">${String(inc.intensity).toUpperCase()}</span>
-            </div>
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Coordinates</span>
-              <span class="tactical-stat-value num text-text-2">${inc.lat.toFixed(4)}°, ${inc.lon.toFixed(4)}°</span>
-            </div>
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Power (MW)</span>
-              <span class="tactical-stat-value num">${inc.frp.toFixed(1)}</span>
-            </div>
-            ${(inc as any).weather ? `
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Wind</span>
-              <span class="tactical-stat-value num">${(inc as any).weather.speed.toFixed(1)} m/s · ${(inc as any).weather.deg}°</span>
-            </div>
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Humidity</span>
-              <span class="tactical-stat-value num">${(inc as any).weather.humidity}%</span>
-            </div>` : ''}
-            ${(inc as any).weather && typeof (inc as any).weather.temp === 'number' ? `
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Temp</span>
-              <span class="tactical-stat-value num">${(inc as any).weather.temp.toFixed(1)}°C</span>
-            </div>` : ''}
-            ${(inc as any).pm25 !== undefined ? `
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">PM2.5</span>
-              <span class="tactical-stat-value num">${(inc as any).pm25 === null ? 's/d' : (inc as any).pm25 + ' µg/m³'}</span>
-            </div>` : ''}
-          </div>
-        </div>
-      `)
+      const popupData: PopupData = {
+        id: inc.id, color, intensity: String(inc.intensity),
+        frp: inc.frp, lat: inc.lat, lon: inc.lon,
+        sDirLabel, wKmh, a2, a6, a12,
+        weather: (inc as any).weather,
+        pm25: (inc as any).pm25,
+      }
 
-      return new mapboxgl.Marker(el)
+      const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '320px' })
+        .setHTML(buildPopupHTML(popupData, null))
+
+      // Delegated listener — survives setHTML updates
+      popup.on('open', () => {
+        popup.getElement()?.addEventListener('click', (e) => {
+          const btn = (e.target as HTMLElement).closest('[data-sentinel-key]')
+          if (!btn) return
+          const key = btn.getAttribute('data-sentinel-key') as ExpansionKey
+          setActiveExpansion(prev => prev === key ? null : key)
+        })
+      })
+
+      el.addEventListener('click', () => {
+        map.flyTo({ center: [inc.lon, inc.lat], zoom: 12, duration: 1200, essential: true })
+        setSelectedFire({ lat: inc.lat, lon: inc.lon, id: inc.id })
+        setActiveExpansion('2h')
+      })
+
+      const marker = new mapboxgl.Marker(el)
         .setLngLat([inc.lon, inc.lat])
         .setPopup(popup)
         .addTo(map)
+
+      return { marker, popup, data: popupData }
     })
 
-    // Recenter on the fires
     if (fires.length > 0) {
       const avgLon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
       const avgLat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
@@ -148,13 +368,20 @@ export function MapboxPanel() {
     }
   }, [sentinelUpdate])
 
-  // Fire polygon + expansion polygons + evacuation routes
+  // Update open popup HTML whenever active expansion changes
+  useEffect(() => {
+    if (!selectedFire) return
+    const entry = markersRef.current.find(e => e.data.id === selectedFire.id)
+    if (!entry) return
+    entry.popup.setHTML(buildPopupHTML(entry.data, activeExpansion))
+  }, [activeExpansion, selectedFire])
+
+  // Fire perimeter + evacuation routes from backend
   useEffect(() => {
     const map = mapRef.current
     if (!map || !sentinelUpdate) return
 
     const apply = () => {
-      // Current perimeter
       const polyId = 'sentinel-polygon'
       if (map.getLayer(polyId + '-fill')) map.removeLayer(polyId + '-fill')
       if (map.getLayer(polyId + '-line')) map.removeLayer(polyId + '-line')
@@ -165,26 +392,6 @@ export function MapboxPanel() {
         map.addLayer({ id: polyId + '-line', type: 'line', source: polyId, paint: { 'line-color': '#ef4444', 'line-width': 2 } })
       }
 
-      // Expansion forecast (2h / 6h / 12h)
-      const exp = sentinelUpdate.expansion
-      const expLayers: Array<[string, { coordinates: number[][][] } | undefined, string]> = [
-        ['exp-12h', exp?.expansion_12h, '#fbbf24'],
-        ['exp-6h', exp?.expansion_6h, '#fb923c'],
-        ['exp-2h', exp?.expansion_2h, '#f97316'],
-      ]
-      for (const [id, poly, color] of expLayers) {
-        if (map.getLayer(id)) map.removeLayer(id)
-        if (map.getSource(id)) map.removeSource(id)
-        if (poly?.coordinates) {
-          map.addSource(id, {
-            type: 'geojson',
-            data: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: poly.coordinates } } as any,
-          })
-          map.addLayer({ id, type: 'line', source: id, paint: { 'line-color': color, 'line-width': 1.5, 'line-dasharray': [2, 2] } })
-        }
-      }
-
-      // Evacuation routes
       const routeId = 'sentinel-routes'
       if (map.getLayer(routeId)) map.removeLayer(routeId)
       if (map.getSource(routeId)) map.removeSource(routeId)
@@ -205,5 +412,99 @@ export function MapboxPanel() {
     else map.once('style.load', apply)
   }, [sentinelUpdate])
 
-  return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+  // Draw expansion — 3 concentric danger zones + glowing border + direction arrow
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const EXP_LAYER_IDS = [
+      'exp-outer-fill', 'exp-outer-glow', 'exp-outer-line',
+      'exp-mid-fill',
+      'exp-core-fill', 'exp-core-line',
+      'exp-arrow',
+    ]
+    const EXP_SOURCE_IDS = ['exp-outer', 'exp-mid', 'exp-core', 'exp-arrow-src']
+
+    const drawExpansion = () => {
+      EXP_LAYER_IDS.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) })
+      EXP_SOURCE_IDS.forEach(id => { if (map.getSource(id)) map.removeSource(id) })
+
+      if (!selectedFire || !activeExpansion) return
+
+      const cfg = EXP_CONFIG[activeExpansion]
+      const windDeg = sentinelUpdate?.weather?.deg ?? 315
+      const windSpeedMs = sentinelUpdate?.weather?.speed ?? 6.7
+      const exp = sentinelUpdate?.expansion
+      const backendPoly = activeExpansion === '2h' ? exp?.expansion_2h
+        : activeExpansion === '6h' ? exp?.expansion_6h
+        : exp?.expansion_12h
+
+      // Outer polygon = full timeframe (or backend data)
+      const outerGeo = backendPoly?.coordinates
+        ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: backendPoly.coordinates } }
+        : makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours)
+
+      // Mid and core = 55% / 25% of hours (same shape, smaller)
+      const midGeo = makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours * 0.55)
+      const coreGeo = makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours * 0.25)
+
+      // Direction arrow: fire origin → downwind tip of outer polygon
+      const spreadRad = ((windDeg + 180) % 360) * Math.PI / 180
+      const sinS = Math.sin(spreadRad)
+      const cosS = Math.cos(spreadRad)
+      const windKmhVal = windSpeedMs * 3.6
+      const ros_f = 0.5 + windKmhVal * 0.15 + windKmhVal * windKmhVal * 0.002
+      const tipKm = ros_f * cfg.hours
+      const cosLat = Math.cos(selectedFire.lat * Math.PI / 180)
+      const tipLon = selectedFire.lon + sinS * tipKm / (111 * cosLat)
+      const tipLat = selectedFire.lat + cosS * tipKm / 111
+
+      // Sources
+      map.addSource('exp-outer', { type: 'geojson', data: outerGeo as any })
+      map.addSource('exp-mid',   { type: 'geojson', data: midGeo   as any })
+      map.addSource('exp-core',  { type: 'geojson', data: coreGeo  as any })
+      map.addSource('exp-arrow-src', {
+        type: 'geojson',
+        data: {
+          type: 'Feature', properties: {},
+          geometry: { type: 'LineString', coordinates: [[selectedFire.lon, selectedFire.lat], [tipLon, tipLat]] },
+        } as any,
+      })
+
+      // Outer glow (wide dim line for bloom effect)
+      map.addLayer({ id: 'exp-outer-glow', type: 'line', source: 'exp-outer',
+        paint: { 'line-color': cfg.colorOuter, 'line-width': 14, 'line-opacity': 0.08, 'line-blur': 4 } })
+      // Outer fill — low opacity danger zone
+      map.addLayer({ id: 'exp-outer-fill', type: 'fill', source: 'exp-outer',
+        paint: { 'fill-color': cfg.colorOuter, 'fill-opacity': 0.07 } })
+      // Outer dashed border
+      map.addLayer({ id: 'exp-outer-line', type: 'line', source: 'exp-outer',
+        paint: { 'line-color': cfg.colorOuter, 'line-width': 1.5, 'line-opacity': 0.7, 'line-dasharray': [4, 3] } })
+
+      // Mid fill — medium intensity
+      map.addLayer({ id: 'exp-mid-fill', type: 'fill', source: 'exp-mid',
+        paint: { 'fill-color': cfg.colorMid, 'fill-opacity': 0.14 } })
+
+      // Core fill — hottest / most dangerous zone
+      map.addLayer({ id: 'exp-core-fill', type: 'fill', source: 'exp-core',
+        paint: { 'fill-color': cfg.colorCore, 'fill-opacity': 0.28 } })
+      // Core solid glowing border
+      map.addLayer({ id: 'exp-core-line', type: 'line', source: 'exp-core',
+        paint: { 'line-color': cfg.colorCore, 'line-width': 2.5, 'line-opacity': 0.9 } })
+
+      // Direction arrow — bold line from fire origin to downwind tip
+      map.addLayer({ id: 'exp-arrow', type: 'line', source: 'exp-arrow-src',
+        paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-opacity': 0.5, 'line-dasharray': [6, 4] } })
+    }
+
+    if (map.isStyleLoaded()) drawExpansion()
+    else map.once('style.load', drawExpansion)
+  }, [selectedFire, activeExpansion, sentinelUpdate])
+
+  return (
+    <div className="absolute inset-0 w-full h-full">
+      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+
+    </div>
+  )
 }

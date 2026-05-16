@@ -56,8 +56,9 @@ export function TopBar() {
         <div className="flex-1 flex items-center justify-center gap-4">
           <nav className="flex items-center gap-1 p-1 rounded-lg border border-white/5 bg-surface/40 backdrop-blur-md">
             {([
-              { href: '/dashboard', label: tx.navDashboard },
-              { href: '/air',       label: tx.navAir },
+              { href: '/dashboard',         label: tx.navDashboard },
+              { href: '/air',               label: tx.navAir },
+              { href: '/dashboard/citizen', label: 'Ciudadano' },
             ] as const).map(({ href, label }) => (
               <Link
                 key={href}
