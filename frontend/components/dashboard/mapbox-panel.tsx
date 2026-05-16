@@ -73,6 +73,18 @@ function makeFireSpreadPolygon(
   }
 }
 
+// Area of spread ellipse in km² (π·a·b), 1 ha = 0.01 km²
+function computeFireSpreadArea(windSpeedMs: number, hours: number) {
+  const windKmh = windSpeedMs * 3.6
+  const ros_f = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
+  const ros_b = 0.3
+  const ros_l = Math.sqrt(ros_f * ros_b)
+  const a = (ros_f * hours + ros_b * hours) / 2
+  const b = Math.max(ros_l * hours, 0.3)
+  const km2 = Math.PI * a * b
+  return { km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) }
+}
+
 const EXP_CONFIG: Record<ExpansionKey, {
   hours: number
   colorCore: string; colorMid: string; colorOuter: string
@@ -344,6 +356,20 @@ export function MapboxPanel() {
   const spreadDeg = (windDeg + 180) % 360
   const spreadCardinal = degToCompass(spreadDeg)
 
+  // Pre-compute areas for all timeframes (use backend area_km2 if available, else calculated)
+  const exp = sentinelUpdate?.expansion
+  const areas: Record<ExpansionKey, { km2: number; ha: number }> = {
+    '2h':  exp?.expansion_2h?.area_km2
+      ? { km2: exp.expansion_2h.area_km2, ha: Math.round(exp.expansion_2h.area_km2 * 100) }
+      : computeFireSpreadArea(windSpeed, 2),
+    '6h':  exp?.expansion_6h?.area_km2
+      ? { km2: exp.expansion_6h.area_km2, ha: Math.round(exp.expansion_6h.area_km2 * 100) }
+      : computeFireSpreadArea(windSpeed, 6),
+    '12h': exp?.expansion_12h?.area_km2
+      ? { km2: exp.expansion_12h.area_km2, ha: Math.round(exp.expansion_12h.area_km2 * 100) }
+      : computeFireSpreadArea(windSpeed, 12),
+  }
+
   return (
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
@@ -387,11 +413,12 @@ export function MapboxPanel() {
           {/* Timeframe buttons */}
           {expansionOptions.map(({ key, label, color }) => {
             const isActive = activeExpansion === key
+            const area = areas[key]
             return (
               <button
                 key={key}
                 onClick={() => setActiveExpansion(prev => prev === key ? null : key)}
-                className="relative px-4 py-2 rounded-xl text-[11px] font-mono font-black tracking-[0.15em] uppercase transition-all duration-200"
+                className="relative flex flex-col items-center gap-0.5 px-4 py-2 rounded-xl transition-all duration-200"
                 style={{
                   color: isActive ? '#fff' : `${color}cc`,
                   background: isActive
@@ -401,10 +428,24 @@ export function MapboxPanel() {
                   boxShadow: isActive
                     ? `0 0 20px ${color}60, 0 0 40px ${color}20, inset 0 1px 1px rgba(255,255,255,0.15)`
                     : 'none',
-                  textShadow: isActive ? `0 0 12px ${color}` : 'none',
                 }}
               >
-                {label}
+                <span
+                  className="text-[11px] font-mono font-black tracking-[0.15em] uppercase"
+                  style={{ textShadow: isActive ? `0 0 12px ${color}` : 'none' }}
+                >
+                  {label}
+                </span>
+                <span className="text-[8px] font-mono opacity-80 whitespace-nowrap">
+                  {area.km2 >= 100
+                    ? `${(area.km2 / 1000).toFixed(1)}k km²`
+                    : `${area.km2} km²`}
+                </span>
+                <span className="text-[8px] font-mono opacity-60 whitespace-nowrap">
+                  {area.ha >= 10000
+                    ? `${Math.round(area.ha / 1000)}k ha`
+                    : `${area.ha.toLocaleString()} ha`}
+                </span>
               </button>
             )
           })}
