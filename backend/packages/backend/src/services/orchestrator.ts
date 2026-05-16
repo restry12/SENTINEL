@@ -47,6 +47,7 @@ async function callAgent<T>(url: string, body: AgentRequest): Promise<AgentRespo
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(45000),
     })
     if (res.ok) return res.json() as Promise<AgentResponse<T>>
     if (res.status !== 502 && res.status !== 503) throw new Error(`Agent at ${url} returned ${res.status}`)
