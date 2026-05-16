@@ -51,6 +51,8 @@ export function MapboxPanel() {
           lon: f.lon,
           frp: f.frp,
           intensity: sentinelUpdate.riskLevel,
+          weather: f.weather,
+          pm25: f.pm25,
         }))
       : []
 
@@ -108,6 +110,24 @@ export function MapboxPanel() {
             <div class="tactical-stat-row">
               <span class="tactical-stat-label">Power (MW)</span>
               <span class="tactical-stat-value num">${inc.frp.toFixed(1)}</span>
+            </div>
+            ${(inc as any).weather ? `
+            <div class="tactical-stat-row">
+              <span class="tactical-stat-label">Wind</span>
+              <span class="tactical-stat-value num">${(inc as any).weather.speed.toFixed(1)} m/s · ${(inc as any).weather.deg}°</span>
+            </div>
+            <div class="tactical-stat-row">
+              <span class="tactical-stat-label">Humidity</span>
+              <span class="tactical-stat-value num">${(inc as any).weather.humidity}%</span>
+            </div>` : ''}
+            ${(inc as any).weather && typeof (inc as any).weather.temp === 'number' ? `
+            <div class="tactical-stat-row">
+              <span class="tactical-stat-label">Temp</span>
+              <span class="tactical-stat-value num">${(inc as any).weather.temp.toFixed(1)}°C</span>
+            </div>` : ''}
+            <div class="tactical-stat-row">
+              <span class="tactical-stat-label">PM2.5</span>
+              <span class="tactical-stat-value num">${(inc as any).pm25 == null ? 's/d' : (inc as any).pm25 + ' µg/m³'}</span>
             </div>
           </div>
         </div>
