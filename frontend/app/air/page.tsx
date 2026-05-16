@@ -143,7 +143,7 @@ function AirPageInner() {
       {/* ── Main ── */}
       <main className="flex-1 relative overflow-hidden">
         <AirMap wind={liveEnv.wind} fires={liveFires} />
-        <SmokeAlert wind={liveEnv.wind} />
+        <SmokeAlert wind={liveEnv.wind} sourceCount={liveFires.length} />
 
         {/* Map overlays — hidden when sidebar open on mobile to avoid clutter */}
         <div className={`transition-opacity duration-200 ${sidebarOpen ? 'opacity-0 pointer-events-none md:opacity-100 md:pointer-events-auto' : ''}`}>
