@@ -1,0 +1,36 @@
+"use client"
+
+import type { FirePoint, WindData } from "./types"
+
+interface Props {
+  fires: FirePoint[]
+  wind: WindData
+}
+
+const BEARING_NAMES = ["N","NE","E","SE","S","SW","W","NW"]
+function bearingName(deg: number): string {
+  return BEARING_NAMES[Math.round(deg / 45) % 8]
+}
+
+export function SmokeAlert({ fires, wind }: Props) {
+  const names   = fires.map(f => f.name).join("  ·  ")
+  const windDir = bearingName(wind.fromDeg)
+
+  return (
+    <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-3 px-5 py-2 bg-black/75 backdrop-blur-md border border-red-500/40 rounded-sm font-mono whitespace-nowrap">
+      <span
+        className="h-2 w-2 rounded-full bg-red-500 flex-shrink-0"
+        style={{ animation: "smokeAlertBlink 1.2s ease-in-out infinite" }}
+      />
+      <span className="text-xs font-semibold tracking-widest uppercase text-red-400">
+        Smoke Propagation Detected
+      </span>
+      <span className="text-border">|</span>
+      <span className="text-xs text-muted-foreground">{names}</span>
+      <span className="text-border">|</span>
+      <span className="text-xs text-muted-foreground">
+        Wind: {windDir} {wind.speed} km/h
+      </span>
+    </div>
+  )
+}
