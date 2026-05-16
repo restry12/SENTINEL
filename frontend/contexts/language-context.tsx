@@ -106,12 +106,7 @@ export const t = {
     },
     // Air — Incident Timeline
     incidentLog: 'REGISTRO DE INCIDENTES',
-    events: {
-      base:     ['Fuente de contaminación detectada — AQI en aumento','Dispersión de PM2.5 identificada — sector NW','Umbral AQI superado — zona B crítica','Deterioro AQI proyectado — proyección 2h','Alertas de salud de emergencia enviadas','32K población en corredor de exposición'],
-      wind:     ['Intensificación del viento — 52 km/h detectado','Velocidad de dispersión escalada significativamente'],
-      humidity: ['Humedad relativa crítica — 8%','Riesgo crítico AQI elevado — todos los sectores'],
-      worst:    ['Condiciones atmosféricas del peor caso activas','Todos los parámetros AQI en umbral crítico','Evacuación de emergencia de salud recomendada'],
-    },
+    noIncidents: 'Sin incidentes registrados',
     // Air — Scenario Controls
     simulate:        'SIMULAR',
     scenarioWind:    'Viento Intensifica',
@@ -217,12 +212,7 @@ export const t = {
       critical: ['CRITICAL: PM2.5 concentration has exceeded safe exposure thresholds.','Emergency response teams have been activated across all affected zones.','Population in the primary exposure corridor must seek shelter immediately.','Air quality is projected to remain critical for the next 4–6 hours.'],
     },
     incidentLog: 'INCIDENT LOG',
-    events: {
-      base:     ['Pollution source detected — AQI rising','PM2.5 dispersion identified — NW sector','AQI threshold exceeded — zone B critical','AQI deterioration forecasted — 2h projection','Emergency health alerts dispatched','32K population in exposure corridor'],
-      wind:     ['Wind intensification — 52 km/h detected','Dispersion velocity escalated significantly'],
-      humidity: ['Relative humidity critical — 8%','AQI critical risk elevated — all sectors'],
-      worst:    ['Worst-case atmospheric conditions active','All AQI parameters at critical threshold','Emergency health evacuation recommended'],
-    },
+    noIncidents: 'No incidents logged',
     simulate:        'SIMULATE',
     scenarioWind:    'Wind Intensifies',
     scenarioHumidity:'Humidity Drops',
