@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
+import { ArrowUp } from 'lucide-react'
 import { useSentinel } from '@/contexts/sentinel-context'
+import { degToCompass } from '@/lib/utils'
 
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
@@ -15,42 +17,53 @@ const FALLBACK_FIRES = [
 ]
 
 type ExpansionKey = '2h' | '6h' | '12h'
-
 interface SelectedFire { lat: number; lon: number; id: string }
 
-// Generate fire expansion ellipse GeoJSON offset in downwind direction.
-// windDegFrom: meteorological (wind comes FROM this bearing, 0=N, 90=E...)
-// Polygon elongated downwind, center shifts downwind over time.
-function makeExpansionPolygon(lat: number, lon: number, windDegFrom: number, windSpeedMs: number, hours: number) {
+// Elliptical fire spread model (simplified Rothermel).
+// Fire origin sits at the REAR of the ellipse — spread is clearly one-directional.
+// windDegFrom: meteorological bearing fire comes FROM (0=N, 90=E…)
+function makeFireSpreadPolygon(
+  lat: number, lon: number,
+  windDegFrom: number, windSpeedMs: number,
+  hours: number
+) {
+  const windKmh = windSpeedMs * 3.6
   const spreadRad = ((windDegFrom + 180) % 360) * (Math.PI / 180)
-  const sinD = Math.sin(spreadRad)
-  const cosD = Math.cos(spreadRad)
-  const cosLat = Math.cos(lat * Math.PI / 180)
+  const sinS = Math.sin(spreadRad)  // east component of spread direction
+  const cosS = Math.cos(spreadRad)  // north component of spread direction
 
-  // km → deg: lat 1°≈111km, lon 1°≈111km*cosLat
+  // Rate of spread (km/h)
+  const ros_forward = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
+  const ros_backing = 0.3
+  const ros_flank = Math.sqrt(ros_forward * ros_backing)
+
+  // Distances after `hours`
+  const d_forward = ros_forward * hours
+  const d_backing = ros_backing * hours
+  const d_flank = Math.max(ros_flank * hours, 0.3)
+
+  // Ellipse axes — fire origin at rear focus, not center
+  const a = (d_forward + d_backing) / 2
+  const b = d_flank
+  const center_offset = (d_forward - d_backing) / 2
+
+  const cosLat = Math.cos(lat * Math.PI / 180)
   const kmToDegLat = 1 / 111
   const kmToDegLon = 1 / (111 * cosLat)
 
-  const windKmh = windSpeedMs * 3.6
-  const spreadKm = 1.5 + hours * (1.2 + windKmh * 0.03)
-  const offsetKm = hours * windKmh * 0.05
+  // Shift ellipse center downwind from fire origin
+  const centerLat = lat + cosS * center_offset * kmToDegLat
+  const centerLon = lon + sinS * center_offset * kmToDegLon
 
-  const centerLat = lat + cosD * offsetKm * kmToDegLat
-  const centerLon = lon + sinD * offsetKm * kmToDegLon
-
-  const elongation = 1.8
-  const aKm = spreadKm * elongation
-  const bKm = spreadKm
-
-  const pts = 48
   const coords: number[][] = []
-  for (let i = 0; i <= pts; i++) {
-    const angle = (i / pts) * Math.PI * 2
-    const localX = aKm * Math.cos(angle)
-    const localY = bKm * Math.sin(angle)
-    const rotX = localX * sinD - localY * cosD
-    const rotY = localX * cosD + localY * sinD
-    coords.push([centerLon + rotX * kmToDegLon, centerLat + rotY * kmToDegLat])
+  for (let i = 0; i <= 64; i++) {
+    const angle = (i / 64) * Math.PI * 2
+    const localAlong = a * Math.cos(angle)   // along spread axis
+    const localPerp = b * Math.sin(angle)    // perpendicular to spread
+    // Rotate to geographic spread direction
+    const east = localAlong * sinS + localPerp * (-cosS)
+    const north = localAlong * cosS + localPerp * sinS
+    coords.push([centerLon + east * kmToDegLon, centerLat + north * kmToDegLat])
   }
 
   return {
@@ -61,9 +74,9 @@ function makeExpansionPolygon(lat: number, lon: number, windDegFrom: number, win
 }
 
 const EXP_CONFIG: Record<ExpansionKey, { hours: number; color: string; fillOpacity: number }> = {
-  '2h':  { hours: 2,  color: '#f97316', fillOpacity: 0.12 },
-  '6h':  { hours: 6,  color: '#fb923c', fillOpacity: 0.09 },
-  '12h': { hours: 12, color: '#fbbf24', fillOpacity: 0.06 },
+  '2h':  { hours: 2,  color: '#f97316', fillOpacity: 0.14 },
+  '6h':  { hours: 6,  color: '#fb923c', fillOpacity: 0.10 },
+  '12h': { hours: 12, color: '#fbbf24', fillOpacity: 0.07 },
 }
 
 export function MapboxPanel() {
@@ -172,7 +185,7 @@ export function MapboxPanel() {
       `)
 
       el.addEventListener('click', () => {
-        map.flyTo({ center: [inc.lon, inc.lat], zoom: 13, duration: 1200, essential: true })
+        map.flyTo({ center: [inc.lon, inc.lat], zoom: 12, duration: 1200, essential: true })
         setSelectedFire({ lat: inc.lat, lon: inc.lon, id: inc.id })
         setActiveExpansion('2h')
       })
@@ -232,7 +245,6 @@ export function MapboxPanel() {
     if (!map) return
 
     const drawExpansion = () => {
-      // Clear previous layer
       if (map.getLayer('exp-active-fill')) map.removeLayer('exp-active-fill')
       if (map.getLayer('exp-active-line')) map.removeLayer('exp-active-line')
       if (map.getSource('exp-active')) map.removeSource('exp-active')
@@ -240,35 +252,23 @@ export function MapboxPanel() {
       if (!selectedFire || !activeExpansion) return
 
       const cfg = EXP_CONFIG[activeExpansion]
-
-      // Prefer backend expansion data if available, otherwise generate from fire coords + wind
-      let geoJson: ReturnType<typeof makeExpansionPolygon> | null = null
       const exp = sentinelUpdate?.expansion
       const backendPoly = activeExpansion === '2h' ? exp?.expansion_2h
         : activeExpansion === '6h' ? exp?.expansion_6h
         : exp?.expansion_12h
 
+      let geoJson
       if (backendPoly?.coordinates) {
-        geoJson = {
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'Polygon', coordinates: backendPoly.coordinates },
-        }
+        geoJson = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: backendPoly.coordinates } }
       } else {
         const windDeg = sentinelUpdate?.weather?.deg ?? 315
-        const windSpeed = sentinelUpdate?.weather?.speed ?? 5
-        geoJson = makeExpansionPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeed, cfg.hours)
+        const windSpeed = sentinelUpdate?.weather?.speed ?? 6.7  // ~24 km/h
+        geoJson = makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeed, cfg.hours)
       }
 
       map.addSource('exp-active', { type: 'geojson', data: geoJson as any })
-      map.addLayer({
-        id: 'exp-active-fill', type: 'fill', source: 'exp-active',
-        paint: { 'fill-color': cfg.color, 'fill-opacity': cfg.fillOpacity },
-      })
-      map.addLayer({
-        id: 'exp-active-line', type: 'line', source: 'exp-active',
-        paint: { 'line-color': cfg.color, 'line-width': 2, 'line-dasharray': [3, 2] },
-      })
+      map.addLayer({ id: 'exp-active-fill', type: 'fill', source: 'exp-active', paint: { 'fill-color': cfg.color, 'fill-opacity': cfg.fillOpacity } })
+      map.addLayer({ id: 'exp-active-line', type: 'line', source: 'exp-active', paint: { 'line-color': cfg.color, 'line-width': 2, 'line-dasharray': [3, 2] } })
     }
 
     if (map.isStyleLoaded()) drawExpansion()
@@ -281,15 +281,41 @@ export function MapboxPanel() {
     { key: '12h', label: '12H', color: '#fbbf24' },
   ]
 
+  // Wind display values
+  const windDeg = sentinelUpdate?.weather?.deg ?? 315
+  const windSpeed = sentinelUpdate?.weather?.speed ?? 6.7
+  const windKmh = Math.round(windSpeed * 3.6)
+  const spreadDeg = (windDeg + 180) % 360
+  const spreadCardinal = degToCompass(spreadDeg)
+
   return (
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
+      {/* Wind indicator — shown when fire is selected */}
+      {selectedFire && (
+        <div className="absolute top-4 right-4 z-20 flex flex-col items-center gap-1 px-3 py-2.5 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md shadow-xl">
+          <span className="text-[8px] font-mono font-bold tracking-[0.2em] text-white/40 uppercase">Viento</span>
+          <ArrowUp
+            className="w-5 h-5 text-orange-400"
+            style={{ transform: `rotate(${spreadDeg}deg)`, filter: 'drop-shadow(0 0 6px rgba(251,146,60,0.6))' }}
+          />
+          <span className="text-[10px] font-mono font-black text-orange-400 tracking-wider">{spreadCardinal}</span>
+          <span className="text-[9px] font-mono text-white/50">{windKmh} km/h</span>
+        </div>
+      )}
+
+      {/* Expansion projection toggle */}
       {selectedFire && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md shadow-2xl">
-          <span className="px-3 text-[9px] font-mono font-bold tracking-[0.2em] text-white/40 uppercase whitespace-nowrap">
-            Expansión {selectedFire.id}
-          </span>
+          <div className="flex flex-col px-3 gap-0.5">
+            <span className="text-[8px] font-mono font-bold tracking-[0.2em] text-white/40 uppercase whitespace-nowrap">
+              Expansión {selectedFire.id}
+            </span>
+            <span className="text-[9px] font-mono text-orange-400 whitespace-nowrap">
+              → {spreadCardinal} · {windKmh} km/h
+            </span>
+          </div>
           {expansionOptions.map(({ key, label, color }) => (
             <button
               key={key}
