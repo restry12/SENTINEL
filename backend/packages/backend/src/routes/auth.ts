@@ -73,7 +73,8 @@ router.post('/login', async (req, res) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error || !data.session) {
-    res.status(401).json({ ok: false, error: 'Credenciales inválidas' })
+    console.error('[auth] login error:', error?.message, error?.status)
+    res.status(401).json({ ok: false, error: error?.message ?? 'Credenciales inválidas' })
     return
   }
 
