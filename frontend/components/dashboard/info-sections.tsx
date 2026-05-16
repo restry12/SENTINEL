@@ -55,7 +55,7 @@ export function InfoSections() {
         
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: tx.atRisk, value: populationAtRisk != null ? populationAtRisk.toLocaleString() : "127,450", color: "text-red-soft" },
+            { label: tx.atRisk, value: populationAtRisk != null ? populationAtRisk.toLocaleString() : "—", color: "text-red-soft" },
             { label: tx.evacuated, value: "—", color: "text-green-soft" },
             { label: tx.inShelters, value: "—", color: "text-blue" },
             { label: tx.structures, value: "—", color: "text-orange-soft" },

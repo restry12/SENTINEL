@@ -47,7 +47,7 @@ export function RightPanel() {
           </div>
           <div className="space-y-0">
             {[
-              { k: tx.populationAtRisk, v: populationAtRisk != null ? populationAtRisk.toLocaleString() : "127,450", color: "text-red-soft" },
+              { k: tx.populationAtRisk, v: populationAtRisk != null ? populationAtRisk.toLocaleString() : "—", color: "text-red-soft" },
               { k: tx.evacuated, v: "—", color: "text-green-soft" },
               { k: tx.inShelters, v: "—", color: "text-blue" },
             ].map((item) => (
