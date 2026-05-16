@@ -1,2 +1,41 @@
 node_modules/
+dist/
+build/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Env files
 .env
+*.env
+*.env.local
+
+# Tooling caches
+.cache/
+.eslintcache
+.parcel-cache/
+.turbo/
+.vite/
+.tsbuildinfo
+*.tsbuildinfo
+
+# Framework outputs
+.next/
+.nuxt/
+.svelte-kit/
+out/
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
