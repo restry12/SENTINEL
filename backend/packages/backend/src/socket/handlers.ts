@@ -14,7 +14,7 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
     socket.on('trigger', (data: { lat?: number; lon?: number }) => {
       const lat = typeof data.lat === 'number' && isFinite(data.lat) ? data.lat : undefined
       const lon = typeof data.lon === 'number' && isFinite(data.lon) ? data.lon : undefined
-      executeAndBroadcast(io, lat, lon).catch((err) => {
+      executeAndBroadcast(io, lat, lon, undefined).catch((err) => {
         console.error('[socket] trigger unhandled error:', err)
       })
     })
@@ -48,12 +48,12 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
   })
 }
 
-export async function executeAndBroadcast(io: Server, lat?: number, lon?: number): Promise<void> {
+export async function executeAndBroadcast(io: Server, lat?: number, lon?: number, firms?: unknown[]): Promise<void> {
   const status: StatusPayload = { state: 'loading' }
   io.emit('status', status)
 
   try {
-    const update = await runAnalysis(lat, lon)
+    const update = await runAnalysis(lat, lon, firms)
     io.emit('update', update)
     io.emit('status', { state: 'ok' } satisfies StatusPayload)
 
