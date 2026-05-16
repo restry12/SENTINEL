@@ -12,6 +12,7 @@ function circlePolygon(lat: number, lon: number, radiusM: number): [number, numb
   const deltaLat = (radiusM / earthRadius) * (180 / Math.PI)
   const deltaLon = deltaLat / Math.cos((lat * Math.PI) / 180)
 
+  // i goes 0..16 (17 iterations): at i=16 angle=360°=0°, closing the ring back to the start point
   for (let i = 0; i <= 16; i++) {
     const angle = (i * 360) / 16
     const rad = (angle * Math.PI) / 180

@@ -9,10 +9,9 @@ app.use(express.json())
 app.post('/analyze', async (req, res) => {
   const body = req.body as AgentRequest
   const fires = body.firms ?? []
-  const polygon = body.polygon
 
   try {
-    const data = await calculateEvacuationRoutes(fires, polygon)
+    const data = await calculateEvacuationRoutes(fires)
     const response: AgentResponse<RouteData[]> = { success: true, data }
     res.json(response)
   } catch (err) {

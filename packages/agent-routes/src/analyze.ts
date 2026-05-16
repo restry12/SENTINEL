@@ -1,4 +1,4 @@
-import type { FireData, RouteData, GeoJSONFeature } from '@sentinel/types'
+import type { FireData, RouteData } from '@sentinel/types'
 
 const EVACUATION_DESTINATIONS: Array<{ name: string; lat: number; lon: number }> = [
   { name: 'Temuco Centro', lat: -38.7359, lon: -72.5904 },
@@ -6,10 +6,8 @@ const EVACUATION_DESTINATIONS: Array<{ name: string; lat: number; lon: number }>
   { name: 'Victoria', lat: -38.2333, lon: -72.3333 },
 ]
 
-export async function calculateEvacuationRoutes(
-  fires: FireData[],
-  polygon?: GeoJSONFeature
-): Promise<RouteData[]> {
+// polygon param removed — fire perimeter is not used in route calculation (origin is fire centroid)
+export async function calculateEvacuationRoutes(fires: FireData[]): Promise<RouteData[]> {
   if (fires.length === 0) return []
 
   const apiKey = process.env.OPENROUTE_API_KEY
@@ -24,8 +22,8 @@ export async function calculateEvacuationRoutes(
     try {
       const route = await fetchOrsRoute(apiKey, avgLon, avgLat, dest.lon, dest.lat)
       if (route) routes.push({ ...route, id: dest.name })
-    } catch {
-      // skip failed routes — others may still work
+    } catch (err) {
+      console.warn(`[agent-routes] route to ${dest.name} failed:`, err)
     }
   }
 
@@ -51,7 +49,10 @@ async function fetchOrsRoute(
     }),
   })
 
-  if (!res.ok) return null
+  if (!res.ok) {
+    console.warn(`[agent-routes] ORS returned ${res.status} for route to [${toLon},${toLat}]`)
+    return null
+  }
 
   const json = await res.json() as {
     routes: Array<{
