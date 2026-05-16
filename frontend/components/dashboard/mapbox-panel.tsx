@@ -6,11 +6,6 @@ import { useSentinel } from '@/contexts/sentinel-context'
 
 const TOKEN = "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
 
-const FALLBACK_FIRES = [
-  { lat: -38.28, lon: -71.90, frp: 480, intensity: 'critical' as const, id: 'FIRE-001' },
-  { lat: -38.25, lon: -71.85, frp: 210, intensity: 'high' as const, id: 'FIRE-002' },
-  { lat: -38.32, lon: -71.95, frp: 95, intensity: 'medium' as const, id: 'FIRE-003' },
-]
 
 export function MapboxPanel() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -57,7 +52,7 @@ export function MapboxPanel() {
           frp: f.frp,
           intensity: sentinelUpdate.riskLevel,
         }))
-      : FALLBACK_FIRES
+      : []
 
     markersRef.current = fires.map(inc => {
       const el = document.createElement('div')
