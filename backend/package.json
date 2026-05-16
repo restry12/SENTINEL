@@ -1,21 +1,17 @@
 {
-  "name": "backend",
+  "name": "sentinel",
   "version": "1.0.0",
-  "description": "",
-  "main": "server.js",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "shared/*"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "dev": "concurrently -n backend,fire,weather,air,routes -c cyan,red,blue,green,yellow \"npm run dev -w packages/backend\" \"npm run dev -w packages/agent-fire\" \"npm run dev -w packages/agent-weather\" \"npm run dev -w packages/agent-air\" \"npm run dev -w packages/agent-routes\"",
+    "test": "npm run test --workspaces --if-present"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "@supabase/supabase-js": "^2.105.4",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "socket.io": "^4.8.3"
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "typescript": "^5.4.5"
   }
 }
