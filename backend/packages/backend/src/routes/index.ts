@@ -27,12 +27,17 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   })
 
   // POST /api/trigger/csv — recibe CSV crudo de NASA FIRMS (text/plain)
-  // Make.com puede enviar el body directamente sin envolverlo en JSON
+  // Header opcional X-Weather-Data: JSON string con WeatherData
   app.post('/api/trigger/csv', async (req, res) => {
     const csv = typeof req.body === 'string' ? req.body : ''
     const firms = csv ? parseFirmsCSV(csv) : undefined
+    const weatherHeader = req.headers['x-weather-data']
+    let weather: unknown
+    if (typeof weatherHeader === 'string') {
+      try { weather = JSON.parse(weatherHeader) } catch { /* ignorar si no es JSON válido */ }
+    }
     try {
-      await executeAndBroadcast(io, undefined, undefined, firms)
+      await executeAndBroadcast(io, undefined, undefined, firms, weather)
       res.json({ ok: true, parsed: firms?.length ?? 0 })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
