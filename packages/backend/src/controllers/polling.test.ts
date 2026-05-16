@@ -39,4 +39,19 @@ describe('PollingController', () => {
     vi.advanceTimersByTime(1000)
     expect(mockRun).toHaveBeenCalledTimes(1)
   })
+
+  it('stop actually clears the timer and prevents further runs', () => {
+    controller.start(1000)
+    controller.stop()
+    vi.advanceTimersByTime(3000)
+    expect(mockRun).not.toHaveBeenCalled()
+  })
+
+  it('sets nextRun on start and updates lastRun after tick', async () => {
+    controller.start(1000)
+    expect(controller.getState().nextRun).not.toBeNull()
+    vi.advanceTimersByTime(1000)
+    await Promise.resolve()
+    expect(controller.getState().lastRun).not.toBeNull()
+  })
 })
