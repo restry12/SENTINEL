@@ -1,39 +1,26 @@
 import type { Express } from 'express'
 import type { Server } from 'socket.io'
-import type { AlertPayload, StatusPayload } from '@sentinel/types'
 import type { PollingController } from '../controllers/polling'
-import { runAnalysis } from '../services/orchestrator'
-import { triggerMakeWebhook } from '../services/alert'
 import { executeAndBroadcast } from '../socket/handlers'
 
 export function registerRoutes(app: Express, io: Server, polling: PollingController): void {
-  // POST /api/trigger — manual single run
+  // POST /api/trigger — manual single analysis run
+  // Data is broadcast to all socket subscribers; HTTP caller receives confirmation only
   app.post('/api/trigger', async (req, res) => {
-    const { lat, lon } = req.body as { lat?: number; lon?: number }
+    const body = req.body as { lat?: number; lon?: number }
+    const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+    const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
     try {
-      io.emit('status', { state: 'loading' } satisfies StatusPayload)
-      const update = await runAnalysis(lat, lon)
-      io.emit('update', update)
-      io.emit('status', { state: 'ok' } satisfies StatusPayload)
-
-      if (update.riskLevel === 'high' || update.riskLevel === 'critical') {
-        const alert: AlertPayload = {
-          riskLevel: update.riskLevel,
-          fires: update.fires,
-          timestamp: update.timestamp,
-        }
-        io.emit('alert', alert)
-        await triggerMakeWebhook(alert)
-      }
-
-      res.json({ ok: true, update })
+      await executeAndBroadcast(io, lat, lon)
+      res.json({ ok: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       res.status(500).json({ ok: false, error: message })
     }
   })
 
-  // POST /api/polling/start
+  // POST /api/polling/start — start polling at given interval
+  // Minimum 10 seconds to avoid rate-limiting NASA FIRMS, OpenWeather, and OpenAQ
   app.post('/api/polling/start', (req, res) => {
     const { intervalMs } = req.body as { intervalMs: number }
     if (!intervalMs || intervalMs < 10000) {
