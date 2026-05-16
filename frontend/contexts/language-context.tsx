@@ -29,7 +29,7 @@ export const t = {
     // Left Panel
     threatAssessment:  'Evaluación de Amenaza',
     currentRisk:       'Nivel de Riesgo Actual',
-    immediateAction:   'Acción Inmediata Requerida · Sector 7A',
+    immediateAction:   'Acción Inmediata Requerida',
     fireRadiativePower:'Potencia Radiativa del Fuego',
     windConditions:    'Condiciones de Viento',
     airQualityIndex:   'Índice de Calidad del Aire',
@@ -151,7 +151,7 @@ export const t = {
     enter:           'Sign in here',
     threatAssessment:  'Threat Assessment',
     currentRisk:       'Current Risk Level',
-    immediateAction:   'Immediate Action Required · Sector 7A',
+    immediateAction:   'Immediate Action Required',
     fireRadiativePower:'Fire Radiative Power',
     windConditions:    'Wind Conditions',
     airQualityIndex:   'Air Quality Index',
