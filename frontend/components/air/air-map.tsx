@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react"
 import mapboxgl from "mapbox-gl"
-import "mapbox-gl/dist/mapbox-gl.css"
 import { drawFrame } from "./smoke-engine"
 import { MOCK_ENV } from "./types"
 
