@@ -31,12 +31,12 @@ export function useSentinelMetrics() {
   const { sentinelUpdate: u, connected, status } = useSentinel()
   const hasData = u !== null
 
-  const frpMax = u ? u.fires.reduce((m, f) => Math.max(m, f.frp), 0) : 847.3
-  const windSpeedKmh = u ? Math.round(u.weather.speed * 3.6) : 24
-  const windDir = u ? degToCompass(u.weather.deg) : "NW"
-  const aqi = u?.airQuality.aqi ?? 187
-  const humidity = u?.weather.humidity ?? 32
-  const riskLevel = (u?.riskLevel ?? "critical").toUpperCase()
+  const frpMax = u ? u.fires.reduce((m, f) => Math.max(m, f.frp), 0) : 0
+  const windSpeedKmh = u ? Math.round(u.weather.speed * 3.6) : 0
+  const windDir = u ? degToCompass(u.weather.deg) : "—"
+  const aqi = u?.airQuality.aqi ?? 0
+  const humidity = u?.weather.humidity ?? 0
+  const riskLevel = u ? (u.riskLevel).toUpperCase() : "NO DATA"
   const populationAtRisk = u?.report?.poblacion_en_riesgo_estimada ?? null
   const briefing =
     u?.report?.resumen_ejecutivo ?? u?.riskAssessment?.resumen ?? null
