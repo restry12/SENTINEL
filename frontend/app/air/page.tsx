@@ -25,7 +25,7 @@ const AirMap = dynamic(
 )
 
 export default function AirPage() {
-  const pathname = usePathname()
+  const pathname   = usePathname()
   const { lang, toggle, tx } = useLang()
   const [scenarioId, setScenarioId] = useState<ScenarioId>("none")
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -39,18 +39,17 @@ export default function AirPage() {
   const threat  = useMemo(() => computeThreatLevel(rawAQI), [rawAQI])
 
   return (
-    <div
-      className="h-screen w-screen flex flex-col bg-background overflow-hidden"
-      data-threat={threat}
-    >
+    <div className="h-screen w-screen flex flex-col bg-background overflow-hidden" data-threat={threat}>
       <div className="pointer-events-none fixed inset-0 z-[9999] scanline-overlay" />
 
-      <header className="h-12 border-b border-border flex items-center justify-between px-6 shrink-0 z-[2000]">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold tracking-widest uppercase text-muted-foreground font-mono">
+      {/* ── Header ── */}
+      <header className="h-12 border-b border-border flex items-center justify-between px-3 sm:px-6 shrink-0 z-[2000] gap-2">
+        {/* Left: brand + nav */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="hidden sm:block text-xs font-semibold tracking-widest uppercase text-muted-foreground font-mono whitespace-nowrap">
             SENTINEL
           </span>
-          <span className="text-border">|</span>
+          <span className="hidden sm:block text-border">|</span>
           <nav className="flex items-center gap-1">
             {[
               { href: '/dashboard', label: tx.navDashboard },
@@ -59,7 +58,7 @@ export default function AirPage() {
               <Link
                 key={href}
                 href={href}
-                className={`px-3 py-1 rounded text-[10px] font-mono font-bold tracking-widest uppercase transition-colors ${
+                className={`px-2 sm:px-3 py-1 rounded text-[9px] sm:text-[10px] font-mono font-bold tracking-widest uppercase transition-colors whitespace-nowrap ${
                   pathname === href
                     ? 'bg-orange/15 text-orange border border-orange/30'
                     : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
@@ -70,44 +69,76 @@ export default function AirPage() {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-4">
-          <ThreatIndicator level={threat} />
-          <div className="flex items-center gap-2">
+
+        {/* Right: threat + live + lang + panels toggle */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="hidden sm:block">
+            <ThreatIndicator level={threat} />
+          </div>
+          <div className="flex items-center gap-1.5">
             <span
-              className="h-2 w-2 rounded-full bg-red-500"
+              className="h-1.5 w-1.5 rounded-full bg-red-500"
               style={{ animation: "smokeAlertBlink 1.2s ease-in-out infinite" }}
             />
-            <span className="text-xs font-mono text-muted-foreground">LIVE</span>
+            <span className="text-[10px] font-mono text-muted-foreground">LIVE</span>
           </div>
           <button
             onClick={toggle}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono font-bold text-muted-foreground hover:text-foreground transition-all"
+            className="flex items-center gap-1 px-2 py-1 rounded border border-white/10 bg-white/5 hover:bg-white/10 text-[9px] font-mono font-bold text-muted-foreground hover:text-foreground transition-all"
           >
             🌐 {lang.toUpperCase()}
+          </button>
+          {/* Mobile panels toggle */}
+          <button
+            onClick={() => setSidebarOpen(o => !o)}
+            className="md:hidden flex items-center gap-1 px-2 py-1 rounded border border-white/20 bg-black/60 text-[9px] font-mono text-muted-foreground"
+          >
+            {sidebarOpen ? '✕' : '☰'} INFO
           </button>
         </div>
       </header>
 
+      {/* ── Main ── */}
       <main className="flex-1 relative overflow-hidden">
-        <button
-          onClick={() => setSidebarOpen(o => !o)}
-          className="absolute top-2 right-2 z-[2000] md:hidden bg-black/80 backdrop-blur-sm border border-white/20 rounded-sm px-2 py-1 font-mono text-[10px] text-muted-foreground"
-        >
-          PANELS
-        </button>
         <AirMap wind={scenario.env.wind} />
         <SmokeAlert wind={scenario.env.wind} />
-        <AQIOverlay info={aqiData} />
-        <EnvStatus env={scenario.env} />
-        <AQILegend />
 
-        <div
-          className={`absolute top-14 right-0 z-[1000] w-64 flex flex-col gap-3 max-h-[calc(100vh-80px)] overflow-y-auto scrollbar-none transition-transform duration-300 md:right-4 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}
-        >
-          <ActionPlan threat={threat} aqi={rawAQI} />
-          <AIBriefing threat={threat} />
-          <IncidentTimeline scenarioId={scenarioId} />
+        {/* Map overlays — hidden when sidebar open on mobile to avoid clutter */}
+        <div className={`transition-opacity duration-200 ${sidebarOpen ? 'opacity-0 pointer-events-none md:opacity-100 md:pointer-events-auto' : ''}`}>
+          <AQIOverlay info={aqiData} />
+          <EnvStatus env={scenario.env} />
+          <AQILegend />
         </div>
+
+        {/* ── Desktop sidebar (right) / Mobile drawer (bottom) ── */}
+        <>
+          {/* Mobile backdrop */}
+          {sidebarOpen && (
+            <div
+              className="absolute inset-0 z-[900] bg-black/50 md:hidden"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+
+          {/* Sidebar panel */}
+          <div
+            className={`
+              absolute z-[1000] flex flex-col gap-3 overflow-y-auto scrollbar-none transition-transform duration-300
+              /* mobile: full-width drawer from bottom */
+              bottom-0 left-0 right-0 max-h-[70vh] rounded-t-2xl border-t border-white/10 bg-background/95 backdrop-blur-xl p-3
+              md:bottom-auto md:top-14 md:left-auto md:right-4 md:w-64 md:max-h-[calc(100vh-80px)] md:rounded-none md:border-t-0 md:bg-transparent md:backdrop-blur-none md:p-0
+              ${sidebarOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}
+            `}
+          >
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pb-1">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            <ActionPlan threat={threat} aqi={rawAQI} />
+            <AIBriefing threat={threat} />
+            <IncidentTimeline scenarioId={scenarioId} />
+          </div>
+        </>
 
         <ScenarioControls active={scenarioId} onSelect={setScenarioId} />
       </main>

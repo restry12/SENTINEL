@@ -32,8 +32,12 @@ export default function LoginPage() {
 
       {/* Main Content */}
       <div className="relative z-10 pt-[60px] pb-[44px] h-full grid grid-cols-1 lg:grid-cols-[1.15fr_1fr]">
-        <VisualScene />
-        <section className="flex flex-col justify-center items-center p-6 md:p-8 lg:p-10 overflow-y-auto">
+        {/* Globe scene — hidden on mobile */}
+        <div className="hidden lg:block">
+          <VisualScene />
+        </div>
+        {/* Auth card — full width on mobile, right col on desktop */}
+        <section className="flex flex-col justify-center items-center p-5 sm:p-8 lg:p-10 overflow-y-auto">
           <AuthCard />
         </section>
       </div>

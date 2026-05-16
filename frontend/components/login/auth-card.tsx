@@ -10,7 +10,7 @@ export function AuthCard() {
   const [activeTab, setActiveTab] = React.useState<'login' | 'register'>('login')
 
   return (
-    <div className={styles.authCard}>
+    <div className={`${styles.authCard} w-full`}>
       {/* Corner decorative elements (handled by CSS in login.module.css) */}
       <span className={styles.cardCornerBottomLeft} />
       <span className={styles.cardCornerBottomRight} />
