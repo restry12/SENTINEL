@@ -1,47 +1,11 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import styles from '@/app/login/login.module.css';
 import { TelemetryTiles } from './telemetry-tiles';
+import { GlobeCanvas } from './globe-canvas';
 import { ShieldAlert, Activity, Globe } from 'lucide-react';
 
-const EARTH_URL = 'https://cdn.jsdelivr.net/npm/three-globe@2.31.1/example/img/earth-blue-marble.jpg';
-
 export function VisualScene() {
-  const globeRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
-  const targetRef = useRef({ x: 0, y: 0 });
-  const currentRef = useRef({ x: 0, y: 0 });
-
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
-      targetRef.current = {
-        x: ((e.clientY - cy) / cy) * -10,
-        y: ((e.clientX - cx) / cx) * 10,
-      };
-    };
-
-    const tick = () => {
-      const t = targetRef.current;
-      const c = currentRef.current;
-      c.x += (t.x - c.x) * 0.06;
-      c.y += (t.y - c.y) * 0.06;
-      if (globeRef.current) {
-        globeRef.current.style.transform = `rotateX(${c.x}deg) rotateY(${c.y}deg)`;
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    window.addEventListener('mousemove', onMove, { passive: true });
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
   return (
     <section className={styles.scene}>
       {/* Header */}
@@ -65,9 +29,9 @@ export function VisualScene() {
 
         <div className="flex flex-wrap gap-2">
           {[
-            { icon: <Activity className="w-3 h-3" />, text: 'NASA FIRMS LIVE', color: 'text-orange' },
-            { icon: <Globe className="w-3 h-3" />, text: 'GLOBAL WATCH ACTIVE', color: 'text-blue' },
-            { icon: <ShieldAlert className="w-3 h-3" />, text: 'SMS ALERTS READY', color: 'text-red' },
+            { icon: <Activity className="w-3 h-3" />, text: 'NASA FIRMS LIVE',    color: 'text-orange' },
+            { icon: <Globe    className="w-3 h-3" />, text: 'GLOBAL WATCH ACTIVE', color: 'text-blue'   },
+            { icon: <ShieldAlert className="w-3 h-3" />, text: 'SMS ALERTS READY', color: 'text-red'    },
           ].map((item, i) => (
             <span
               key={i}
@@ -80,13 +44,8 @@ export function VisualScene() {
       </div>
 
       {/* Globe */}
-      <div className={styles.globeArea} style={{ perspective: '900px' }}>
-        <div
-          ref={globeRef}
-          className={styles.globeWrap}
-          aria-hidden="true"
-          style={{ transformStyle: 'preserve-3d', willChange: 'transform' }}
-        >
+      <div className={styles.globeArea}>
+        <div className={styles.globeWrap} aria-hidden="true">
           {/* Atmosphere glow */}
           <div className={styles.atmosphere} />
 
@@ -94,16 +53,10 @@ export function VisualScene() {
           <div className={styles.scanRingOuter} />
           <div className={styles.scanRing} />
 
-          {/* Globe surface */}
+          {/* WebGL Earth */}
           <div className={styles.globe}>
-            {/* Rotating Earth texture */}
-            <div
-              className={styles.earthTexture}
-              style={{ backgroundImage: `url(${EARTH_URL})` }}
-            />
-            {/* Sphere shading */}
-            <div className={styles.sphereShading} />
-            {/* Radar sweep */}
+            <GlobeCanvas />
+            {/* Radar sweep on top of 3D globe */}
             <div className={styles.sweep} />
           </div>
 
