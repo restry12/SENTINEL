@@ -131,3 +131,52 @@
 .sentinel-tooltip::before {
   border-top-color: #2a2a2a !important;
 }
+
+/* ── SENTINEL Command Center Animations ── */
+
+@keyframes threatPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50%       { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+}
+
+@keyframes threatPulseOrange {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
+  50%       { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
+}
+
+@keyframes ambientPulse {
+  0%, 100% { opacity: 0.025; }
+  50%       { opacity: 0.05;  }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(16px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { transform: translateY(6px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+@keyframes borderGlow {
+  0%, 100% { border-color: rgba(239, 68, 68, 0.2); }
+  50%       { border-color: rgba(239, 68, 68, 0.6); }
+}
+
+/* Scanline texture overlay for cinematic atmosphere */
+.scanline-overlay {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.025) 2px,
+    rgba(0, 0, 0, 0.025) 4px
+  );
+  animation: ambientPulse 5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
