@@ -15,7 +15,7 @@ const BUTTONS: { id: Exclude<ScenarioId, "none">; label: string; danger: boolean
 
 export function ScenarioControls({ active, onSelect }: Props) {
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-2 font-mono">
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000] flex flex-wrap justify-center items-center gap-2 font-mono px-4 max-w-[calc(100vw-32px)]">
       <span className="text-[9px] text-muted-foreground tracking-widest uppercase mr-1 select-none">
         SIMULATE
       </span>

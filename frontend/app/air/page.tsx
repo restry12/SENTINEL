@@ -23,6 +23,7 @@ const AirMap = dynamic(
 
 export default function AirPage() {
   const [scenarioId, setScenarioId] = useState<ScenarioId>("none")
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const scenario = SCENARIOS[scenarioId]
 
   const rawAQI = useMemo(
@@ -62,13 +63,21 @@ export default function AirPage() {
       </header>
 
       <main className="flex-1 relative overflow-hidden">
+        <button
+          onClick={() => setSidebarOpen(o => !o)}
+          className="absolute top-2 right-2 z-[2000] md:hidden bg-black/80 backdrop-blur-sm border border-white/20 rounded-sm px-2 py-1 font-mono text-[10px] text-muted-foreground"
+        >
+          PANELS
+        </button>
         <AirMap wind={scenario.env.wind} />
         <SmokeAlert wind={scenario.env.wind} />
         <AQIOverlay info={aqiData} />
         <EnvStatus env={scenario.env} />
         <AQILegend />
 
-        <div className="absolute top-14 right-4 z-[1000] w-64 flex flex-col gap-3 max-h-[calc(100vh-120px)] overflow-y-auto scrollbar-none">
+        <div
+          className={`absolute top-14 right-0 z-[1000] w-64 flex flex-col gap-3 max-h-[calc(100vh-80px)] overflow-y-auto scrollbar-none transition-transform duration-300 md:right-4 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}
+        >
           <ActionPlan threat={threat} aqi={rawAQI} />
           <AIBriefing threat={threat} />
           <IncidentTimeline scenarioId={scenarioId} />

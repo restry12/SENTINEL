@@ -155,13 +155,13 @@ export function AirMap({ wind }: Props) {
       {/* Infrastructure at-risk count overlay */}
       <div
         className="absolute font-mono flex flex-col gap-1.5"
-        style={{ top: 16, left: "50%", transform: "translateX(-50%)", zIndex: 20 }}
+        style={{ bottom: 120, left: 16, zIndex: 20 }}
       >
         <div className="px-2 py-1 bg-black/75 backdrop-blur-sm border border-red-500/40 rounded-sm text-[10px] text-red-400 whitespace-nowrap">
-          ⚠ {hospitals} Hospital in smoke zone
+          ⚠ {hospitals} Hospital — AQI impact zone
         </div>
         <div className="px-2 py-1 bg-black/75 backdrop-blur-sm border border-orange-500/40 rounded-sm text-[10px] text-orange-400 whitespace-nowrap">
-          ⚠ {schools} Schools at risk
+          ⚠ {schools} Schools — elevated AQI
         </div>
       </div>
 
