@@ -1,0 +1,42 @@
+<h2>Functionality Scope</h2>
+<p class="subtitle">Decide the level of interactivity for the login migration</p>
+
+<div class="options">
+  <div class="option" data-choice="ui" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>UI / Visuals Only</h3>
+      <p>Port the HTML/CSS to Next.js components and Tailwind. Focus on animations and look.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="validation" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Form Validation</h3>
+      <p>Add client-side validation using React Hook Form and Zod (following project patterns).</p>
+    </div>
+  </div>
+  <div class="option" data-choice="mock" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Mock Auth Flow</h3>
+      <p>Simulate a successful login and redirect to the dashboard.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="full" onclick="toggleSelect(this)">
+    <div class="letter">4</div>
+    <div class="content">
+      <h3>Full Auth Integration</h3>
+      <p>Connect to a real backend or auth provider (NextAuth, Supabase, etc.).</p>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Recommendation</h4>
+    <ul>
+      <li>Start with <strong>Validation + Mock Flow</strong> to ensure a smooth transition from login to the existing dashboard.</li>
+    </ul>
+  </div>
+</div>

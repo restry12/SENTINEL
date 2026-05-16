@@ -21,12 +21,21 @@ export function useIncidents() {
 
     fetchIncidents()
 
+    const channelName = `incidents_realtime_${Math.random().toString(36).slice(2, 11)}`
     const channel = supabase
-      .channel('incidents_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, fetchIncidents)
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'incidents' },
+        () => {
+          fetchIncidents()
+        }
+      )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   return incidents

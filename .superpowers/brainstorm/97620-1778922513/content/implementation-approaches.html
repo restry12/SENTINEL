@@ -1,0 +1,37 @@
+<h2>Implementation Approaches</h2>
+<p class="subtitle">Decide how to translate the static HTML into our Next.js codebase</p>
+
+<div class="options">
+  <div class="option" data-choice="literal" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Literal Port</h3>
+      <p>Keep the original CSS and HTML structure. Fastest for visual fidelity but harder to maintain with Tailwind.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tailwind" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tailwind Refactor</h3>
+      <p>Rebuild the UI entirely with Tailwind classes. Consistent with project standards but might miss subtle animation details.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid (Recommended)</h3>
+      <p>Custom CSS for complex visuals (Stars, Globe, Scanlines) and Tailwind/Shadcn for the Auth form and layout.</p>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Approach C Pros</h4>
+    <ul>
+      <li>Preserves high-end visuals</li>
+      <li>Uses standard project components for forms</li>
+      <li>Easier to maintain and extend</li>
+    </ul>
+  </div>
+</div>

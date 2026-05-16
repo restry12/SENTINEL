@@ -1,0 +1,47 @@
+<h2>Login Implementation Context</h2>
+<p class="subtitle">Reviewing the provided static HTML for migration to Next.js</p>
+
+<div class="mockup">
+  <div class="mockup-header">Preview: SENTINEL Auth.html</div>
+  <div class="mockup-body" style="background: #04080F; padding: 20px; color: #F5F8FC; font-family: sans-serif;">
+    <div style="border: 1px solid rgba(148, 163, 184, 0.16); padding: 40px; border-radius: 14px; max-width: 400px; margin: 0 auto; background: linear-gradient(180deg, rgba(13, 27, 42, 0.78), rgba(7, 17, 29, 0.78));">
+      <h3 style="margin-top: 0;">SENTINEL / ACCESO</h3>
+      <p style="color: #8FA3B8;">Accede a la plataforma de monitoreo satelital en tiempo real.</p>
+      
+      <div style="display: flex; gap: 4px; padding: 4px; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 10px; background: rgba(4,8,15,.5); margin-bottom: 20px;">
+        <div style="flex: 1; text-align: center; padding: 8px; background: rgba(56,189,248,.16); border: 1px solid rgba(56,189,248,.22); border-radius: 7px;">Login</div>
+        <div style="flex: 1; text-align: center; padding: 8px;">Register</div>
+      </div>
+      
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="height: 40px; background: rgba(4,8,15,.7); border: 1px solid rgba(148,163,184,0.16); border-radius: 8px;"></div>
+        <div style="height: 40px; background: rgba(4,8,15,.7); border: 1px solid rgba(148,163,184,0.16); border-radius: 8px;"></div>
+        <div style="height: 45px; background: linear-gradient(180deg, #C8341A 0%, #8B1F0F 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #FFEFE3;">Iniciar sesión →</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="replace" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Replace Landing (/)</h3>
+      <p>The login becomes the first thing users see.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="route" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>Separate Route (/login)</h3>
+      <p>Keep existing dashboard as home, or redirect there after auth.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="conditional" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Conditional Rendering</h3>
+      <p>Auth state determines whether to show login or dashboard on /.</p>
+    </div>
+  </div>
+</div>
