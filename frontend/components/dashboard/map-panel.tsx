@@ -6,85 +6,98 @@ const MapboxPanel = dynamic(
   { ssr: false, loading: () => <div className="absolute inset-0 bg-background" /> }
 )
 
+function MapLabel({ label, value }: { label: string, value: string | React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.14em] text-text-dim whitespace-nowrap">
+      <span className="text-[9.5px] tracking-[0.2em] uppercase text-text-muted">{label}</span>
+      <span className="text-orange-soft font-bold uppercase">{value}</span>
+    </div>
+  )
+}
+
 export function MapPanel() {
   return (
-    <div className="h-[40vh] md:h-auto md:flex-1 flex flex-col bg-background border-b md:border-b-0 border-border shrink-0">
-      {/* Tactical Header */}
-      <div className="h-10 md:h-12 border-b border-border flex items-center justify-between px-3 md:px-4 shrink-0">
-        <div className="flex items-center gap-2 md:gap-4">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Sentinel View
-          </h2>
-          <div className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-mono">38.28°S</span>
-            <span className="text-border">|</span>
-            <span className="font-mono">71.90°W</span>
+    <div className="relative flex-1 flex flex-col bg-[#04050a] min-h-0 overflow-hidden">
+      {/* Map Header - Refined Sentinel Pass */}
+      <header className="relative z-40 h-14 px-[18px] flex items-center justify-between gap-4 border-b border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.015),transparent_80%)] bg-[#0a0b0e/70] backdrop-blur-md shrink-0">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-green shadow-[0_0_8px_rgba(34,197,94,0.7)] animate-pulse" />
+            <span className="text-[10px] font-semibold tracking-[0.16em] uppercase text-green-soft">Live Feed</span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-5">
+            <MapLabel label="Lat" value="38.28° S" />
+            <MapLabel label="Lng" value="71.90° W" />
           </div>
         </div>
-        <div className="flex items-center gap-3 md:gap-4">
-          <div className="flex items-center gap-1 md:gap-2">
-            <div className="h-2 w-2 md:h-3 md:w-3 rounded-full bg-warning pulse-dot" />
-            <span className="text-xs text-muted-foreground hidden sm:inline">Active Fire</span>
-          </div>
-          <div className="flex items-center gap-1 md:gap-2">
-            <div className="h-2 w-2 md:h-3 md:w-3 border border-dashed border-warning rounded-sm" />
-            <span className="text-xs text-muted-foreground hidden sm:inline">Spread Projection</span>
-          </div>
-          <div className="flex items-center gap-1 md:gap-2">
-            <div className="h-0.5 w-3 md:w-4 bg-safe" />
-            <span className="text-xs text-muted-foreground hidden sm:inline">Safe Zones</span>
-          </div>
-        </div>
-      </div>
 
-      {/* Map Container with Overlays */}
-      <div className="flex-1 relative overflow-hidden group">
-        {/* Base Layer: Functional Mapbox */}
+        <div className="hidden xl:flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_6px_var(--red)] animate-pulse" />
+              <span className="text-[9.5px] font-bold tracking-[0.14em] text-text-dim uppercase">Critical Fire</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-orange shadow-[0_0_6px_var(--orange)]" />
+              <span className="text-[9.5px] font-bold tracking-[0.14em] text-text-dim uppercase">Active Risk</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-[1px] bg-green-soft" />
+              <span className="text-[9.5px] font-bold tracking-[0.14em] text-text-dim uppercase">Evac Route</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Map Stage */}
+      <div className="flex-1 relative min-h-0 group">
+        {/* Deep Space / Aura Layer */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 map-aura" />
+          <div className="absolute top-[10%] left-[20%] w-[60%] h-[60%] nebula-glow" style={{ '--color': 'rgba(249, 115, 22, 0.05)', '--x': '30%', '--y': '40%' } as any} />
+          <div className="absolute bottom-[10%] right-[10%] w-[50%] h-[50%] nebula-glow" style={{ '--color': 'rgba(59, 130, 246, 0.08)', '--x': '70%', '--y': '60%' } as any} />
+        </div>
+
+        {/* Base Layer: Mapbox */}
         <MapboxPanel />
 
-        {/* Overlay Layer: Tactical Grid (Pointer events disabled to allow map interaction) */}
-        <div className="absolute inset-0 pointer-events-none opacity-20 group-hover:opacity-30 transition-opacity">
-          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id="tactical-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-muted-foreground" />
-              </pattern>
-              <pattern id="tactical-grid-large" width="200" height="200" patternUnits="userSpaceOnUse">
-                <path d="M 200 0 L 0 0 0 200" fill="none" stroke="currentColor" strokeWidth="1" className="text-muted-foreground/50" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#tactical-grid)" />
-            <rect width="100%" height="100%" fill="url(#tactical-grid-large)" />
-          </svg>
-        </div>
+        {/* HUD: Grid & Corners */}
+        <div className="absolute inset-0 pointer-events-none z-10">
+          {/* Refined Grid Overlay */}
+          <div className="absolute inset-0 opacity-[0.15] mix-blend-screen bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px)_0_0/48px_48px,linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)_0_0/48px_48px]" />
+          
+          {/* Tactical Corners */}
+          <div className="absolute top-3 left-3 w-3.5 h-3.5 border-t border-l border-white/20" />
+          <div className="absolute top-3 right-3 w-3.5 h-3.5 border-t border-r border-white/20" />
+          <div className="absolute bottom-3 left-3 w-3.5 h-3.5 border-b border-l border-white/20" />
+          <div className="absolute bottom-3 right-3 w-3.5 h-3.5 border-b border-r border-white/20" />
 
-        {/* HUD Elements */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Sector Label */}
-          <div className="absolute top-2 left-2 md:top-4 md:left-4">
-            <div className="px-2 py-1 bg-background/60 backdrop-blur-sm border border-border rounded text-[10px] md:text-xs font-mono text-muted-foreground tracking-tighter">
-              OPERATIONAL SECTOR: <span className="text-foreground font-bold">ALPHA-01</span>
+          {/* Floating Data Chips */}
+          <div className="absolute top-6 left-6 px-2.5 py-1.5 bg-[#0a0b0e/75] border border-border-2 rounded-sm backdrop-blur-md flex items-center gap-2">
+            <span className="text-[10px] font-mono font-medium text-text-2 tracking-wider">
+              SECTOR <b className="text-foreground font-bold">ALPHA-01</b>
+            </span>
+          </div>
+
+          <div className="absolute bottom-6 right-6 px-2.5 py-1.5 bg-[#0a0b0e/75] border border-border-2 rounded-sm backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-[1px] bg-text-dim/50" />
+              <span className="text-[10px] font-mono font-medium text-text-2 tracking-widest uppercase">5.0 KM</span>
             </div>
           </div>
 
-          {/* Scale Indicator */}
-          <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4">
-            <div className="px-2 py-1 md:px-3 md:py-2 bg-background/60 backdrop-blur-sm border border-border rounded">
-              <div className="flex items-center gap-2">
-                <div className="w-8 md:w-16 h-0.5 bg-foreground" />
-                <span className="text-[10px] font-mono text-foreground uppercase tracking-widest">5 KM</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Compass/Crosshair (Minimalist) */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20">
-            <div className="w-20 h-20 md:w-32 md:h-32 border border-foreground/30 rounded-full flex items-center justify-center">
-              <div className="w-1 h-8 bg-foreground/30 absolute" />
-              <div className="w-8 h-1 bg-foreground/30 absolute" />
+          {/* Central Reticle (Slightly more technical) */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10">
+            <div className="w-40 h-40 border border-white/30 rounded-full flex items-center justify-center">
+              <div className="w-[1px] h-12 bg-white/40 absolute" />
+              <div className="w-12 h-[1px] bg-white/40 absolute" />
             </div>
           </div>
         </div>
+
+        {/* Scanline Overlay (Integrated into Map Stage) */}
+        <div className="absolute inset-0 scanline-overlay z-20 opacity-[0.4] mix-blend-overlay" />
       </div>
     </div>
   )

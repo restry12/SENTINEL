@@ -4,30 +4,31 @@ import { Route } from "lucide-react"
 
 export function SafeRoute() {
   return (
-    <div className="border-b border-border bg-card p-3 shrink-0">
-      <div className="flex items-center gap-2 mb-3">
-        <Route className="h-4 w-4 text-safe" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Safe Route
-        </span>
-        <div className="flex items-center gap-1 ml-auto">
-          <div className="h-2 w-2 rounded-full bg-critical animate-pulse" />
-          <span className="text-xs text-critical font-semibold">HWY 9 CLOSED</span>
+    <div className="sentinel-card p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-green-soft">
+          <Route className="h-3 w-3" />
+          <span>Safe Route</span>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <div className="w-1.5 h-1.5 rounded-full bg-red shadow-[0_0_8px_rgba(239,68,68,0.7)] animate-blink" />
+          <span className="text-[9px] font-bold text-red-soft uppercase tracking-wider">HWY 9 CLOSED</span>
         </div>
       </div>
       
-      <div className="p-3 bg-safe/10 border border-safe/30 rounded-lg">
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-mono text-safe">
+      <div className="p-4 bg-green/5 border border-green/20 rounded-md">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm font-medium text-text-2">
           <span>Oak Valley Rd</span>
-          <span className="text-safe/50">→</span>
+          <span className="text-text-muted">→</span>
           <span>I-42 N</span>
-          <span className="text-safe/50">→</span>
+          <span className="text-text-muted">→</span>
           <span>Exit 17B</span>
-          <span className="text-safe/50">→</span>
+          <span className="text-text-muted">→</span>
           <span>Lincoln High</span>
         </div>
-        <div className="mt-2 text-xs text-muted-foreground">
-          Est. travel time: <span className="font-mono text-foreground">23 min</span>
+        <div className="mt-3 pt-3 border-t border-border flex justify-between items-center text-[10px] font-semibold text-text-muted uppercase tracking-wider">
+          <span>Est. travel time</span>
+          <span className="text-sm font-medium text-foreground num">23 MIN</span>
         </div>
       </div>
     </div>

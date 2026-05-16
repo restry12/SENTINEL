@@ -1,6 +1,6 @@
 "use client"
 
-import { Flame, Activity, ShieldAlert } from "lucide-react"
+import { Flame, Activity, ShieldAlert, Globe } from "lucide-react"
 import { useState, useEffect } from "react"
 
 export function TopBar() {
@@ -17,71 +17,55 @@ export function TopBar() {
   }, [])
 
   return (
-    <header className="h-12 md:h-14 border-b border-border bg-card flex items-center justify-between px-3 md:px-6 shrink-0 overflow-hidden relative">
-      {/* Ambient background glow for critical status */}
-      <div className="absolute inset-0 bg-critical/5 animate-pulse pointer-events-none" />
+    <div className="flex flex-col shrink-0 z-50">
+      {/* Top Accent Strip */}
+      <div className="h-[1px] bg-[linear-gradient(90deg,transparent_0%,rgba(239,68,68,0)_10%,rgba(239,68,68,0.5)_40%,rgba(239,68,68,0.8)_50%,rgba(239,68,68,0.5)_60%,rgba(239,68,68,0)_90%,transparent_100%)]" />
       
-      {/* Logo & Status Badge */}
-      <div className="flex items-center gap-4 md:gap-6 z-10">
-        <div className="flex items-center gap-2 md:gap-3">
-          <Flame className="h-5 w-5 md:h-6 md:w-6 text-warning" />
-          <span className="text-base md:text-lg font-semibold tracking-wider text-foreground">
-            SENTINEL
-          </span>
+      <header className="h-[60px] px-5 border-b border-border bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_70%)] bg-[#0a0b0e/85] backdrop-blur-[12px] flex items-center justify-between gap-4">
+        {/* Left: Brand */}
+        <div className="w-80 flex items-center gap-3">
+          <div className="w-[34px] h-[34px] rounded-sm border border-border-2 bg-[radial-gradient(circle_at_50%_75%,rgba(249,115,22,0.32),transparent_65%),linear-gradient(180deg,#15171c,#0c0e12)] flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_2px_rgba(0,0,0,0.5)]">
+            <Flame className="w-[18px] h-[18px] text-orange" />
+          </div>
+          <div className="flex flex-col gap-1.5 leading-none">
+            <span className="text-sm font-semibold tracking-[0.18em] text-[#f4f5f7] uppercase">SENTINEL</span>
+            <span className="text-[9px] font-mono font-normal tracking-[0.18em] text-text-muted uppercase">Wildfire Intelligence</span>
+          </div>
         </div>
-        
-        <div className="hidden sm:flex items-center gap-2 px-2 py-0.5 rounded border border-critical/30 bg-critical/10 animate-pulse">
-          <ShieldAlert className="h-3 w-3 text-critical" />
-          <span className="text-[10px] font-bold text-critical tracking-tighter uppercase">
-            CRITICAL ACTIVE
-          </span>
-        </div>
-      </div>
 
-      {/* Global Hotspots Counter */}
-      <div className="flex items-center gap-3 px-3 md:px-5 py-1 bg-background/50 rounded-sm border border-border/50 z-10 backdrop-blur-sm">
-        <div className="flex flex-col items-center leading-none">
-          <span className="text-[9px] text-muted-foreground uppercase tracking-[0.2em] mb-1">
-            Hotspots
-          </span>
-          <div className="flex items-center gap-2">
-            <div className="h-1.5 w-1.5 rounded-full bg-critical shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-            <span className="text-xl md:text-2xl font-mono font-bold text-foreground tabular-nums">
-              2,847
+        {/* Center: Mission Critical Status */}
+        <div className="flex-1 flex items-center justify-center gap-3.5">
+          <div className="px-3.5 py-1.5 rounded-full border border-red/35 bg-[linear-gradient(180deg,rgba(239,68,68,0.10),rgba(239,68,68,0.04))] text-red-soft flex items-center gap-2.5 shadow-[0_0_0_1px_rgba(239,68,68,0.04),0_8px_24px_-12px_rgba(239,68,68,0.35)]">
+            <div className="w-1.5 h-1.5 rounded-full bg-red shadow-[0_0_8px_var(--red)] animate-pulse" />
+            <span className="text-[11px] font-semibold tracking-[0.16em] uppercase whitespace-nowrap">Critical Active</span>
+          </div>
+
+          <div className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 bg-surface border border-border rounded-sm text-[11px] font-medium tracking-[0.12em] text-text-dim">
+            <span>Hotspots</span>
+            <span className="text-orange-soft font-mono text-sm leading-none num">2,847</span>
+          </div>
+        </div>
+
+        {/* Right: Telemetry & Time */}
+        <div className="w-80 flex items-center justify-end gap-2">
+          <div className="hidden xl:flex items-center gap-2 px-2.5 py-1.5 bg-surface border border-border rounded-sm text-[11px] font-medium tracking-[0.12em] text-green-soft">
+            <Activity className="w-3 h-3" />
+            <span>Operational</span>
+          </div>
+
+          <div className="px-2.5 py-1.5 bg-surface border border-border rounded-sm flex items-center gap-2 whitespace-nowrap">
+            <div className="w-1.5 h-1.5 rounded-full bg-green shadow-[0_0_6px_rgba(34,197,94,0.6)]" />
+            <span className="text-[11px] font-mono text-text-2 tracking-[0.04em] uppercase">
+              {time ? time.split(' ')[1] : "00:00:00"} <span className="text-text-muted ml-0.5">UTC</span>
             </span>
           </div>
-        </div>
-      </div>
 
-      {/* System Status & Clock */}
-      <div className="hidden md:flex items-center gap-6 z-10">
-        <div className="flex flex-col items-end leading-none">
-          <span className="text-[9px] text-muted-foreground uppercase tracking-[0.2em] mb-1">
-            System Status
-          </span>
-          <div className="flex items-center gap-2">
-            <Activity className="h-3 w-3 text-safe" />
-            <span className="text-xs font-mono text-safe font-bold tracking-tight">OPERATIONAL</span>
-          </div>
+          <button className="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface border border-border rounded-sm text-[11px] font-medium tracking-[0.08em] text-foreground hover:border-border-3 hover:bg-surface-2 transition-colors">
+            <Globe className="w-3 h-3 opacity-70" />
+            <span>EN</span>
+          </button>
         </div>
-        
-        <div className="h-8 w-px bg-border/50" />
-        
-        <div className="flex flex-col items-end leading-none">
-          <span className="text-[9px] text-muted-foreground uppercase tracking-[0.2em] mb-1">
-            Mission Time
-          </span>
-          <span className="text-xs font-mono text-foreground font-medium">
-            {time || "0000-00-00 00:00:00"} <span className="text-muted-foreground ml-1 text-[10px]">UTC</span>
-          </span>
-        </div>
-      </div>
-
-      {/* Mobile status indicator */}
-      <div className="flex md:hidden items-center gap-1 z-10">
-        <div className="h-2 w-2 rounded-full bg-critical animate-pulse" />
-        <span className="text-xs font-mono text-critical font-bold">CRITICAL</span>
-      </div>
-    </header>
+      </header>
+    </div>
   )
 }

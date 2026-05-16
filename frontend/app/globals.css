@@ -4,27 +4,46 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #e8e6e0;
-  --card: #111111;
-  --card-foreground: #e8e6e0;
-  --popover: #111111;
-  --popover-foreground: #e8e6e0;
-  --primary: #e8e6e0;
-  --primary-foreground: #0a0a0a;
-  --secondary: #1f1f1f;
-  --secondary-foreground: #e8e6e0;
-  --muted: #1f1f1f;
-  --muted-foreground: #737373;
-  --accent: #1f1f1f;
-  --accent-foreground: #e8e6e0;
-  --destructive: #ef4444;
-  --destructive-foreground: #e8e6e0;
-  --border: #1f1f1f;
-  --input: #1f1f1f;
-  --ring: #3b82f6;
-  --radius: 0.375rem;
-  
+  /* Base surfaces — slightly cooler, less pure black */
+  --background: #07080a;
+  --bg-2: #0c0d10;
+  --surface: #101115;
+  --surface-2: #14161b;
+  --surface-3: #1a1d23;
+  --foreground: #e7e8ec;
+
+  /* Border ladder */
+  --border: #1d2026;
+  --border-2: #262a32;
+  --border-3: #353a44;
+
+  /* Text ladder */
+  --text-2: #b6b9c2;
+  --text-dim: #7a7d87;
+  --text-muted: #525560;
+  --text-faint: #3a3d46;
+
+  /* Accent system */
+  --red: #ef4444;
+  --red-2: #dc2626;
+  --red-soft: #f87171;
+  --orange: #f97316;
+  --orange-soft: #fb923c;
+  --amber: #f59e0b;
+  --green: #22c55e;
+  --green-soft: #4ade80;
+  --blue: #60a5fa;
+  --blue-2: #3b82f6;
+
+  --radius: 6px;
+  --radius-sm: 4px;
+
+  /* Legacy Sentinel Colors (for compatibility) */
+  --critical: var(--red);
+  --warning: var(--orange);
+  --safe: var(--green);
+  --info: var(--blue);
+
   /* Original SENTINEL Login Colors */
   --sentinel-bg-0: #04080F;
   --sentinel-bg-1: #07111D;
@@ -46,12 +65,6 @@
   --sentinel-b-cyan: rgba(56, 189, 248, 0.22);
   --sentinel-b-red: rgba(239, 68, 68, 0.28);
   --sentinel-b-green: rgba(47, 143, 123, 0.30);
-
-  /* Custom sentinel colors */
-  --critical: #ef4444;
-  --warning: #f97316;
-  --safe: #22c55e;
-  --info: #3b82f6;
 }
 
 @theme inline {
@@ -59,221 +72,145 @@
   --font-mono: 'Geist Mono', 'Geist Mono Fallback';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-sentinel-bg-0: var(--sentinel-bg-0);
-  --color-sentinel-bg-1: var(--sentinel-bg-1);
-  --color-sentinel-bg-2: var(--sentinel-bg-2);
-  --color-sentinel-bg-3: var(--sentinel-bg-3);
-  --color-sentinel-line: var(--sentinel-line);
-  --color-sentinel-line-strong: var(--sentinel-line-strong);
-  --color-sentinel-text-0: var(--sentinel-text-0);
-  --color-sentinel-text-1: var(--sentinel-text-1);
-  --color-sentinel-text-2: var(--sentinel-text-2);
-  --color-sentinel-text-3: var(--sentinel-text-3);
-  --color-sentinel-cyan: var(--sentinel-cyan);
-  --color-sentinel-cyan-2: var(--sentinel-cyan-2);
-  --color-sentinel-green: var(--sentinel-green);
-  --color-sentinel-green-2: var(--sentinel-green-2);
-  --color-sentinel-red: var(--sentinel-red);
-  --color-sentinel-orange: var(--sentinel-orange);
-  --color-sentinel-orange-2: var(--sentinel-orange-2);
-  --color-sentinel-b-cyan: var(--sentinel-b-cyan);
-  --color-sentinel-b-red: var(--sentinel-b-red);
-  --color-sentinel-b-green: var(--sentinel-b-green);
-  --color-critical: var(--critical);
-  --color-warning: var(--warning);
-  --color-safe: var(--safe);
-  --color-info: var(--info);
-  --radius-sm: calc(var(--radius) - 2px);
+  --color-border-2: var(--border-2);
+  --color-border-3: var(--border-3);
+  --color-text-dim: var(--text-dim);
+  --color-text-muted: var(--text-muted);
+  --color-critical: var(--red);
+  --color-warning: var(--orange);
+  --color-safe: var(--green);
+  --color-info: var(--blue);
+  --radius-sm: var(--radius-sm);
   --radius-md: var(--radius);
-  --radius-lg: calc(var(--radius) + 2px);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-none;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    letter-spacing: -0.005em;
   }
 }
 
+/* Tabular figures for numbers */
+.num, .num * {
+  @apply font-mono;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: 0;
+}
+
+/* Pattern: Sentinel Label */
+.sentinel-label {
+  @apply flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-dim;
+}
+.sentinel-label .bar {
+  @apply h-[1px] flex-1 bg-border;
+}
+
+/* Card pattern */
+.sentinel-card {
+  @apply bg-surface border border-border rounded-md shadow-sm relative overflow-hidden;
+  background-image: linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 24%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02), 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* Animations */
 @keyframes pulse-ring {
-  0% {
-    transform: scale(0.8);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
 }
 
 @keyframes pulse-dot {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-.pulse-ring {
-  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.pulse-dot {
-  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* ── SENTINEL AIR animations ─────────────────────────────── */
-@keyframes sentinelFirePulse {
-  0%   { transform: scale(1);    opacity: 1; }
-  100% { transform: scale(1.35); opacity: 0.85; }
-}
-
-@keyframes sentinelFireRing {
-  0%   { transform: scale(1);   opacity: 0.6; }
-  100% { transform: scale(3.5); opacity: 0; }
-}
-
-@keyframes smokeAlertBlink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
-}
-
-.sentinel-tooltip {
-  background: #0a0a0a !important;
-  border: 1px solid #2a2a2a !important;
-  border-radius: 2px !important;
-  color: #e8e6e0 !important;
-  font-family: 'Geist Mono', monospace !important;
-  font-size: 10px !important;
-  letter-spacing: 0.08em !important;
-  padding: 3px 7px !important;
-  box-shadow: 0 0 12px rgba(255, 100, 0, 0.3) !important;
-}
-
-.sentinel-tooltip::before {
-  border-top-color: #2a2a2a !important;
-}
-
-/* ── SENTINEL Command Center Animations ── */
-
-@keyframes threatPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
-  50%       { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-}
-
-@keyframes threatPulseOrange {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
-  50%       { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
-}
-
-@keyframes ambientPulse {
-  0%, 100% { opacity: 0.025; }
-  50%       { opacity: 0.05;  }
-}
-
-@keyframes slideInRight {
-  from { transform: translateX(16px); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
-}
-
-@keyframes fadeInUp {
-  from { transform: translateY(6px); opacity: 0; }
-  to   { transform: translateY(0);   opacity: 1; }
-}
-
-@keyframes borderGlow {
-  0%, 100% { border-color: rgba(239, 68, 68, 0.2); }
-  50%       { border-color: rgba(239, 68, 68, 0.6); }
-}
-
-@keyframes pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.8; transform: scale(1.1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
 }
 
-/* Scanline texture overlay for cinematic atmosphere */
-.scanline-overlay {
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
-              linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-  background-size: 100% 3px, 3px 100%;
-  pointer-events: none;
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
 }
 
-/* Hide scrollbar utility */
+@keyframes blink { 50% { opacity: 0.25; } }
+
+@keyframes flicker {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.pulse-ring { animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+.animate-shimmer { position: relative; overflow: hidden; }
+.animate-shimmer::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: shimmer 2.4s linear infinite;
+}
+.animate-blink { animation: blink 1.2s steps(2, start) infinite; }
+
 /* ── Tactical Mapbox Popups ─────────────────────────────── */
 .mapboxgl-popup-content {
-  background: rgba(10, 10, 10, 0.9) !important;
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(249, 115, 22, 0.4);
-  border-radius: 2px !important;
+  background: rgba(7, 8, 10, 0.9) !important;
+  backdrop-filter: blur(12px) saturate(1.2);
+  border: 1px solid var(--border-2) !important;
+  border-radius: var(--radius) !important;
   padding: 0 !important;
-  color: #e8e6e0 !important;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(249, 115, 22, 0.1) !important;
+  color: var(--foreground) !important;
+  box-shadow: 0 16px 40px -14px rgba(0,0,0,0.7) !important;
 }
 
 .mapboxgl-popup-tip {
-  border-top-color: rgba(249, 115, 22, 0.4) !important;
-}
-
-.mapboxgl-popup-close-button {
-  color: #737373 !important;
-  padding: 4px 8px !important;
-  font-size: 16px !important;
-}
-
-.mapboxgl-popup-close-button:hover {
-  background-color: transparent !important;
-  color: #ef4444 !important;
+  border-top-color: var(--border-2) !important;
 }
 
 .tactical-popup-header {
-  background: rgba(249, 115, 22, 0.1);
-  border-bottom: 1px solid rgba(249, 115, 22, 0.2);
-  padding: 8px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  @apply bg-surface-2 border-b border-border p-3 flex items-center gap-2 rounded-t-[var(--radius)];
 }
 
 .tactical-popup-body {
-  padding: 12px;
-  font-family: 'Geist Mono', monospace;
+  @apply p-3 font-mono text-xs space-y-1.5;
 }
 
 .tactical-stat-row {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 4px;
-  font-size: 11px;
+  @apply flex justify-between items-baseline;
 }
 
 .tactical-stat-label {
-  color: #737373;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  @apply text-[10px] uppercase tracking-wider text-text-muted font-sans font-semibold;
 }
 
 .tactical-stat-value {
-  color: #e8e6e0;
-  font-weight: 600;
+  @apply text-foreground font-semibold;
+}
+
+/* ── Map Aura & Space Depth ─────────────────────────────── */
+.map-aura {
+  background: radial-gradient(circle at 50% 50%, rgba(249, 115, 22, 0.08) 0%, rgba(59, 130, 246, 0.05) 30%, transparent 70%);
+  filter: blur(40px);
+}
+
+.nebula-glow {
+  background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), var(--color, rgba(59, 130, 246, 0.1)), transparent 60%);
+  filter: blur(60px);
+  animation: ambient-pulse 8s ease-in-out infinite alternate;
+}
+
+@keyframes ambient-pulse {
+  0% { opacity: 0.3; transform: scale(1); }
+  100% { opacity: 0.6; transform: scale(1.1); }
+}
+
+/* Scanline texture overlay */
+.scanline-overlay {
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255,255,255,0.008) 3px 4px);
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: 0.6;
 }

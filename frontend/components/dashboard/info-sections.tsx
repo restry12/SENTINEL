@@ -2,89 +2,88 @@
 
 import { Users, FileText } from "lucide-react"
 
-export function InfoSections() {
+function Label({ children, right }: { children: React.ReactNode, right?: string }) {
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="sentinel-label">
+      <span>{children}</span>
+      <span className="bar" />
+      {right && <span className="text-text-muted font-mono tracking-widest">{right}</span>}
+    </div>
+  )
+}
+
+export function InfoSections() {
+  const evacPct = 66
+
+  return (
+    <div className="space-y-4">
       {/* Municipal Briefing */}
-      <div className="p-3 border-b border-border">
-        <div className="flex items-center gap-2 mb-3">
-          <FileText className="h-4 w-4 text-foreground" />
-          <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Municipal Briefing
-          </span>
-          <span className="text-xs font-mono text-muted-foreground ml-auto">
-            15:00 UTC
-          </span>
+      <div className="sentinel-card p-4">
+        <div className="mb-4">
+          <Label right="15:00 UTC">Municipal Briefing</Label>
         </div>
         
-        <div className="p-3 bg-background border border-border rounded-lg">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            The Cedar Ridge Fire has expanded to approximately{" "}
-            <span className="text-foreground font-semibold">12,400 acres</span>{" "}
-            with <span className="text-warning font-semibold">8%</span>{" "}
-            containment. NW winds at 24 km/h are pushing the fire toward
-            residential zones 7A-C. All CAL FIRE resources deployed.
+        <div className="p-4 bg-surface-2 border border-border rounded-md">
+          <p className="text-[13px] text-text-2 leading-relaxed italic">
+            "The <span className="text-orange font-semibold not-italic">Cedar Ridge Fire</span> has expanded to 
+            <span className="text-foreground font-bold not-italic"> 12,400 acres</span> with 
+            <span className="text-foreground font-bold not-italic"> 8% containment</span>. NW winds pushing toward sectors 7A–C."
           </p>
         </div>
         
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          <div className="p-2 bg-background border border-border rounded text-center">
-            <div className="text-lg font-mono font-bold text-foreground">1,247</div>
-            <div className="text-xs text-muted-foreground">Personnel</div>
-          </div>
-          <div className="p-2 bg-background border border-border rounded text-center">
-            <div className="text-lg font-mono font-bold text-foreground">89</div>
-            <div className="text-xs text-muted-foreground">Vehicles</div>
-          </div>
-          <div className="p-2 bg-background border border-border rounded text-center">
-            <div className="text-lg font-mono font-bold text-foreground">12</div>
-            <div className="text-xs text-muted-foreground">Aircraft</div>
-          </div>
+        <div className="grid grid-cols-3 gap-3 mt-4">
+          {[
+            { label: "Personnel", value: "1,247" },
+            { label: "Vehicles", value: "89" },
+            { label: "Aircraft", value: "12" },
+          ].map((item) => (
+            <div key={item.label} className="p-2.5 bg-background border border-border rounded-sm text-center">
+              <div className="text-base font-medium text-foreground num leading-none mb-1">{item.value}</div>
+              <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider">{item.label}</div>
+            </div>
+          ))}
         </div>
         
-        <div className="p-2 bg-warning/10 border border-warning/30 rounded mt-3">
-          <p className="text-xs text-warning text-center">
+        <div className="p-2 border border-orange/20 bg-orange/5 rounded mt-4">
+          <p className="text-[10px] font-bold text-orange-soft uppercase tracking-[0.14em] text-center">
             Next briefing: 18:00 UTC
           </p>
         </div>
       </div>
 
       {/* Social Impact */}
-      <div className="p-3">
-        <div className="flex items-center gap-2 mb-3">
-          <Users className="h-4 w-4 text-info" />
-          <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Social Impact
-          </span>
+      <div className="sentinel-card p-4">
+        <div className="mb-4">
+          <Label>Social Impact</Label>
         </div>
         
-        <div className="grid grid-cols-2 gap-2">
-          <div className="p-3 bg-background border border-border rounded-lg">
-            <div className="text-xs text-muted-foreground mb-1">At Risk</div>
-            <div className="text-lg font-mono font-bold text-critical">127,450</div>
-          </div>
-          <div className="p-3 bg-background border border-border rounded-lg">
-            <div className="text-xs text-muted-foreground mb-1">Evacuated</div>
-            <div className="text-lg font-mono font-bold text-safe">84,230</div>
-          </div>
-          <div className="p-3 bg-background border border-border rounded-lg">
-            <div className="text-xs text-muted-foreground mb-1">In Shelters</div>
-            <div className="text-lg font-mono font-bold text-info">23,847</div>
-          </div>
-          <div className="p-3 bg-background border border-border rounded-lg">
-            <div className="text-xs text-muted-foreground mb-1">Structures</div>
-            <div className="text-lg font-mono font-bold text-warning">4,892</div>
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { label: "At Risk", value: "127,450", color: "text-red-soft" },
+            { label: "Evacuated", value: "84,230", color: "text-green-soft" },
+            { label: "In Shelters", value: "23,847", color: "text-blue" },
+            { label: "Structures", value: "4,892", color: "text-orange-soft" },
+          ].map((item) => (
+            <div key={item.label} className="p-3 bg-background border border-border rounded-md">
+              <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">{item.label}</div>
+              <div className={`text-lg font-medium ${item.color} num leading-none`}>{item.value}</div>
+            </div>
+          ))}
         </div>
         
         {/* Evacuation Progress */}
-        <div className="mt-3 p-3 bg-background border border-border rounded-lg">
-          <div className="flex justify-between text-xs text-muted-foreground mb-2">
-            <span>Evacuation Progress</span>
-            <span className="font-mono text-foreground">66%</span>
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[10px] font-semibold text-text-dim uppercase tracking-wider">
+              Evacuation Progress
+            </span>
+            <span className="text-sm font-medium text-green-soft num">{evacPct}%</span>
           </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-safe" style={{ width: "66%" }} />
+          <div className="h-2 bg-[#15171c] border border-border rounded-full overflow-hidden relative">
+            <div 
+              className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,#16a34a,#22c55e)] shadow-[0_0_10px_rgba(34,197,94,0.35)] animate-shimmer" 
+              style={{ width: `${evacPct}%` }} 
+            />
           </div>
         </div>
       </div>

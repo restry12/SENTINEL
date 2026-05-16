@@ -22,7 +22,17 @@ export function MapboxPanel() {
       zoom: 9,
       projection: 'globe' as any
     })
-    map.on('style.load', () => { map.setFog({}) })
+    
+    map.on('style.load', () => { 
+      map.setFog({
+        color: 'rgb(7, 8, 10)', // Matches --background
+        'high-color': 'rgb(16, 17, 21)', // Matches --surface
+        'horizon-blend': 0.15,
+        'space-color': 'rgb(2, 2, 3)',
+        'star-intensity': 0.8 // More intense stars for that orbital feel
+      })
+    })
+
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
@@ -31,65 +41,87 @@ export function MapboxPanel() {
     if (!mapRef.current) return
     markersRef.current.forEach(m => m.remove())
     
-    // Use real incidents if available, otherwise use mock data for visual testing
     const displayIncidents = incidents.length > 0 ? incidents : [
-      { id: 'mock-1', lng: -71.90, lat: -38.28, intensity: 'CRITICAL' },
-      { id: 'mock-2', lng: -71.85, lat: -38.25, intensity: 'HIGH' },
-      { id: 'mock-3', lng: -71.95, lat: -38.32, intensity: 'MEDIUM' }
+      { id: 'FIRE-001', lng: -71.90, lat: -38.28, intensity: 'CRITICAL', label: 'Cedar Ridge' },
+      { id: 'FIRE-002', lng: -71.85, lat: -38.25, intensity: 'HIGH', label: 'Bío-Bío' },
+      { id: 'FIRE-003', lng: -71.95, lat: -38.32, intensity: 'MEDIUM', label: 'Araucanía' }
     ]
 
     markersRef.current = displayIncidents.map(inc => {
       const el = document.createElement('div')
-      el.className = 'relative flex items-center justify-center cursor-pointer pointer-events-auto'
+      el.className = 'relative flex items-center justify-center cursor-pointer group'
       el.style.width = '32px'
       el.style.height = '32px'
       
-      // Outer pulsing ring
-      const ring = document.createElement('div')
-      ring.className = `absolute w-8 h-8 rounded-full border ${inc.intensity === 'CRITICAL' ? 'border-critical' : 'border-warning'} pulse-ring`
-      el.appendChild(ring)
+      const isCritical = inc.intensity === 'CRITICAL'
+      const color = isCritical ? '#ef4444' : '#f97316'
+      
+      // Marker Glow (Atmospheric)
+      const glow = document.createElement('div')
+      glow.className = 'absolute inset-0 rounded-full blur-xl opacity-20'
+      glow.style.backgroundColor = color
+      el.appendChild(glow)
 
-      // Inner dot
-      const dot = document.createElement('div')
-      dot.className = `w-3 h-3 ${inc.intensity === 'CRITICAL' ? 'bg-critical' : 'bg-warning'} rounded-full border border-white shadow-[0_0_10px_rgba(249,115,22,0.8)] pulse-dot`
-      el.appendChild(dot)
+      // Outer pulsing rings (Tactical refined)
+      const ring1 = document.createElement('div')
+      ring1.className = 'absolute inset-0 rounded-full border border-current opacity-60'
+      ring1.style.color = color
+      ring1.style.animation = 'pulse-ring 3s ease-out infinite'
+      el.appendChild(ring1)
 
-      // Add Popup
+      const ring2 = document.createElement('div')
+      ring2.className = 'absolute inset-0 rounded-full border border-current opacity-40'
+      ring2.style.color = color
+      ring2.style.animation = 'pulse-ring 3s ease-out 1.5s infinite'
+      el.appendChild(ring2)
+
+      // Fire Core (Flickering)
+      const core = document.createElement('div')
+      core.className = 'w-3 h-3 rounded-full z-10 flex items-center justify-center relative'
+      core.style.backgroundColor = color
+      core.style.boxShadow = `0 0 15px ${color}, inset 0 0 5px white`
+      
+      const flicker = document.createElement('div')
+      flicker.className = 'absolute inset-0 rounded-full bg-white opacity-40'
+      flicker.style.animation = 'flicker 0.15s ease-in-out infinite alternate'
+      core.appendChild(flicker)
+      
+      el.appendChild(core)
+
       const popupContent = `
         <div class="tactical-popup">
           <div class="tactical-popup-header">
-            <div class="w-2 h-2 rounded-full ${inc.intensity === 'CRITICAL' ? 'bg-critical' : 'bg-warning'} pulse-dot"></div>
-            <span class="text-xs font-bold tracking-widest uppercase">${inc.id}</span>
+            <div class="w-1.5 h-1.5 rounded-full pulse-dot" style="background-color: ${color}; box-shadow: 0 0 6px ${color}"></div>
+            <span class="text-[11px] font-bold tracking-[0.16em] uppercase text-[#f4f5f7]">${inc.id}</span>
           </div>
           <div class="tactical-popup-body">
             <div class="tactical-stat-row">
               <span class="tactical-stat-label">Intensity</span>
-              <span class="tactical-stat-value" style="color: ${inc.intensity === 'CRITICAL' ? '#ef4444' : '#f97316'}">${inc.intensity}</span>
+              <span class="tactical-stat-value" style="color: ${color}">${inc.intensity}</span>
             </div>
             <div class="tactical-stat-row">
               <span class="tactical-stat-label">Coordinates</span>
-              <span class="tactical-stat-value">${inc.lat.toFixed(4)}, ${inc.lng.toFixed(4)}</span>
+              <span class="tactical-stat-value num text-text-2">${inc.lat.toFixed(4)}°, ${inc.lng.toFixed(4)}°</span>
             </div>
             <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Radiative Power</span>
-              <span class="tactical-stat-value">${(Math.random() * 500 + 300).toFixed(1)} MW</span>
+              <span class="tactical-stat-label">Power (MW)</span>
+              <span class="tactical-stat-value num">${(Math.random() * 500 + 300).toFixed(1)}</span>
             </div>
-            <div class="tactical-stat-row">
-              <span class="tactical-stat-label">Spread Rate</span>
-              <span class="tactical-stat-value">${(Math.random() * 5 + 2).toFixed(1)} km/h</span>
-            </div>
-            <div class="mt-2 pt-2 border-t border-white/10">
-              <div class="flex items-center justify-between text-[10px] text-info font-bold">
-                <span>ANALYZING TELEMETRY...</span>
-                <span class="animate-pulse">ONLINE</span>
+            <div class="mt-2.5 pt-2 border-t border-border">
+              <div class="flex items-center justify-between text-[9px] font-bold tracking-widest text-blue uppercase">
+                <span>Telemetry Status</span>
+                <span class="animate-pulse">Active</span>
               </div>
             </div>
           </div>
         </div>
       `
 
-      const popup = new mapboxgl.Popup({ offset: 15, closeButton: true })
-        .setHTML(popupContent)
+      const popup = new mapboxgl.Popup({ 
+        offset: 12, 
+        closeButton: false,
+        anchor: 'bottom'
+      }).setHTML(popupContent)
 
       return new mapboxgl.Marker(el)
         .setLngLat([inc.lng, inc.lat])
