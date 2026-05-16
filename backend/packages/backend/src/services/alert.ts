@@ -64,7 +64,7 @@ export async function triggerMakeWebhook(update: SentinelUpdate, centroidLat: nu
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const secret = process.env.MAKE_WEBHOOK_SECRET
-  if (secret) headers['Authorization'] = `Token ${secret}`
+  if (secret) headers['x-make-apikey'] = secret
 
   try {
     const res = await fetch(url, {
