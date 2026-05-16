@@ -1,6 +1,6 @@
 "use client"
 
-import { Flame, Activity, Globe, RadarIcon } from "lucide-react"
+import { Activity, Globe, RadarIcon } from "lucide-react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -40,10 +40,12 @@ export function TopBar() {
 
       <header className="h-[64px] px-6 border-b border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_70%)] bg-[#080c14/90] backdrop-blur-xl flex items-center justify-between gap-4">
         {/* Brand */}
-        <div className="w-80 flex items-center gap-4">
-          <div className="w-[38px] h-[38px] rounded-lg border border-white/10 bg-[radial-gradient(circle_at_50%_75%,rgba(255,126,21,0.4),transparent_65%),linear-gradient(180deg,#1e293b,#0f172a)] flex items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.1)]">
-            <Flame className="w-[20px] h-[20px] text-orange drop-shadow-[0_0_8px_rgba(255,126,21,0.6)]" />
-          </div>
+        <div className="w-80 flex items-center gap-3">
+          <img
+            src="/sentinel-logo.png"
+            alt="SENTINEL"
+            className="h-[42px] w-auto object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.25)]"
+          />
           <div className="flex flex-col gap-0.5 leading-none">
             <span className="text-[15px] font-black tracking-[0.2em] text-white uppercase drop-shadow-sm">SENTINEL</span>
             <span className="text-[9px] font-bold tracking-[0.25em] text-text-muted uppercase">{tx.brandSub}</span>
