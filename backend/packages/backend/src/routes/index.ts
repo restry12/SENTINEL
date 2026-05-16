@@ -84,13 +84,14 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       .filter((v): v is number => typeof v === 'number')
     const pm25 = pm25Values.length > 0 ? Math.max(...pm25Values) : undefined
 
-    try {
-      await executeAndBroadcast(io, lat, lon, firms, weather, pm25)
-      res.json({ ok: true, fires: firms.length })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      res.status(500).json({ ok: false, error: message })
-    }
+    // Respond immediately. The full pipeline (Render cold start + 5 LLM agents)
+    // exceeds Make.com's 40s HTTP timeout; results are broadcast over Socket.io,
+    // not via this HTTP response, so Make.com only needs the ACK.
+    res.status(202).json({ ok: true, accepted: true, fires: firms.length })
+
+    executeAndBroadcast(io, lat, lon, firms, weather, pm25).catch((err) => {
+      console.error('[trigger/full] background analysis error:', err instanceof Error ? err.message : err)
+    })
   })
 
   // POST /api/trigger/csv — recibe CSV crudo de NASA FIRMS (text/plain)
