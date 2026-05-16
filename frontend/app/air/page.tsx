@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import dynamic from "next/dynamic"
 import { useLang } from "@/contexts/language-context"
+import { useSentinel } from "@/contexts/sentinel-context"
 import {
-  MAP_CENTER, computeAQI, aqiInfo, computeThreatLevel,
-  SCENARIOS, type ScenarioId,
+  aqiInfo, computeThreatLevel,
+  type EnvData, type FirePoint, type InfrastructurePoint,
 } from "@/components/air/types"
 import { SmokeAlert }       from "@/components/air/smoke-alert"
 import { AQIOverlay }       from "@/components/air/aqi-overlay"
@@ -17,7 +18,6 @@ import { ThreatIndicator }  from "@/components/air/threat-indicator"
 import { ActionPlan }       from "@/components/air/action-plan"
 import { AIBriefing }       from "@/components/air/ai-briefing"
 import { IncidentTimeline } from "@/components/air/incident-timeline"
-import { ScenarioControls } from "@/components/air/scenario-controls"
 import { AuthGuard } from "@/components/auth-guard"
 
 const AirMap = dynamic(
@@ -36,16 +36,48 @@ export default function AirPage() {
 function AirPageInner() {
   const pathname   = usePathname()
   const { lang, toggle, tx } = useLang()
-  const [scenarioId, setScenarioId] = useState<ScenarioId>("none")
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const scenario = SCENARIOS[scenarioId]
 
-  const rawAQI = useMemo(
-    () => computeAQI(scenario.fires, scenario.env.wind, MAP_CENTER.lat, MAP_CENTER.lng),
-    [scenario]
+  const { sentinelUpdate: u, connected } = useSentinel()
+
+  // Real env from weather data (speed is m/s → km/h)
+  const liveEnv: EnvData = {
+    wind:         { speed: u ? Math.round(u.weather.speed * 3.6) : 0, fromDeg: u?.weather.deg ?? 0 },
+    humidity:     u?.weather.humidity ?? 0,
+    tempC:        u?.weather.temp ?? 0,
+    visibilityKm: u?.weather.visibility != null ? Math.round(u.weather.visibility / 100) / 10 : null,
+  }
+
+  // Real fires from NASA FIRMS data (FireData uses .lon, FirePoint uses .lng)
+  const liveFires: FirePoint[] = (u?.fires ?? []).map((f, i) => ({
+    id:        `fire-${i}`,
+    lat:       f.lat,
+    lng:       f.lon,
+    intensity: Math.min(1, f.frp / 100),
+    name:      `SRC-${String(i + 1).padStart(3, "0")}`,
+  }))
+
+  // Real AQI directly from airQuality data (not computed from fires)
+  const rawAQI  = u?.airQuality.aqi ?? 0
+  const aqiData = useMemo(
+    () => aqiInfo(rawAQI, u?.report?.poblacion_en_riesgo_estimada ?? 0),
+    [rawAQI, u]
   )
-  const aqiData = useMemo(() => aqiInfo(rawAQI, 127_450), [rawAQI])
-  const threat  = useMemo(() => computeThreatLevel(rawAQI), [rawAQI])
+  const threat = useMemo(() => computeThreatLevel(rawAQI), [rawAQI])
+
+  // Real action items from authority report
+  const liveActions = u?.report?.acciones_inmediatas ?? null
+
+  // Real briefing text
+  const liveBriefing = u?.report?.resumen_ejecutivo ?? u?.riskAssessment?.resumen ?? u?.airAlerts?.resumen_general ?? null
+
+  // Real alerts for timeline
+  const liveAlerts = u?.airAlerts?.alertas ?? null
+
+  // Infrastructure — comes from the backend; empty until Make.com sends it
+  const liveInfra: InfrastructurePoint[] = (u?.infrastructure ?? []).map(p => ({
+    id: p.id, name: p.name, lat: p.lat, lng: p.lon, type: p.type,
+  }))
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden" data-threat={threat}>
@@ -55,6 +87,11 @@ function AirPageInner() {
       <header className="h-12 border-b border-border flex items-center justify-between px-3 sm:px-6 shrink-0 z-[2000] gap-2">
         {/* Left: brand + nav */}
         <div className="flex items-center gap-2 min-w-0">
+          <img
+            src="/sentinel-logo.png"
+            alt="SENTINEL"
+            className="h-7 w-auto object-contain drop-shadow-[0_0_8px_rgba(56,189,248,0.25)]"
+          />
           <span className="hidden sm:block text-xs font-semibold tracking-widest uppercase text-muted-foreground font-mono whitespace-nowrap">
             SENTINEL
           </span>
@@ -90,6 +127,12 @@ function AirPageInner() {
               style={{ animation: "smokeAlertBlink 1.2s ease-in-out infinite" }}
             />
             <span className="text-[10px] font-mono text-muted-foreground">LIVE</span>
+            {!connected && (
+              <span className="text-[9px] font-mono text-muted-foreground/60">CONNECTING...</span>
+            )}
+            {connected && !u && (
+              <span className="text-[9px] font-mono text-muted-foreground/60">AWAITING DATA</span>
+            )}
           </div>
           <button
             onClick={toggle}
@@ -109,13 +152,13 @@ function AirPageInner() {
 
       {/* ── Main ── */}
       <main className="flex-1 relative overflow-hidden">
-        <AirMap wind={scenario.env.wind} />
-        <SmokeAlert wind={scenario.env.wind} />
+        <AirMap wind={liveEnv.wind} fires={liveFires} infrastructure={liveInfra} />
+        <SmokeAlert wind={liveEnv.wind} sourceCount={liveFires.length} />
 
         {/* Map overlays — hidden when sidebar open on mobile to avoid clutter */}
         <div className={`transition-opacity duration-200 ${sidebarOpen ? 'opacity-0 pointer-events-none md:opacity-100 md:pointer-events-auto' : ''}`}>
           <AQIOverlay info={aqiData} />
-          <EnvStatus env={scenario.env} />
+          <EnvStatus env={liveEnv} />
           <AQILegend />
         </div>
 
@@ -143,13 +186,11 @@ function AirPageInner() {
             <div className="md:hidden flex justify-center pb-1">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
-            <ActionPlan threat={threat} aqi={rawAQI} />
-            <AIBriefing threat={threat} />
-            <IncidentTimeline scenarioId={scenarioId} />
+            <ActionPlan threat={threat} aqi={rawAQI} actions={liveActions} />
+            <AIBriefing threat={threat} briefing={liveBriefing} />
+            <IncidentTimeline alerts={liveAlerts} />
           </div>
         </>
-
-        <ScenarioControls active={scenarioId} onSelect={setScenarioId} />
       </main>
     </div>
   )

@@ -20,7 +20,6 @@ export function getSupabaseAdmin() {
 export function getSupabaseClient() {
   return createClient(
     requireEnv('SUPABASE_URL'),
-    requireEnv('SUPABASE_ANON_KEY'),
-    { auth: { autoRefreshToken: false, persistSession: false } }
+    requireEnv('SUPABASE_ANON_KEY')
   )
 }

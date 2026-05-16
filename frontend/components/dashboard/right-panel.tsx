@@ -17,7 +17,6 @@ function Label({ children, right }: { children: React.ReactNode, right?: string 
 export function RightPanel() {
   const { tx } = useLang()
   const { sentinelUpdate: u } = useSentinel()
-  const evacPct = 66
 
   const report = u?.report ?? null
   const natural = u?.naturalRoutes ?? null
@@ -25,8 +24,9 @@ export function RightPanel() {
   const primaryRoute = natural?.rutas?.[0] ?? null
   const routeSteps = primaryRoute
     ? [primaryRoute.origen, ...primaryRoute.instrucciones.split(/[→·,;]+/).map((s) => s.trim()).filter(Boolean).slice(0, 2), primaryRoute.destino]
-    : ["Oak Valley Rd", "Interstate 42 N", "Exit 17B", "Lincoln High School"]
-  const meetingPoint = natural?.punto_encuentro_principal ?? "PRIMARY: LINCOLN HUB"
+    : []
+  const meetingPoint = natural?.punto_encuentro_principal ?? "—"
+  const routeBlocked = (natural?.rutas ?? []).some((r) => r.estado === "BLOQUEADA")
   const briefingText = report?.resumen_ejecutivo ?? u?.riskAssessment?.resumen ?? null
 
   return (
@@ -48,29 +48,15 @@ export function RightPanel() {
           </div>
           <div className="space-y-0">
             {[
-              { k: tx.populationAtRisk, v: populationAtRisk != null ? populationAtRisk.toLocaleString() : "127,450", color: "text-red-soft" },
-              { k: tx.evacuated, v: "84,230", color: "text-green-soft" },
-              { k: tx.inShelters, v: "23,847", color: "text-blue" },
+              { k: tx.populationAtRisk, v: populationAtRisk != null ? populationAtRisk.toLocaleString() : "—", color: "text-red-soft" },
+              { k: tx.evacuated, v: "—", color: "text-green-soft" },
+              { k: tx.inShelters, v: "—", color: "text-blue" },
             ].map((item) => (
               <div key={item.k} className="flex items-baseline justify-between py-2.5 border-b border-white/5 last:border-0">
                 <span className="text-sm font-semibold text-text-dim">{item.k}</span>
                 <span className={`text-lg font-bold ${item.color} num`}>{item.v}</span>
               </div>
             ))}
-          </div>
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[10px] font-bold text-text-dim uppercase tracking-widest">
-                {tx.evacuationProgress}
-              </span>
-              <span className="text-sm font-bold text-green-soft num">{evacPct}%</span>
-            </div>
-            <div className="h-2.5 bg-black/40 border border-border/50 rounded-full overflow-hidden relative">
-              <div 
-                className="absolute inset-y-0 left-0 bg-[linear-gradient(90deg,#10b981,#34d399)] shadow-[0_0_15px_rgba(16,185,129,0.5)] animate-shimmer" 
-                style={{ width: `${evacPct}%` }} 
-              />
-            </div>
           </div>
         </div>
 
@@ -80,29 +66,41 @@ export function RightPanel() {
           <div className="p-4 bg-[linear-gradient(180deg,rgba(52,211,153,0.1),transparent_40%)] bg-surface/60 border border-green/30 rounded-xl shadow-[0_10px_25px_-10px_rgba(16,185,129,0.15)] backdrop-blur-md">
             <div className="flex justify-between items-center mb-4">
               <span className="text-sm font-bold text-text-2 tracking-tight">{meetingPoint}</span>
-              <span className="px-2 py-0.5 rounded border border-green/40 bg-green/10 text-[9px] font-black text-green-soft tracking-[0.15em] uppercase">
-                {tx.routeActive}
-              </span>
+              {primaryRoute && (
+                <span className="px-2 py-0.5 rounded border border-green/40 bg-green/10 text-[9px] font-black text-green-soft tracking-[0.15em] uppercase">
+                  {primaryRoute.estado}
+                </span>
+              )}
             </div>
-            <div className="space-y-2">
-              {routeSteps.map((step, i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <span className="w-5 h-5 flex items-center justify-center border border-green/40 bg-green/10 text-[10px] font-black text-green-soft rounded num">
-                    {i + 1}
-                  </span>
-                  <span className="text-sm font-medium text-text-2">{step}</span>
-                </div>
-              ))}
-            </div>
+            {routeSteps.length > 0 ? (
+              <div className="space-y-2">
+                {routeSteps.map((step, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="w-5 h-5 flex items-center justify-center border border-green/40 bg-green/10 text-[10px] font-black text-green-soft rounded num">
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-medium text-text-2">{step}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[11px] text-text-muted uppercase tracking-wider py-2">{tx.noRouteData}</div>
+            )}
             <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
               <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest">{tx.estTravel}</span>
-              <span className="text-sm font-bold text-foreground num bg-surface px-2 py-0.5 border border-border rounded">23 MIN</span>
+              <span className="text-sm font-bold text-foreground num bg-surface px-2 py-0.5 border border-border rounded">
+                {primaryRoute?.tiempo_estimado_min != null
+                  ? `${primaryRoute.tiempo_estimado_min} MIN`
+                  : "— MIN"}
+              </span>
             </div>
           </div>
-          <div className="flex items-center gap-3 px-4 py-2.5 border border-red/30 bg-red/5 rounded-lg text-red-soft shadow-lg shadow-red/5">
-            <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_12px_rgba(255,51,51,1)] animate-blink" />
-            <span className="text-[11px] font-black tracking-[0.15em] uppercase">{tx.hwyClosed}</span>
-          </div>
+          {routeBlocked && (
+            <div className="flex items-center gap-3 px-4 py-2.5 border border-red/30 bg-red/5 rounded-lg text-red-soft shadow-lg shadow-red/5">
+              <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_12px_rgba(255,51,51,1)] animate-blink" />
+              <span className="text-[11px] font-black tracking-[0.15em] uppercase">{tx.hwyClosed}</span>
+            </div>
+          )}
         </div>
 
         {/* Municipal Briefing */}
@@ -110,27 +108,18 @@ export function RightPanel() {
           <Label>{tx.officialBriefing}</Label>
           <div className="flex justify-between items-center mb-1">
             <span className="text-[10px] font-black text-text-dim uppercase tracking-[0.2em]">{tx.execSummary}</span>
-            <span className="text-blue font-mono font-bold text-[10px] uppercase shadow-blue/20">15:00 UTC</span>
           </div>
           <div className="text-[13.5px] leading-[1.6] text-text-2 p-4 bg-surface/40 border border-border rounded-xl">
             {briefingText ? (
               <p>{briefingText}</p>
             ) : (
-              <p>
-                The <span className="text-orange font-bold drop-shadow-[0_0_8px_rgba(255,126,21,0.3)]">Cedar Ridge Fire</span> expanded to
-                <span className="text-foreground font-bold"> 12,400 acres</span>.
-                {tx.containment} <span className="text-red-soft font-bold">8%</span>. {tx.windNote}
-              </p>
+              <p className="text-text-muted italic">{tx.awaitingBriefing}</p>
             )}
-          </div>
-          <div className="flex items-center gap-4 p-4 border border-border rounded-xl bg-[linear-gradient(135deg,rgba(255,255,255,0.03),transparent)] bg-surface/80 shadow-lg">
-            <div className="w-10 h-10 border-2 border-green/40 rounded-full flex items-center justify-center bg-green/10 text-[12px] font-black text-green shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-              CV
-            </div>
-            <div className="flex-1">
-              <div className="text-sm font-bold text-foreground">Cmdr. C. Vásquez</div>
-              <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest mt-0.5">{tx.incidentCommander}</div>
-            </div>
+            {report?.nivel_emergencia && (
+              <div className="mt-2 text-[10px] font-bold text-orange-soft uppercase tracking-widest">
+                {report.nivel_emergencia}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -7,16 +7,18 @@ import { useLang } from "@/contexts/language-context"
 interface Props {
   threat: ThreatLevel
   aqi: number
+  actions?: string[] | null
 }
 
 function now(): string {
   return new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
 }
 
-export function ActionPlan({ threat, aqi }: Props) {
+export function ActionPlan({ threat, aqi, actions }: Props) {
   const { tx } = useLang()
-  const color   = THREAT_COLORS[threat]
-  const actions = tx.actions[threat.toLowerCase() as keyof typeof tx.actions]
+  const color          = THREAT_COLORS[threat]
+  const staticActions  = tx.actions[threat.toLowerCase() as keyof typeof tx.actions]
+  const displayActions = actions ?? staticActions
   const [open, setOpen] = useState(true)
 
   return (
@@ -56,7 +58,7 @@ export function ActionPlan({ threat, aqi }: Props) {
       {open && (
         <div className="mt-3">
           <div className="flex flex-col gap-2">
-            {actions.map((action, i) => (
+            {displayActions.map((action, i) => (
               <div
                 key={i}
                 className="flex items-start gap-2"

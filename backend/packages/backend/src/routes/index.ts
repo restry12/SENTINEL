@@ -5,6 +5,7 @@ import { rateLimit } from 'express-rate-limit'
 import { executeAndBroadcast } from '../socket/handlers'
 import { parseFirmsCSV } from '../utils/parseFirmsCSV'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
+import { getLastUpdate } from '../services/last-update'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
@@ -23,6 +24,13 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   app.use('/api/auth', authRouter)
   app.use('/api/geo', geoRouter)
   app.use('/api/history', historyRouter)
+
+  // GET /api/last — last known SentinelUpdate (page memory: hydrate on load
+  // without waiting for the next Make.com trigger)
+  app.get('/api/last', (_req, res) => {
+    const update = getLastUpdate()
+    res.json({ ok: true, update })
+  })
 
   // GET /api/status — system status for monitoring
   app.get('/api/status', (_req, res) => {
