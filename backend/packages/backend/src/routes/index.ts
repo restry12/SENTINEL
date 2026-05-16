@@ -26,16 +26,16 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
   })
 
-  // POST /api/fires/filter — recibe CSV de NASA, devuelve focos peligrosos ordenados por FRP
+  // POST /api/fires/filter — recibe CSV de NASA, devuelve los 50 focos con mayor FRP
   app.post('/api/fires/filter', (req, res) => {
     const csv = typeof req.body === 'string' ? req.body : ''
     const all = csv ? parseFirmsCSV(csv) : []
 
-    const dangerous = all
-      .filter(f => f.frp > 50)
+    const fires = [...all]
       .sort((a, b) => b.frp - a.frp)
+      .slice(0, 50)
 
-    res.json({ fires: dangerous, total: all.length, dangerous: dangerous.length })
+    res.json({ fires, total: all.length, dangerous: fires.length })
   })
 
   // POST /api/trigger/full — recibe fires[] de Make.com
