@@ -26,6 +26,20 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
   })
 
+  // POST /api/trigger/csv — recibe CSV crudo de NASA FIRMS (text/plain)
+  // Make.com puede enviar el body directamente sin envolverlo en JSON
+  app.post('/api/trigger/csv', async (req, res) => {
+    const csv = typeof req.body === 'string' ? req.body : ''
+    const firms = csv ? parseFirmsCSV(csv) : undefined
+    try {
+      await executeAndBroadcast(io, undefined, undefined, firms)
+      res.json({ ok: true, parsed: firms?.length ?? 0 })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(500).json({ ok: false, error: message })
+    }
+  })
+
   // POST /api/polling/start — start polling at given interval
   // Minimum 10 seconds to avoid rate-limiting NASA FIRMS, OpenWeather, and OpenAQ
   app.post('/api/polling/start', (req, res) => {
