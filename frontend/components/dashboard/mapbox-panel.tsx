@@ -461,97 +461,52 @@ export function MapboxPanel() {
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
-      {/* Wind indicator */}
+      {/* Wind + expansion toggle — compact top-right widget */}
       {selectedFire && (
-        <div className="absolute top-4 right-4 z-20 flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl backdrop-blur-md"
+        <div className="absolute top-4 right-4 z-20 flex flex-col items-center gap-2 px-3 py-3 rounded-2xl backdrop-blur-md"
           style={{
             background: 'rgba(0,0,0,0.78)',
-            border: '1px solid rgba(251,146,60,0.25)',
-            boxShadow: '0 0 24px rgba(251,146,60,0.08)',
+            border: '1px solid rgba(251,146,60,0.22)',
+            boxShadow: '0 0 20px rgba(251,146,60,0.07)',
           }}
         >
-          <span className="text-[9px] font-mono font-bold tracking-[0.25em] text-white/30 uppercase">Viento</span>
+          {/* Wind */}
+          <span className="text-[8px] font-mono font-bold tracking-[0.25em] text-white/25 uppercase">Viento</span>
           <ArrowUp
-            className="w-7 h-7 text-orange-400"
-            style={{ transform: `rotate(${spreadDeg}deg)`, filter: 'drop-shadow(0 0 8px rgba(251,146,60,0.7))' }}
+            className="w-6 h-6 text-orange-400"
+            style={{ transform: `rotate(${spreadDeg}deg)`, filter: 'drop-shadow(0 0 6px rgba(251,146,60,0.65))' }}
           />
-          <span className="text-[13px] font-mono font-black text-orange-400 tracking-widest">{spreadCardinal}</span>
-          <span className="text-[11px] font-mono text-white/50">{windKmh} km/h</span>
-        </div>
-      )}
+          <span className="text-[11px] font-mono font-black text-orange-400 tracking-widest">{spreadCardinal} · {windKmh}km/h</span>
 
-      {/* Expansion projection toggle */}
-      {selectedFire && (
-        <div
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1.5 rounded-2xl backdrop-blur-md"
-          style={{
-            background: 'linear-gradient(135deg, rgba(0,0,0,0.88) 0%, rgba(18,4,4,0.92) 100%)',
-            border: '1px solid rgba(239,68,68,0.3)',
-            boxShadow: '0 0 40px rgba(239,68,68,0.12), inset 0 1px 0 rgba(255,255,255,0.04)',
-          }}
-        >
-          {/* Fire badge */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_#ef4444]" />
-            <div className="flex flex-col leading-none">
-              <span className="text-[10px] font-mono font-black tracking-[0.18em] text-red-400 uppercase">{selectedFire.id}</span>
-              <span className="text-[9px] font-mono text-orange-400/80 mt-0.5">▶ {spreadCardinal} · {windKmh} km/h</span>
-            </div>
+          <div className="w-full h-px bg-white/8" />
+
+          {/* Timeframe pills */}
+          <div className="flex gap-1">
+            {expansionOptions.map(({ key, label, color }) => {
+              const isActive = activeExpansion === key
+              return (
+                <button
+                  key={key}
+                  onClick={() => setActiveExpansion(prev => prev === key ? null : key)}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-black tracking-wider transition-all duration-150"
+                  style={{
+                    color: isActive ? '#000' : `${color}99`,
+                    background: isActive ? color : `${color}14`,
+                    border: `1px solid ${isActive ? color : `${color}30`}`,
+                    boxShadow: isActive ? `0 0 12px ${color}60` : 'none',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
-
-          <div className="w-px h-8 bg-white/10" />
-
-          {/* Timeframe cards */}
-          {expansionOptions.map(({ key, label, color }) => {
-            const isActive = activeExpansion === key
-            const area = areas[key]
-            const km2Str = area.km2 >= 1000
-              ? `${(area.km2 / 1000).toFixed(1)}k km²`
-              : `${area.km2} km²`
-            const haStr = area.ha >= 10000
-              ? `${Math.round(area.ha / 1000)}k ha`
-              : `${area.ha.toLocaleString()} ha`
-
-            return (
-              <button
-                key={key}
-                onClick={() => setActiveExpansion(prev => prev === key ? null : key)}
-                className="relative rounded-xl transition-all duration-200 overflow-hidden"
-                style={{
-                  background: isActive ? `linear-gradient(135deg, ${color}bb, ${color}77)` : 'transparent',
-                  border: `1px solid ${isActive ? color : `${color}35`}`,
-                  boxShadow: isActive ? `0 0 24px ${color}50, inset 0 1px 0 rgba(255,255,255,0.12)` : 'none',
-                  minWidth: isActive ? 140 : 52,
-                }}
-              >
-                {isActive ? (
-                  /* Expanded active state — all info visible */
-                  <div className="flex items-center gap-3 px-4 py-2.5">
-                    <span className="text-[15px] font-mono font-black text-white tracking-wider" style={{ textShadow: `0 0 16px ${color}` }}>
-                      {label}
-                    </span>
-                    <div className="flex flex-col items-start leading-tight">
-                      <span className="text-[11px] font-mono font-black text-white">{km2Str}</span>
-                      <span className="text-[10px] font-mono text-white/60">{haStr}</span>
-                    </div>
-                  </div>
-                ) : (
-                  /* Compact inactive */
-                  <div className="flex items-center justify-center px-4 py-2.5">
-                    <span className="text-[13px] font-mono font-black tracking-wider" style={{ color: `${color}99` }}>{label}</span>
-                  </div>
-                )}
-              </button>
-            )
-          })}
-
-          <div className="w-px h-8 bg-white/10" />
 
           <button
             onClick={() => { setSelectedFire(null); setActiveExpansion(null) }}
-            className="w-8 h-8 flex items-center justify-center rounded-xl text-[11px] font-mono text-white/25 hover:text-white/60 hover:bg-white/5 transition-all"
+            className="text-[9px] font-mono text-white/20 hover:text-white/50 transition-colors"
           >
-            ✕
+            cerrar
           </button>
         </div>
       )}
