@@ -70,9 +70,11 @@ export function LeftPanel() {
               {riskLevel}
             </div>
           </div>
-          <p className="mt-3 text-[11px] font-semibold text-red-soft tracking-wide">
-            {tx.immediateAction}
-          </p>
+          {(riskLevel === "HIGH" || riskLevel === "CRITICAL") && (
+            <p className="mt-3 text-[11px] font-semibold text-red-soft tracking-wide">
+              {tx.immediateAction}
+            </p>
+          )}
         </div>
 
         {/* Fire Radiative Power */}
