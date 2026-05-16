@@ -50,15 +50,28 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     res.json({ fires: dangerous, centroid, total: all.length, dangerous: dangerous.length })
   })
 
-  // POST /api/trigger/full — recibe fires (JSON) + weather (JSON) de Make.com
-  // Usado después de /api/fires/filter + OpenWeather
+  // POST /api/trigger/full — recibe fires[] de Make.com con clima embebido en cada foco
+  // Cada fire trae: { lat, lon, frp, brightness, speed, deg, humidity }
   app.post('/api/trigger/full', async (req, res) => {
-    const body = req.body as { fires?: unknown[]; weather?: unknown }
-    const firms = Array.isArray(body.fires) ? body.fires : undefined
-    const weather = body.weather
+    const body = req.body as { fires?: unknown[] }
+    const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
+
+    const firms = rawFires.map(f => ({
+      lat: f.lat, lon: f.lon, frp: f.frp, brightness: f.brightness, timestamp: f.timestamp,
+    }))
+
+    // Clima del primer foco (el más peligroso — vienen ordenados por FRP desc)
+    const first = rawFires[0]
+    const weather = first
+      ? { speed: first.speed as number, deg: first.deg as number, humidity: first.humidity as number, temp: first.temp as number | undefined }
+      : undefined
+
+    const lat = typeof first?.lat === 'number' ? first.lat : undefined
+    const lon = typeof first?.lon === 'number' ? first.lon : undefined
+
     try {
-      await executeAndBroadcast(io, undefined, undefined, firms, weather)
-      res.json({ ok: true, fires: firms?.length ?? 0 })
+      await executeAndBroadcast(io, lat, lon, firms, weather)
+      res.json({ ok: true, fires: firms.length })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       res.status(500).json({ ok: false, error: message })
