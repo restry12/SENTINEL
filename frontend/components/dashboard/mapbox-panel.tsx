@@ -16,14 +16,65 @@ const FALLBACK_FIRES = [
 
 type ExpansionKey = '2h' | '6h' | '12h'
 
+interface SelectedFire { lat: number; lon: number; id: string }
+
+// Generate fire expansion ellipse GeoJSON offset in downwind direction.
+// windDegFrom: meteorological (wind comes FROM this bearing, 0=N, 90=E...)
+// Polygon elongated downwind, center shifts downwind over time.
+function makeExpansionPolygon(lat: number, lon: number, windDegFrom: number, windSpeedMs: number, hours: number) {
+  const spreadRad = ((windDegFrom + 180) % 360) * (Math.PI / 180)
+  const sinD = Math.sin(spreadRad)
+  const cosD = Math.cos(spreadRad)
+  const cosLat = Math.cos(lat * Math.PI / 180)
+
+  // km → deg: lat 1°≈111km, lon 1°≈111km*cosLat
+  const kmToDegLat = 1 / 111
+  const kmToDegLon = 1 / (111 * cosLat)
+
+  const windKmh = windSpeedMs * 3.6
+  const spreadKm = 1.5 + hours * (1.2 + windKmh * 0.03)
+  const offsetKm = hours * windKmh * 0.05
+
+  const centerLat = lat + cosD * offsetKm * kmToDegLat
+  const centerLon = lon + sinD * offsetKm * kmToDegLon
+
+  const elongation = 1.8
+  const aKm = spreadKm * elongation
+  const bKm = spreadKm
+
+  const pts = 48
+  const coords: number[][] = []
+  for (let i = 0; i <= pts; i++) {
+    const angle = (i / pts) * Math.PI * 2
+    const localX = aKm * Math.cos(angle)
+    const localY = bKm * Math.sin(angle)
+    const rotX = localX * sinD - localY * cosD
+    const rotY = localX * cosD + localY * sinD
+    coords.push([centerLon + rotX * kmToDegLon, centerLat + rotY * kmToDegLat])
+  }
+
+  return {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: { type: 'Polygon' as const, coordinates: [coords] },
+  }
+}
+
+const EXP_CONFIG: Record<ExpansionKey, { hours: number; color: string; fillOpacity: number }> = {
+  '2h':  { hours: 2,  color: '#f97316', fillOpacity: 0.12 },
+  '6h':  { hours: 6,  color: '#fb923c', fillOpacity: 0.09 },
+  '12h': { hours: 12, color: '#fbbf24', fillOpacity: 0.06 },
+}
+
 export function MapboxPanel() {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
   const { sentinelUpdate } = useSentinel()
   const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
-  const [selectedFireId, setSelectedFireId] = useState<string | null>(null)
+  const [selectedFire, setSelectedFire] = useState<SelectedFire | null>(null)
 
+  // Init map
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
     mapboxgl.accessToken = TOKEN
@@ -34,7 +85,6 @@ export function MapboxPanel() {
       zoom: 9,
       projection: 'globe' as any,
     })
-
     map.on('style.load', () => {
       map.setFog({
         'color': 'rgba(56, 189, 248, 0.15)',
@@ -44,7 +94,6 @@ export function MapboxPanel() {
         'star-intensity': 0.9,
       })
     })
-
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
@@ -58,9 +107,7 @@ export function MapboxPanel() {
     const fires = sentinelUpdate
       ? sentinelUpdate.fires.map((f, i) => ({
           id: `FIRE-${String(i + 1).padStart(3, '0')}`,
-          lat: f.lat,
-          lon: f.lon,
-          frp: f.frp,
+          lat: f.lat, lon: f.lon, frp: f.frp,
           intensity: sentinelUpdate.riskLevel,
         }))
       : FALLBACK_FIRES
@@ -126,7 +173,7 @@ export function MapboxPanel() {
 
       el.addEventListener('click', () => {
         map.flyTo({ center: [inc.lon, inc.lat], zoom: 13, duration: 1200, essential: true })
-        setSelectedFireId(inc.id)
+        setSelectedFire({ lat: inc.lat, lon: inc.lon, id: inc.id })
         setActiveExpansion('2h')
       })
 
@@ -136,7 +183,6 @@ export function MapboxPanel() {
         .addTo(map)
     })
 
-    // Recenter on the fires
     if (fires.length > 0) {
       const avgLon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
       const avgLat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
@@ -144,13 +190,12 @@ export function MapboxPanel() {
     }
   }, [sentinelUpdate])
 
-  // Fire polygon + expansion polygons + evacuation routes
+  // Fire perimeter + evacuation routes from backend
   useEffect(() => {
     const map = mapRef.current
     if (!map || !sentinelUpdate) return
 
     const apply = () => {
-      // Current perimeter
       const polyId = 'sentinel-polygon'
       if (map.getLayer(polyId + '-fill')) map.removeLayer(polyId + '-fill')
       if (map.getLayer(polyId + '-line')) map.removeLayer(polyId + '-line')
@@ -161,27 +206,6 @@ export function MapboxPanel() {
         map.addLayer({ id: polyId + '-line', type: 'line', source: polyId, paint: { 'line-color': '#ef4444', 'line-width': 2 } })
       }
 
-      // Expansion forecast — add all sources but hide non-active
-      const exp = sentinelUpdate.expansion
-      const expLayers: Array<[string, { coordinates: number[][][] } | undefined, string, ExpansionKey]> = [
-        ['exp-12h', exp?.expansion_12h, '#fbbf24', '12h'],
-        ['exp-6h',  exp?.expansion_6h,  '#fb923c', '6h'],
-        ['exp-2h',  exp?.expansion_2h,  '#f97316', '2h'],
-      ]
-      for (const [id, poly, color] of expLayers) {
-        if (map.getLayer(id)) map.removeLayer(id)
-        if (map.getSource(id)) map.removeSource(id)
-        if (poly?.coordinates) {
-          map.addSource(id, {
-            type: 'geojson',
-            data: { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: poly.coordinates } } as any,
-          })
-          map.addLayer({ id, type: 'line', source: id, paint: { 'line-color': color, 'line-width': 1.5, 'line-dasharray': [2, 2] } })
-          map.setLayoutProperty(id, 'visibility', 'none')
-        }
-      }
-
-      // Evacuation routes
       const routeId = 'sentinel-routes'
       if (map.getLayer(routeId)) map.removeLayer(routeId)
       if (map.getSource(routeId)) map.removeSource(routeId)
@@ -202,18 +226,54 @@ export function MapboxPanel() {
     else map.once('style.load', apply)
   }, [sentinelUpdate])
 
-  // Toggle expansion layer visibility
+  // Draw expansion polygon for selected fire + active timeframe
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !map.isStyleLoaded()) return
-    const keys: ExpansionKey[] = ['2h', '6h', '12h']
-    for (const k of keys) {
-      const id = `exp-${k}`
-      if (map.getLayer(id)) {
-        map.setLayoutProperty(id, 'visibility', activeExpansion === k ? 'visible' : 'none')
+    if (!map) return
+
+    const drawExpansion = () => {
+      // Clear previous layer
+      if (map.getLayer('exp-active-fill')) map.removeLayer('exp-active-fill')
+      if (map.getLayer('exp-active-line')) map.removeLayer('exp-active-line')
+      if (map.getSource('exp-active')) map.removeSource('exp-active')
+
+      if (!selectedFire || !activeExpansion) return
+
+      const cfg = EXP_CONFIG[activeExpansion]
+
+      // Prefer backend expansion data if available, otherwise generate from fire coords + wind
+      let geoJson: ReturnType<typeof makeExpansionPolygon> | null = null
+      const exp = sentinelUpdate?.expansion
+      const backendPoly = activeExpansion === '2h' ? exp?.expansion_2h
+        : activeExpansion === '6h' ? exp?.expansion_6h
+        : exp?.expansion_12h
+
+      if (backendPoly?.coordinates) {
+        geoJson = {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'Polygon', coordinates: backendPoly.coordinates },
+        }
+      } else {
+        const windDeg = sentinelUpdate?.weather?.deg ?? 315
+        const windSpeed = sentinelUpdate?.weather?.speed ?? 5
+        geoJson = makeExpansionPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeed, cfg.hours)
       }
+
+      map.addSource('exp-active', { type: 'geojson', data: geoJson as any })
+      map.addLayer({
+        id: 'exp-active-fill', type: 'fill', source: 'exp-active',
+        paint: { 'fill-color': cfg.color, 'fill-opacity': cfg.fillOpacity },
+      })
+      map.addLayer({
+        id: 'exp-active-line', type: 'line', source: 'exp-active',
+        paint: { 'line-color': cfg.color, 'line-width': 2, 'line-dasharray': [3, 2] },
+      })
     }
-  }, [activeExpansion])
+
+    if (map.isStyleLoaded()) drawExpansion()
+    else map.once('style.load', drawExpansion)
+  }, [selectedFire, activeExpansion, sentinelUpdate])
 
   const expansionOptions: Array<{ key: ExpansionKey; label: string; color: string }> = [
     { key: '2h',  label: '2H',  color: '#f97316' },
@@ -225,11 +285,10 @@ export function MapboxPanel() {
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
-      {/* Expansion projection toggle — shown when a fire is selected */}
-      {selectedFireId && sentinelUpdate?.expansion && (
+      {selectedFire && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 p-1 rounded-xl border border-white/10 bg-black/70 backdrop-blur-md shadow-2xl">
           <span className="px-3 text-[9px] font-mono font-bold tracking-[0.2em] text-white/40 uppercase whitespace-nowrap">
-            Proyección fuego
+            Expansión {selectedFire.id}
           </span>
           {expansionOptions.map(({ key, label, color }) => (
             <button
@@ -247,7 +306,7 @@ export function MapboxPanel() {
             </button>
           ))}
           <button
-            onClick={() => { setSelectedFireId(null); setActiveExpansion(null) }}
+            onClick={() => { setSelectedFire(null); setActiveExpansion(null) }}
             className="ml-1 px-2 py-2 rounded-lg text-[10px] font-mono text-white/30 hover:text-white/60 transition-colors"
           >
             ✕
