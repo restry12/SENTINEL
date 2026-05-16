@@ -8,7 +8,7 @@ import { useLang } from "@/contexts/language-context"
 import { useSentinel } from "@/contexts/sentinel-context"
 import {
   aqiInfo, computeThreatLevel, visibilityFromAQI,
-  type EnvData, type FirePoint,
+  type EnvData, type FirePoint, type InfrastructurePoint,
 } from "@/components/air/types"
 import { SmokeAlert }       from "@/components/air/smoke-alert"
 import { AQIOverlay }       from "@/components/air/aqi-overlay"
@@ -73,6 +73,11 @@ function AirPageInner() {
 
   // Real alerts for timeline
   const liveAlerts = u?.airAlerts?.alertas ?? null
+
+  // Infrastructure — comes from the backend; empty until Make.com sends it
+  const liveInfra: InfrastructurePoint[] = (u?.infrastructure ?? []).map(p => ({
+    id: p.id, name: p.name, lat: p.lat, lng: p.lon, type: p.type,
+  }))
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden" data-threat={threat}>
@@ -142,7 +147,7 @@ function AirPageInner() {
 
       {/* ── Main ── */}
       <main className="flex-1 relative overflow-hidden">
-        <AirMap wind={liveEnv.wind} fires={liveFires} />
+        <AirMap wind={liveEnv.wind} fires={liveFires} infrastructure={liveInfra} />
         <SmokeAlert wind={liveEnv.wind} sourceCount={liveFires.length} />
 
         {/* Map overlays — hidden when sidebar open on mobile to avoid clutter */}

@@ -47,14 +47,6 @@ export const FALLBACK_ENV: EnvData = {
   visibilityKm: 10,
 }
 
-export const MOCK_INFRASTRUCTURE: InfrastructurePoint[] = [
-  { id: "h-001", name: "Hosp. Hernán Henríquez", lat: -38.24, lng: -72.35, type: "hospital"  },
-  { id: "s-001", name: "Escuela La Araucanía",    lat: -38.18, lng: -71.62, type: "school"    },
-  { id: "s-002", name: "Liceo Técnico Curacautín",lat: -38.44, lng: -71.89, type: "school"    },
-  { id: "s-003", name: "Colegio Los Volcanes",     lat: -38.35, lng: -72.12, type: "school"    },
-  { id: "e-001", name: "Bomberos Lonquimay",       lat: -38.44, lng: -71.24, type: "emergency" },
-]
-
 // ── AQI thresholds ───────────────────────────────────────────────
 export const AQI_THRESHOLDS: Array<{
   max: number; color: string; label: string; risk: AQIInfo["riskLevel"]
