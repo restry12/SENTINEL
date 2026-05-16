@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Wind, MessageSquare } from "lucide-react"
 import { useLang } from "@/contexts/language-context"
-import { useSentinelMetrics } from "@/contexts/sentinel-context"
+import { useSentinel, useSentinelMetrics } from "@/contexts/sentinel-context"
 
 function Label({ children, right }: { children: React.ReactNode, right?: string }) {
   return (
@@ -31,6 +31,7 @@ function WindRose({ direction }: { direction: string }) {
 
 export function LeftPanel() {
   const { tx } = useLang()
+  const { sentinelUpdate: u } = useSentinel()
   const m = useSentinelMetrics()
   const riskLevel = m.riskLevel
   const frp = m.frpMax
@@ -81,9 +82,6 @@ export function LeftPanel() {
             <div className="flex items-baseline justify-between">
               <div className="text-3xl font-bold tracking-tight text-orange-soft num drop-shadow-[0_0_8px_rgba(255,174,66,0.3)]">
                 {frp.toFixed(1)} <span className="text-xs text-text-dim font-sans font-bold ml-1 uppercase">MW</span>
-              </div>
-              <div className="text-[10px] font-bold px-2 py-0.5 rounded border border-red/40 bg-red/10 text-red num">
-                +12%
               </div>
             </div>
             <div className="h-[6px] bg-black/40 border border-border/50 rounded-full relative overflow-hidden">
@@ -144,9 +142,12 @@ export function LeftPanel() {
             <span className="text-amber font-bold">{tx.wildfireAlert}</span>&nbsp;
             {tx.evacuationOrder}
           </div>
-          <div className="mt-3.5 flex justify-between items-center text-[10px] font-bold text-text-muted tracking-wide uppercase border-t border-blue/10 pt-3">
-            <span className="num opacity-70">14:23 UTC</span>
-            <span className="text-blue num shadow-blue/20 drop-shadow-sm">47,832 {tx.recipients}</span>
+          <div className="mt-3.5 text-[10px] font-bold text-text-muted tracking-wide uppercase border-t border-blue/10 pt-3">
+            <span className="num opacity-70">
+              {u?.timestamp
+                ? new Date(u.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC"
+                : "— UTC"}
+            </span>
           </div>
         </div>
       </div>
