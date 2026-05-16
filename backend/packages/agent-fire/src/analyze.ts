@@ -6,17 +6,29 @@ function degreesToCardinal(deg: number): string {
   return dirs[Math.round(deg / 45) % 8]
 }
 
+function centroid(fires: FireData[]): { lat: number; lon: number } {
+  const lat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
+  const lon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
+  return { lat: parseFloat(lat.toFixed(4)), lon: parseFloat(lon.toFixed(4)) }
+}
+
 function toNasaData(fires: FireData[]) {
+  const sorted = [...fires].sort((a, b) => b.frp - a.frp)
+  const top50 = sorted.slice(0, 50)
+  const center = centroid(fires)
   return {
-    hotspots: fires.slice(0, 50).map(f => ({
+    hotspots: top50.map(f => ({
       lat: f.lat,
       lon: f.lon,
       brightness: f.brightness,
       confidence: 85,
       frp: f.frp,
     })),
-    acq_date: new Date().toISOString().split('T')[0],
-    region: 'Patagonia / Araucanía, Chile-Argentina',
+    total_hotspots: fires.length,
+    acq_date: fires[0]?.timestamp?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+    centroid: center,
+    // LLM determines region name from actual coordinates
+    region_hint: `centroide en lat ${center.lat}, lon ${center.lon}`,
   }
 }
 
@@ -51,13 +63,14 @@ El JSON debe tener exactamente esta estructura:
   return parseJSON<RiskAssessment>(raw, 'Agent 1 (Risk)')
 }
 
-// A2: Expansion Predictor — uses A1 output
+// A2: Expansion Predictor — uses A1 output + real coordinates
 async function runA2(
   a1: RiskAssessment,
-  climateData: ReturnType<typeof toClimateData>
+  climateData: ReturnType<typeof toClimateData>,
+  center: { lat: number; lon: number }
 ): Promise<ExpansionData> {
   const system = `Eres un experto en modelado de propagación de incendios forestales.
-Recibes una evaluación de riesgo y datos de viento.
+Recibes una evaluación de riesgo, datos de viento y las coordenadas reales del centroide del incendio.
 Debes responder SOLO con JSON válido, sin texto adicional, sin markdown, sin bloques de código.
 El JSON debe tener exactamente esta estructura:
 {
@@ -67,9 +80,9 @@ El JSON debe tener exactamente esta estructura:
   "velocidad_propagacion_kmh": número,
   "direccion_principal": "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW"
 }
-Genera polígonos realistas basados en la dirección e intensidad del viento.`
+IMPORTANTE: Los polígonos deben estar centrados en las coordenadas reales del incendio proporcionadas. Genera coordenadas GeoJSON realistas y geográficamente correctas.`
 
-  const user = `Evaluación de riesgo (Agent 1):\n${JSON.stringify(a1, null, 2)}\n\nDatos climáticos:\n${JSON.stringify(climateData, null, 2)}\n\nPredice la expansión del incendio a 2h, 6h y 12h con polígonos GeoJSON.`
+  const user = `Centroide real del incendio: lat ${center.lat}, lon ${center.lon}\n\nEvaluación de riesgo (Agent 1):\n${JSON.stringify(a1, null, 2)}\n\nDatos climáticos:\n${JSON.stringify(climateData, null, 2)}\n\nPredice la expansión a 2h, 6h y 12h con polígonos GeoJSON centrados en las coordenadas reales.`
 
   const raw = await callOpenRouter(MODELS.large, system, user)
   return parseJSON<ExpansionData>(raw, 'Agent 2 (Expansion)')
@@ -113,10 +126,11 @@ export async function analyzeFireExpansion(fires: FireData[], weather: WeatherDa
 
   const nasaData = toNasaData(fires)
   const climateData = toClimateData(weather)
+  const center = centroid(fires)
 
-  // A1 first, then A2 uses A1 output (sequential by design)
+  // A1 first, then A2 uses A1 output + real coordinates (sequential by design)
   const a1 = await runA1(nasaData, climateData)
-  const a2 = await runA2(a1, climateData)
+  const a2 = await runA2(a1, climateData, center)
 
   return {
     polygon: expansionToGeoJSON(a2),
