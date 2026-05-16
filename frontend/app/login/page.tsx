@@ -1,3 +1,4 @@
+import { Flame } from 'lucide-react';
 import { Background } from '@/components/login/background';
 import { VisualScene } from '@/components/login/visual-scene';
 import { AuthCard } from '@/components/login/auth-card';
