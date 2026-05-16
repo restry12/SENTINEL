@@ -6,6 +6,7 @@ import { drawFrame }         from "./smoke-engine"
 import { MOCK_INFRASTRUCTURE, type WindData } from "./types"
 
 const TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
   "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
 
 const SMOKE_SOURCES = [
