@@ -8,6 +8,7 @@ interface SentinelContextValue {
   status: SocketStatus
   connected: boolean
   trigger: (lat?: number, lon?: number) => void
+  triggerCitizen: (lat: number, lon: number) => void
 }
 
 const SentinelContext = createContext<SentinelContextValue | null>(null)

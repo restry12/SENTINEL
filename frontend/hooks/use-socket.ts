@@ -270,5 +270,9 @@ export function useSocket() {
     socketRef.current?.emit("trigger", { lat, lon })
   }, [])
 
-  return { sentinelUpdate, status, connected, trigger }
+  const triggerCitizen = useCallback((lat: number, lon: number) => {
+    socketRef.current?.emit("trigger-citizen", { lat, lon })
+  }, [])
+
+  return { sentinelUpdate, status, connected, trigger, triggerCitizen }
 }

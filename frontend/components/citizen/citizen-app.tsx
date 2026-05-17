@@ -40,7 +40,7 @@ function buildScene(
 export function CitizenApp() {
   const [screen, setScreen] = useState<ScreenState>('locating')
   const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(null)
-  const { sentinelUpdate } = useSentinel()
+  const { sentinelUpdate, triggerCitizen } = useSentinel()
   const data = useMemo(() => buildScene(userLoc, sentinelUpdate), [userLoc, sentinelUpdate])
   const route = data.naturalRoutes[0] ?? CITIZEN_MOCK.naturalRoutes[0]
 
@@ -50,7 +50,10 @@ export function CitizenApp() {
         <ScreenLocating
           riskLevel={data.riskLevel}
           onLocated={(coords) => {
-            if (coords) setUserLoc(coords)
+            if (coords) {
+              setUserLoc(coords)
+              triggerCitizen(coords.lat, coords.lon)
+            }
             setScreen('alert')
           }}
         />
