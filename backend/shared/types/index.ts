@@ -226,3 +226,48 @@ export interface AgentRequest {
 export type AgentResponse<T = unknown> =
   | { success: true; data: T }
   | { success: false; data: null; error: string }
+
+export interface GlacierInfo {
+  id: string;
+  name: string;
+  country: string;
+  region: string;
+  lat: number;
+  lon: number;
+  altitude?: number;
+  area_km2?: number;
+}
+
+export interface GlacierClimateData {
+  temp_avg: number;
+  temp_max: number;
+  precipitation_mm: number;
+  snowfall_cm: number;
+  days_above_zero: number;
+  thermal_anomaly: number;
+}
+
+export interface GlacierMassData {
+  year: number;
+  mass_change_mmwe: number;
+}
+
+export interface GlacierAnalysis {
+  glacierInfo: GlacierInfo;
+  climateData: GlacierClimateData;
+  massHistory: GlacierMassData[];
+  riskIndex: number;
+  riskCategory: 'BAJO' | 'MEDIO' | 'ALTO' | 'CRITICO';
+  prediction: {
+    trend: string;
+    estimated_years_to_critical: number | null;
+  };
+  llmAnalysis: {
+    summary: string;
+    riskExplanation: string;
+    prediction: string;
+    urgentActions: string[];
+    monitoringRecommendations: string[];
+    publicAlert: string;
+  };
+}
