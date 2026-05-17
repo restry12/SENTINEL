@@ -215,6 +215,24 @@ export function useSocket() {
   const [connected, setConnected] = useState(false)
   const socketRef = useRef<Socket | null>(null)
 
+  const hydrate = useCallback(async (retries = 3): Promise<boolean> => {
+    try {
+      const r = await fetch("/api/last")
+      const d = await r.json()
+      if (d?.ok && d.update) {
+        setSentinelUpdate(d.update as SentinelUpdate)
+        cacheUpdate(d.update as SentinelUpdate)
+        setStatus({ state: "ok" })
+        return true
+      }
+    } catch {
+      if (retries > 0) {
+        setTimeout(() => hydrate(retries - 1), 2000)
+      }
+    }
+    return false
+  }, [])
+
   useEffect(() => {
     // 1. Instant paint from the browser's own cache of the last analysis.
     const cached = readCachedUpdate()
@@ -224,24 +242,6 @@ export function useSocket() {
     }
 
     // 2. Hydrate from the backend's last snapshot (covers a fresh browser).
-    const hydrate = async (retries = 3) => {
-      try {
-        const r = await fetch("/api/last")
-        const d = await r.json()
-        if (d?.ok && d.update) {
-          setSentinelUpdate(d.update as SentinelUpdate)
-          cacheUpdate(d.update as SentinelUpdate)
-          setStatus({ state: "ok" })
-          return true
-        }
-      } catch (e) {
-        if (retries > 0) {
-          setTimeout(() => hydrate(retries - 1), 2000)
-        }
-      }
-      return false
-    }
-
     hydrate()
 
     const url = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000"
@@ -264,7 +264,7 @@ export function useSocket() {
       socket.disconnect()
       socketRef.current = null
     }
-  }, [])
+  }, [hydrate])
 
   const trigger = useCallback((lat?: number, lon?: number) => {
     socketRef.current?.emit("trigger", { lat, lon })
@@ -281,5 +281,7 @@ export function useSocket() {
     }).catch((err) => console.error('[triggerCitizen] HTTP trigger failed:', err))
   }, [])
 
-  return { sentinelUpdate, status, connected, trigger, triggerCitizen }
+  const refresh = useCallback(() => { hydrate() }, [hydrate])
+
+  return { sentinelUpdate, status, connected, trigger, triggerCitizen, refresh }
 }

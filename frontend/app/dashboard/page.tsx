@@ -6,6 +6,7 @@ import { AuthGuard } from "@/components/auth-guard"
 import { FireSelectionProvider, useFireSelection } from "@/contexts/fire-selection-context"
 import { TacticalNotification } from "@/components/dashboard/tactical-notification"
 import { MetricCards } from "@/components/dashboard/metric-cards"
+import { useSentinel } from "@/contexts/sentinel-context"
 import { useEffect, useState } from "react"
 
 export default function Dashboard() {
@@ -29,6 +30,13 @@ export default function Dashboard() {
 
 function DashboardContent() {
   const { selectedFire } = useFireSelection()
+  const { refresh } = useSentinel()
+
+  // Re-fetch latest data each time the user navigates to the dashboard
+  // so focos always appear without requiring a full page refresh.
+  useEffect(() => {
+    refresh()
+  }, [refresh])
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden relative selection:bg-orange/30">
