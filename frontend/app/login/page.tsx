@@ -3,7 +3,6 @@ import { Background } from '@/components/login/background'
 import { VisualScene } from '@/components/login/visual-scene'
 import { AuthCard } from '@/components/login/auth-card'
 import { LanguageProvider } from '@/lib/i18n/language-context'
-import { LangToggle } from '@/components/login/lang-toggle'
 import { HeaderStatus } from '@/components/login/header-status'
 
 export default function LoginPage() {
@@ -28,7 +27,6 @@ export default function LoginPage() {
             <div className="hidden lg:flex items-center gap-8">
               <HeaderStatus />
             </div>
-            <LangToggle />
           </div>
         </header>
 
