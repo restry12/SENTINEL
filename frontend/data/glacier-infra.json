@@ -1,0 +1,45 @@
+{
+  "rm_maipo": [
+    {"t": "Sistema APR · Lo Barnechea", "d": "18 km", "ic": "AP"},
+    {"t": "Embalse El Yeso", "d": "9 km", "ic": "EM"},
+    {"t": "Central Alfalfal II", "d": "14 km", "ic": "HE"},
+    {"t": "Zona agrícola Maipo", "d": "32 km", "ic": "AG"},
+    {"t": "RM Santiago", "d": "65 km", "ic": "CI"},
+    {"t": "Reserva Río Olivares", "d": "11 km", "ic": "PN"}
+  ],
+  "valpo_aconcagua": [
+    {"t": "Río Aconcagua", "d": "1 km", "ic": "RI"},
+    {"t": "Embalse Los Aromos", "d": "120 km", "ic": "EM"},
+    {"t": "Zonas agrícolas Aconcagua", "d": "50 km", "ic": "AG"},
+    {"t": "Sistema APR · Los Andes", "d": "45 km", "ic": "AP"},
+    {"t": "Paso Cristo Redentor", "d": "8 km", "ic": "RT"}
+  ],
+  "ohiggins_rapel": [
+    {"t": "Río Tinguiririca", "d": "0.4 km", "ic": "RI"},
+    {"t": "Embalse Convento Viejo", "d": "85 km", "ic": "EM"},
+    {"t": "Zonas agrícolas Colchagua", "d": "60 km", "ic": "AG"},
+    {"t": "Termas del Flaco", "d": "12 km", "ic": "TU"}
+  ],
+  "aysen_norte": [
+    {"t": "Ruta X-728", "d": "2 km", "ic": "RT"},
+    {"t": "Bahía Murta", "d": "38 km", "ic": "CI"},
+    {"t": "PN Laguna San Rafael", "d": "12 km", "ic": "PN"},
+    {"t": "Río Exploradores", "d": "0.5 km", "ic": "RI"},
+    {"t": "Concesión turística", "d": "1 km", "ic": "TU"}
+  ],
+  "aysen_sur": [
+    {"t": "PN Laguna San Rafael", "d": "0 km", "ic": "PN"},
+    {"t": "Laguna San Rafael", "d": "0 km", "ic": "RI"},
+    {"t": "Operadores turísticos", "d": "0.5 km", "ic": "TU"}
+  ],
+  "magallanes": [
+    {"t": "PN Torres del Paine", "d": "0 km", "ic": "PN"},
+    {"t": "Lago Grey", "d": "0 km", "ic": "RI"},
+    {"t": "Concesiones turísticas", "d": "1 km", "ic": "TU"},
+    {"t": "Puerto Natales", "d": "85 km", "ic": "CI"}
+  ],
+  "default": [
+    {"t": "Cuenca hidrográfica local", "d": "< 5 km", "ic": "RI"},
+    {"t": "Zona protegida", "d": "variable", "ic": "PN"}
+  ]
+}
