@@ -89,19 +89,30 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
 const DEFAULT_LAT = -38.5
 const DEFAULT_LON = -72.0
 
-export async function executeAndBroadcast(io: Server, lat?: number, lon?: number, firms?: unknown[], weather?: unknown, pm25?: number): Promise<void> {
+export async function executeAndBroadcast(
+  io: Server,
+  lat?: number,
+  lon?: number,
+  firms?: unknown[],
+  weather?: unknown,
+  pm25?: number,
+  targetSocketId?: string,
+): Promise<void> {
   if (!acquireLock()) {
     console.warn('[orchestrator] analysis already in progress — skipping duplicate trigger')
     return
   }
 
-  io.emit('status', { state: 'loading' } satisfies StatusPayload)
+  const chan: { emit: (ev: string, ...args: unknown[]) => void } =
+    targetSocketId ? io.to(targetSocketId) : io
+
+  chan.emit('status', { state: 'loading' } satisfies StatusPayload)
 
   try {
     const update = await runAnalysis(lat, lon, firms, weather, pm25)
-    setLastUpdate(update)
-    io.emit('update', update)
-    io.emit('status', { state: 'ok' } satisfies StatusPayload)
+    if (!targetSocketId) setLastUpdate(update)
+    chan.emit('update', update)
+    chan.emit('status', { state: 'ok' } satisfies StatusPayload)
 
     let alertsSent = false
     if (update.riskLevel === 'high' || update.riskLevel === 'critical') {
@@ -110,7 +121,7 @@ export async function executeAndBroadcast(io: Server, lat?: number, lon?: number
         fires: update.fires,
         timestamp: update.timestamp,
       }
-      io.emit('alert', alert)
+      chan.emit('alert', alert)
       const centLat = lat ?? DEFAULT_LAT
       const centLon = lon ?? DEFAULT_LON
       await triggerMakeWebhook(update as SentinelUpdate, centLat, centLon)
@@ -122,7 +133,7 @@ export async function executeAndBroadcast(io: Server, lat?: number, lon?: number
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[orchestrator] error:', message)
-    io.emit('status', { state: 'error', message } satisfies StatusPayload)
+    chan.emit('status', { state: 'error', message } satisfies StatusPayload)
   } finally {
     releaseLock()
   }
