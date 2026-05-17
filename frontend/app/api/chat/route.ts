@@ -137,20 +137,22 @@ R: [valor numérico exacto] — [categoría]. Riesgo respiratorio [bajo/medio/al
       : '0'
 
     const perFire = snapshot.perFireExpansions ?? []
+    const TOP_FIRES = 8
     if (perFire.length > 0) {
       const topByFrp = [...perFire]
         .sort((a, b) => b.frp - a.frp)
-        .slice(0, 8)
+        .slice(0, TOP_FIRES)
       prompt += `\n\n## FOCOS ACTIVOS (con ubicación verificada)\n`
       topByFrp.forEach((f, i) => {
         const ctx = f.regional_context
-        const loc = ctx
-          ? `${ctx.region_name}, ${ctx.country}`
-          : `lat ${f.lat.toFixed(2)}, lon ${f.lon.toFixed(2)} (ubicación sin confirmar)`
-        prompt += `${i + 1}. ${loc} — ${f.frp.toFixed(1)} MW (lat ${f.lat.toFixed(2)}, lon ${f.lon.toFixed(2)})\n`
+        const coords = `lat ${f.lat.toFixed(2)}, lon ${f.lon.toFixed(2)}`
+        const line = ctx
+          ? `${i + 1}. ${ctx.region_name}, ${ctx.country} — ${f.frp.toFixed(1)} MW (${coords})`
+          : `${i + 1}. ${coords} (ubicación sin confirmar) — ${f.frp.toFixed(1)} MW`
+        prompt += `${line}\n`
       })
-      if (perFire.length > 8) {
-        prompt += `(... y ${perFire.length - 8} focos más de menor intensidad, no listados)\n`
+      if (perFire.length > TOP_FIRES) {
+        prompt += `(... y ${perFire.length - TOP_FIRES} focos más de menor intensidad, no listados)\n`
       }
     } else {
       prompt += `\n\n## FOCOS ACTIVOS\nNo hay focos con ubicación verificada en este snapshot. Si el usuario pregunta por un foco específico, di que no tienes ese dato.\n`
