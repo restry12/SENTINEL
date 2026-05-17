@@ -18,6 +18,39 @@ import historyRouter from './history'
 // perilla: subir/bajar acá según cuánto aguante OpenAQ / el tiempo de corrida.
 const ENRICH_LIMIT = 150
 
+type RawCitizenBody = {
+  fires?: unknown
+  lat?: unknown
+  lon?: unknown
+  socketId?: unknown
+}
+
+export function parseCitizenBody(body: RawCitizenBody): {
+  firms: unknown[]
+  socketId: string
+  lat: number | undefined
+  lon: number | undefined
+  pm25: number | undefined
+} | null {
+  const socketId = typeof body.socketId === 'string' && body.socketId.length > 0
+    ? body.socketId
+    : null
+  if (!socketId) return null
+
+  const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : null
+  if (!rawFires) return null
+
+  const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+  const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+
+  const pm25Values = rawFires
+    .map(f => f.pm25)
+    .filter((v): v is number => typeof v === 'number')
+  const pm25 = pm25Values.length > 0 ? Math.max(...pm25Values) : undefined
+
+  return { firms: rawFires, socketId, lat, lon, pm25 }
+}
+
 // Max 10 analysis requests per IP every 15 minutes
 const triggerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -121,6 +154,23 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
 
     executeAndBroadcast(io, lat, lon, firms, undefined, pm25).catch((err) => {
       console.error('[trigger/full] background analysis error:', err instanceof Error ? err.message : err)
+    })
+  })
+
+  // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
+  // Receives { fires, socketId, lat, lon } — emits analysis only to the requesting citizen socket
+  app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
+    const parsed = parseCitizenBody(req.body as RawCitizenBody)
+    if (!parsed) {
+      res.status(400).json({ ok: false, error: 'socketId required and fires must be an array' })
+      return
+    }
+    const { firms, socketId, lat, lon, pm25 } = parsed
+
+    res.status(202).json({ ok: true, accepted: true, fires: firms.length })
+
+    executeAndBroadcast(io, lat, lon, firms, undefined, pm25, socketId).catch((err) => {
+      console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
     })
   })
 
