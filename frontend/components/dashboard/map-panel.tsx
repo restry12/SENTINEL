@@ -1,8 +1,11 @@
 "use client"
 import dynamic from "next/dynamic"
-import { useState } from "react"
+import { useState, useCallback } from "react"
+import { Loader2 } from "lucide-react"
 import { useSentinel } from "@/contexts/sentinel-context"
+import type { FireRiskGrid, FireRiskCell, CellDetail } from "@/hooks/use-socket"
 import { FireDetailOverlay } from "./fire-detail-overlay"
+import { FireRiskCellPanel } from "./fire-risk-cell-panel"
 import { SituationalOverlay } from "./situational-overlay"
 import { TacticalExpansionWidget } from "./tactical-expansion-widget"
 
@@ -14,12 +17,57 @@ const MapboxPanel = dynamic(
 export function MapPanel() {
   const { sentinelUpdate: u } = useSentinel()
   const fires = u?.fires ?? []
-  const [showHeatmap, setShowHeatmap] = useState(false)
   const [activeExpansion, setActiveExpansion] = useState<'2h' | '6h' | '12h' | null>(null)
+
+  const [showGrid, setShowGrid] = useState(false)
+  const [riskGrid, setRiskGrid] = useState<FireRiskGrid | null>(null)
+  const [gridLoading, setGridLoading] = useState(false)
+  const [gridError, setGridError] = useState<string | null>(null)
+
+  const [selectedCell, setSelectedCell] = useState<FireRiskCell | null>(null)
+  const [cellDetail, setCellDetail] = useState<CellDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+
+  const toggleGrid = useCallback(async () => {
+    const next = !showGrid
+    setShowGrid(next)
+    if (next && !riskGrid && !gridLoading) {
+      setGridLoading(true)
+      setGridError(null)
+      try {
+        const res = await fetch('/api/risk-grid')
+        const data = await res.json()
+        if (data.ok) setRiskGrid(data.grid as FireRiskGrid)
+        else setGridError(data.error ?? 'Error al cargar la grilla')
+      } catch {
+        setGridError('Backend inalcanzable')
+      } finally {
+        setGridLoading(false)
+      }
+    }
+  }, [showGrid, riskGrid, gridLoading])
+
+  const handleCellClick = useCallback(async (cell: FireRiskCell) => {
+    setSelectedCell(cell)
+    setCellDetail(null)
+    setDetailLoading(true)
+    try {
+      const res = await fetch('/api/cell-detail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cell }),
+      })
+      const data = await res.json()
+      if (data.ok) setCellDetail(data.detail as CellDetail)
+    } catch {
+      /* keep panel open with no detail — score + factors still shown */
+    } finally {
+      setDetailLoading(false)
+    }
+  }, [])
 
   return (
     <div className="relative flex-1 flex flex-col bg-[#04050a] min-h-0 overflow-hidden">
-      {/* Map Stage */}
       <div className="flex-1 relative min-h-0 group">
         {/* Deep Space / Aura Layer */}
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
@@ -29,36 +77,40 @@ export function MapPanel() {
         </div>
 
         {/* Base Layer: Mapbox */}
-        <MapboxPanel 
-          showHeatmap={showHeatmap} 
-          activeExpansion={activeExpansion} 
-          setActiveExpansion={setActiveExpansion} 
+        <MapboxPanel
+          riskGrid={showGrid ? riskGrid : null}
+          onCellClick={handleCellClick}
+          activeExpansion={activeExpansion}
+          setActiveExpansion={setActiveExpansion}
         />
 
         {/* Fire Details Overlay */}
         <FireDetailOverlay />
 
+        {/* Fire Risk Cell Panel */}
+        <FireRiskCellPanel
+          cell={selectedCell}
+          detail={cellDetail}
+          loading={detailLoading}
+          onClose={() => { setSelectedCell(null); setCellDetail(null) }}
+        />
+
         {/* Situational Intelligence Overlay */}
         <SituationalOverlay />
 
         {/* Tactical Expansion HUD (Fixed Right side) */}
-        <TacticalExpansionWidget 
-          activeExpansion={activeExpansion} 
-          onExpansionChange={(k) => setActiveExpansion(prev => prev === k ? null : k)} 
+        <TacticalExpansionWidget
+          activeExpansion={activeExpansion}
+          onExpansionChange={(k) => setActiveExpansion(prev => prev === k ? null : k)}
         />
 
         {/* HUD: Grid & Corners */}
         <div className="absolute inset-0 pointer-events-none z-10">
-          {/* Refined Grid Overlay */}
           <div className="absolute inset-0 opacity-[0.15] mix-blend-screen bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px)_0_0/48px_48px,linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)_0_0/48px_48px]" />
-
-          {/* Tactical Corners */}
           <div className="absolute top-3 left-3 w-3.5 h-3.5 border-t border-l border-white/20" />
           <div className="absolute top-3 right-3 w-3.5 h-3.5 border-t border-r border-white/20" />
           <div className="absolute bottom-3 left-3 w-3.5 h-3.5 border-b border-l border-white/20" />
           <div className="absolute bottom-3 right-3 w-3.5 h-3.5 border-b border-r border-white/20" />
-
-          {/* Floating Data Chip */}
           <div className="absolute top-6 left-6 px-2.5 py-1.5 bg-[#0a0b0e/75] border border-border-2 rounded-sm backdrop-blur-md flex items-center gap-2">
             <span className="text-[10px] font-mono font-medium text-text-2 tracking-wider">
               {fires.length > 0
@@ -66,8 +118,6 @@ export function MapPanel() {
                 : <b className="text-foreground font-bold">NO ACTIVE FIRES</b>}
             </span>
           </div>
-
-          {/* Central Reticle */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10">
             <div className="w-40 h-40 border border-white/30 rounded-full flex items-center justify-center">
               <div className="w-[1px] h-12 bg-white/40 absolute" />
@@ -76,21 +126,30 @@ export function MapPanel() {
           </div>
         </div>
 
-        {/* Heatmap toggle — A6 prediction (floating control) */}
+        {/* Fire Risk Grid toggle (floating control) */}
         <button
-          onClick={() => setShowHeatmap((h) => !h)}
-          title={showHeatmap ? "Ocultar heatmap de predicción A6" : "Mostrar heatmap de predicción A6"}
+          onClick={toggleGrid}
+          title={showGrid ? "Ocultar Fire Risk Grid" : "Mostrar Fire Risk Grid"}
           className={`absolute top-6 right-6 z-30 flex items-center gap-2 px-2.5 py-1.5 rounded-md backdrop-blur-md transition-all duration-200 ${
-            showHeatmap
+            showGrid
               ? "bg-red/12 border border-red/45 shadow-[0_0_14px_rgba(255,51,51,0.18)]"
               : "bg-[#0a0b0e]/75 border border-border-2 hover:border-red/40"
           }`}
         >
-          <div className={`w-2 h-2 rounded-full bg-red shadow-[0_0_6px_var(--red)] ${showHeatmap ? "animate-pulse" : "opacity-60"}`} />
-          <span className={`text-[9.5px] font-bold tracking-[0.14em] uppercase ${showHeatmap ? "text-red" : "text-text-dim"}`}>
-            Predicción A6
+          {gridLoading
+            ? <Loader2 className="w-2.5 h-2.5 animate-spin text-red" />
+            : <div className={`w-2 h-2 rounded-full bg-red shadow-[0_0_6px_var(--red)] ${showGrid ? "animate-pulse" : "opacity-60"}`} />}
+          <span className={`text-[9.5px] font-bold tracking-[0.14em] uppercase ${showGrid ? "text-red" : "text-text-dim"}`}>
+            Fire Risk Grid
           </span>
         </button>
+
+        {/* Grid load error */}
+        {gridError && showGrid && (
+          <div className="absolute top-16 right-6 z-30 px-2.5 py-1.5 rounded-md bg-red/15 border border-red/40 backdrop-blur-md">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-red">{gridError}</span>
+          </div>
+        )}
 
         {/* Scanline Overlay */}
         <div className="absolute inset-0 scanline-overlay z-20 opacity-[0.4] mix-blend-overlay" />
