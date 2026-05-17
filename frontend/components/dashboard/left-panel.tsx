@@ -133,24 +133,37 @@ export function LeftPanel() {
               </div>
             </div>
 
-            {/* Wind impact on this fire */}
-            <div className="sentinel-card p-4">
-              <Label>{tx.windImpact}</Label>
-              <div className="mt-3 flex items-center gap-4">
-                <WindRose direction={selectedFire.windImpactDir} />
-                <div className="flex-1">
-                  <div className="text-2xl font-bold text-foreground num leading-none">
-                    {selectedFire.windKmh}<span className="text-[10px] font-sans text-text-dim ml-1">KM/H</span>
+            {/* Wind impact — solo si el foco tiene datos enriquecidos (top 150) */}
+            {selectedFire.weather && (
+              <div className="sentinel-card p-4">
+                <Label>{tx.windImpact}</Label>
+                <div className="mt-3 flex items-center gap-4">
+                  <WindRose direction={selectedFire.windImpactDir} />
+                  <div className="flex-1">
+                    <div className="text-2xl font-bold text-foreground num leading-none">
+                      {selectedFire.windKmh}<span className="text-[10px] font-sans text-text-dim ml-1">KM/H</span>
+                    </div>
+                    <div className="text-[10px] text-text-muted mt-1">
+                      {tx.spreading} <span className="text-blue font-bold">{selectedFire.windImpactDir}</span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-text-muted mt-1">
-                    {tx.spreading} <span className="text-blue font-bold">{selectedFire.windImpactDir}</span>
+                  <div className="px-3 py-1.5 bg-surface border border-border-2 rounded text-xs font-mono font-bold text-blue min-w-[45px] text-center">
+                    {selectedFire.windImpactDir}
                   </div>
-                </div>
-                <div className="px-3 py-1.5 bg-surface border border-border-2 rounded text-xs font-mono font-bold text-blue min-w-[45px] text-center">
-                  {selectedFire.windImpactDir}
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Humidity per fire */}
+            {selectedFire.weather?.humidity != null && (
+              <div className="flex items-center justify-between px-4 py-3 sentinel-card">
+                <div className="flex items-center gap-2">
+                  <Droplets className="w-4 h-4 text-blue opacity-70" />
+                  <span className="text-[11px] font-bold text-text-dim uppercase tracking-widest">{tx.humidity}</span>
+                </div>
+                <span className="text-lg font-black text-blue num">{selectedFire.weather.humidity}%</span>
+              </div>
+            )}
 
             {/* Deselect */}
             <button
@@ -201,21 +214,6 @@ export function LeftPanel() {
               </div>
             </div>
 
-            {/* Wind Conditions */}
-            <div className="sentinel-card p-4">
-              <Label>{tx.windConditions}</Label>
-              <div className="mt-4 flex items-center gap-4">
-                <WindRose direction={m.windDir} />
-                <div className="flex-1">
-                  <div className="text-2xl font-bold tracking-tight text-foreground num leading-none">
-                    {m.windSpeedKmh} <span className="text-[10px] text-text-dim font-sans font-bold ml-1 uppercase">KM/H</span>
-                  </div>
-                </div>
-                <div className="px-3 py-1.5 bg-surface border border-border-2 rounded text-xs font-mono font-bold text-blue shadow-[0_0_10px_rgba(56,189,248,0.1)] min-w-[45px] text-center">
-                  {m.windDir}
-                </div>
-              </div>
-            </div>
 
             {/* AQI + PM2.5 */}
             <div className="sentinel-card sentinel-card-glow-red p-4">
@@ -246,16 +244,6 @@ export function LeftPanel() {
               </div>
             </div>
 
-            {/* Humidity */}
-            {m.humidity > 0 && (
-              <div className="flex items-center justify-between px-4 py-3 sentinel-card">
-                <div className="flex items-center gap-2">
-                  <Droplets className="w-4 h-4 text-blue opacity-70" />
-                  <span className="text-[11px] font-bold text-text-dim uppercase tracking-widest">{tx.humidity}</span>
-                </div>
-                <span className="text-lg font-black text-blue num">{m.humidity}%</span>
-              </div>
-            )}
 
             {/* SMS Alert — only on high/critical */}
             {(m.riskLevel === "HIGH" || m.riskLevel === "CRITICAL") && (

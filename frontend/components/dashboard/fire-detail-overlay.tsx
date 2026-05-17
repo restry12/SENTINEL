@@ -93,20 +93,22 @@ export function FireDetailOverlay() {
           </div>
         </CollapsibleWidget>
 
-        {/* Wind Widget */}
-        <CollapsibleWidget title="Impacto del Viento" icon={<Wind className="w-3.5 h-3.5" />} className="w-full">
-          <div className="flex items-center gap-4">
-            <WindRose direction={selectedFire.windImpactDir} />
-            <div className="flex-1">
-              <div className="text-2xl font-bold text-white num leading-none">
-                {selectedFire.windKmh}<span className="text-[11px] font-sans text-text-dim ml-1.5">KM/H</span>
-              </div>
-              <div className="text-[10px] text-text-muted mt-1.5 uppercase tracking-tight font-medium">
-                Propagación: <span className="text-blue font-black">{selectedFire.windImpactDir}</span>
+        {/* Wind Widget — solo si el foco tiene datos enriquecidos (top 150) */}
+        {selectedFire.weather && (
+          <CollapsibleWidget title="Impacto del Viento" icon={<Wind className="w-3.5 h-3.5" />} className="w-full">
+            <div className="flex items-center gap-4">
+              <WindRose direction={selectedFire.windImpactDir} />
+              <div className="flex-1">
+                <div className="text-2xl font-bold text-white num leading-none">
+                  {selectedFire.windKmh}<span className="text-[11px] font-sans text-text-dim ml-1.5">KM/H</span>
+                </div>
+                <div className="text-[10px] text-text-muted mt-1.5 uppercase tracking-tight font-medium">
+                  Propagación: <span className="text-blue font-black">{selectedFire.windImpactDir}</span>
+                </div>
               </div>
             </div>
-          </div>
-        </CollapsibleWidget>
+          </CollapsibleWidget>
+        )}
 
         {/* Projections Widget */}
         <CollapsibleWidget title="Proyecciones" icon={<ChevronUp className="w-3.5 h-3.5 rotate-45" />} defaultOpen={false} className="w-full">
