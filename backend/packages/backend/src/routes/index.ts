@@ -10,6 +10,8 @@ import { storeRun, getRun } from '../services/run-cache'
 import { mergeEnriched } from '../utils/mergeEnriched'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
+import { fetchRiskGrid, fetchCellDetail } from '../services/prediction-proxy'
+import type { FireRiskCell } from '@sentinel/types'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
@@ -22,6 +24,16 @@ const ENRICH_LIMIT = 150
 const triggerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Demasiadas solicitudes. Intenta de nuevo en 15 minutos.' },
+})
+
+// Grid endpoints hit Overpass + Mistral — more generous than triggerLimiter
+// but still capped to protect the upstreams.
+const gridLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, error: 'Demasiadas solicitudes. Intenta de nuevo en 15 minutos.' },
@@ -46,6 +58,37 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       lock: getLockStatus(),
       polling: polling.getState(),
     })
+  })
+
+  // GET /api/risk-grid — Fire Risk Grid, lazy-loaded by the dashboard toggle.
+  // Weather + live fires come from the last analysis already in memory.
+  app.get('/api/risk-grid', gridLimiter, async (_req, res) => {
+    const last = getLastUpdate()
+    const weather = last?.weather ?? { speed: 0, deg: 0, humidity: 0 }
+    const firms = last?.fires ?? []
+    try {
+      const grid = await fetchRiskGrid(weather, firms)
+      res.json({ ok: true, grid })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(502).json({ ok: false, error: message })
+    }
+  })
+
+  // POST /api/cell-detail — per-cell infrastructure + AI detail.
+  app.post('/api/cell-detail', gridLimiter, async (req, res) => {
+    const body = req.body as { cell?: FireRiskCell }
+    if (!body.cell) {
+      res.status(400).json({ ok: false, error: 'Missing cell' })
+      return
+    }
+    try {
+      const detail = await fetchCellDetail(body.cell)
+      res.json({ ok: true, detail })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(502).json({ ok: false, error: message })
+    }
   })
 
   // POST /api/trigger — manual single analysis run (rate limited)
