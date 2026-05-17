@@ -1,6 +1,6 @@
 "use client"
 
-import { Activity, Globe, RadarIcon } from "lucide-react"
+import { Activity, Globe } from "lucide-react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -10,7 +10,7 @@ import { useSentinel } from "@/contexts/sentinel-context"
 export function TopBar() {
   const pathname = usePathname()
   const { lang, toggle, tx } = useLang()
-  const { connected, status, trigger, sentinelUpdate } = useSentinel()
+  const { connected, status, sentinelUpdate } = useSentinel()
   const [time, setTime] = useState<string>("")
 
   const fireCount = sentinelUpdate?.fires.length ?? 0
@@ -58,6 +58,7 @@ export function TopBar() {
             {([
               { href: '/dashboard',         label: tx.navDashboard },
               { href: '/air',               label: tx.navAir },
+              { href: '/news',              label: tx.navNews },
               { href: '/dashboard/citizen', label: 'Ciudadano' },
             ] as const).map(({ href, label }) => (
               <Link
@@ -78,15 +79,6 @@ export function TopBar() {
             <div className={`w-2 h-2 rounded-full shadow-[0_0_12px_rgba(255,51,51,1)] ${connected ? "bg-red animate-pulse" : "bg-text-muted"}`} />
             <span className="text-[11px] font-black tracking-[0.2em] uppercase whitespace-nowrap">{statusLabel}</span>
           </div>
-
-          <button
-            onClick={() => trigger()}
-            disabled={isLoading || !connected}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-orange/40 bg-orange/10 text-orange text-[11px] font-black tracking-[0.15em] uppercase hover:bg-orange/20 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <RadarIcon className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            <span>{isLoading ? "…" : "Analizar"}</span>
-          </button>
 
           <div className="hidden lg:flex items-center gap-3 px-4 py-2 bg-surface/60 border border-white/5 rounded-lg text-[11px] font-bold tracking-[0.15em] text-text-dim backdrop-blur-md">
             <span>{tx.hotspots}</span>
