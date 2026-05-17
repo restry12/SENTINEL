@@ -1,4 +1,4 @@
-import type { FireRiskCell, RiskCategory } from '@/hooks/use-socket'
+import type { RiskCategory } from '@/hooks/use-socket'
 
 export const CATEGORY_COLOR: Record<RiskCategory, string> = {
   bajo: '#22c55e',
@@ -19,16 +19,4 @@ export const PRIORITY_LABEL: Record<string, string> = {
   media: 'Media',
   alta: 'Alta',
   critica: 'Crítica',
-}
-
-// Cell SW corner + size → a closed GeoJSON polygon ring (lon/lat order).
-export function cellPolygon(cell: FireRiskCell): number[][][] {
-  const { lat, lon, size } = cell
-  return [[
-    [lon, lat],
-    [lon + size, lat],
-    [lon + size, lat + size],
-    [lon, lat + size],
-    [lon, lat],
-  ]]
 }

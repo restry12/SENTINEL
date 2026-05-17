@@ -1,8 +1,9 @@
 import type {
   AgentResponse,
-  FireRiskGrid,
-  CellDetail,
-  FireRiskCell,
+  FireRiskRegionMap,
+  RegionDetail,
+  RiskCategory,
+  RiskFactors,
   WeatherData,
   FireData,
 } from '@sentinel/types'
@@ -13,7 +14,7 @@ function predictionUrl(): string {
   return url
 }
 
-export async function fetchRiskGrid(weather: WeatherData, firms: FireData[]): Promise<FireRiskGrid> {
+export async function fetchRiskGrid(weather: WeatherData, firms: FireData[]): Promise<FireRiskRegionMap> {
   const res = await fetch(`${predictionUrl()}/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -21,20 +22,28 @@ export async function fetchRiskGrid(weather: WeatherData, firms: FireData[]): Pr
     signal: AbortSignal.timeout(60000),
   })
   if (!res.ok) throw new Error(`agent-prediction /analyze returned ${res.status}`)
-  const json = (await res.json()) as AgentResponse<FireRiskGrid>
+  const json = (await res.json()) as AgentResponse<FireRiskRegionMap>
   if (!json.success) throw new Error(json.error)
   return json.data
 }
 
-export async function fetchCellDetail(cell: FireRiskCell): Promise<CellDetail> {
+export interface RegionDetailRequest {
+  region_id: number
+  nombre: string
+  score: number
+  category: RiskCategory
+  factors: RiskFactors
+}
+
+export async function fetchCellDetail(region: RegionDetailRequest): Promise<RegionDetail> {
   const res = await fetch(`${predictionUrl()}/cell-detail`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cell }),
+    body: JSON.stringify(region),
     signal: AbortSignal.timeout(60000),
   })
   if (!res.ok) throw new Error(`agent-prediction /cell-detail returned ${res.status}`)
-  const json = (await res.json()) as AgentResponse<CellDetail>
+  const json = (await res.json()) as AgentResponse<RegionDetail>
   if (!json.success) throw new Error(json.error)
   return json.data
 }

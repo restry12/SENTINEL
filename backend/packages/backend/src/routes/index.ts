@@ -11,7 +11,7 @@ import { mergeEnriched } from '../utils/mergeEnriched'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
 import { fetchRiskGrid, fetchCellDetail } from '../services/prediction-proxy'
-import type { FireRiskCell } from '@sentinel/types'
+import type { RiskCategory, RiskFactors } from '@sentinel/types'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
@@ -75,15 +75,27 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
   })
 
-  // POST /api/cell-detail — per-cell infrastructure + AI detail.
+  // POST /api/cell-detail — per-region infrastructure + AI detail.
   app.post('/api/cell-detail', gridLimiter, async (req, res) => {
-    const body = req.body as { cell?: FireRiskCell }
-    if (!body.cell) {
-      res.status(400).json({ ok: false, error: 'Missing cell' })
+    const body = req.body as {
+      region_id?: unknown
+      nombre?: unknown
+      score?: unknown
+      category?: unknown
+      factors?: unknown
+    }
+    if (typeof body.region_id !== 'number') {
+      res.status(400).json({ ok: false, error: 'Missing region_id' })
       return
     }
     try {
-      const detail = await fetchCellDetail(body.cell)
+      const detail = await fetchCellDetail({
+        region_id: body.region_id,
+        nombre: typeof body.nombre === 'string' ? body.nombre : '',
+        score: typeof body.score === 'number' ? body.score : 0,
+        category: (body.category as RiskCategory) ?? 'bajo',
+        factors: (body.factors as RiskFactors) ?? { fwi: 0, historial: 0, terreno: 0 },
+      })
       res.json({ ok: true, detail })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'

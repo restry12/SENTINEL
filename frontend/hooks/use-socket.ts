@@ -115,42 +115,31 @@ export interface RiskFactors {
   terreno: number
 }
 
-export interface FireRiskCell {
-  id: string
-  lat: number
-  lon: number
-  size: number
+export interface RegionGeometry {
+  type: 'Polygon' | 'MultiPolygon'
+  coordinates: number[][][] | number[][][][]
+}
+
+export interface FireRiskRegion {
+  id: number
+  nombre: string
   score: number
   category: RiskCategory
   factors: RiskFactors
-  zona: string
+  geometry: RegionGeometry
 }
 
-export interface FireRiskGrid {
-  cells: FireRiskCell[]
+export interface FireRiskRegionMap {
+  regions: FireRiskRegion[]
   generated_at: string
   weather_point: { lat: number; lon: number }
-  bbox: { latMin: number; latMax: number; lonMin: number; lonMax: number }
 }
 
-export interface CellInfrastructure {
-  name: string
-  type: 'hospital' | 'school' | 'kindergarten' | 'fire_station' | 'police'
-  lat: number
-  lon: number
-  distance_km: number
-}
-
-export interface CellSocialImpact {
-  score: number
-  poblacion_estimada?: number
-  resumen: string
-}
-
-export interface CellDetail {
-  cell_id: string
-  infrastructure: CellInfrastructure[]
-  social_impact: CellSocialImpact
+export interface RegionDetail {
+  region_id: number
+  nombre: string
+  infraestructura_total: number
+  resumen_infraestructura: string
   explicacion: string
   recomendaciones: string[]
   prioridad: 'baja' | 'media' | 'alta' | 'critica'

@@ -3,7 +3,7 @@ import dynamic from "next/dynamic"
 import { useState, useCallback, useRef } from "react"
 import { Loader2 } from "lucide-react"
 import { useSentinel } from "@/contexts/sentinel-context"
-import type { FireRiskGrid, FireRiskCell, CellDetail } from "@/hooks/use-socket"
+import type { FireRiskRegionMap, FireRiskRegion, RegionDetail } from "@/hooks/use-socket"
 import { FireDetailOverlay } from "./fire-detail-overlay"
 import { FireRiskCellPanel } from "./fire-risk-cell-panel"
 import { SituationalOverlay } from "./situational-overlay"
@@ -20,12 +20,12 @@ export function MapPanel() {
   const [activeExpansion, setActiveExpansion] = useState<'2h' | '6h' | '12h' | null>(null)
 
   const [showGrid, setShowGrid] = useState(false)
-  const [riskGrid, setRiskGrid] = useState<FireRiskGrid | null>(null)
+  const [riskMap, setRiskMap] = useState<FireRiskRegionMap | null>(null)
   const [gridLoading, setGridLoading] = useState(false)
   const [gridError, setGridError] = useState<string | null>(null)
 
-  const [selectedCell, setSelectedCell] = useState<FireRiskCell | null>(null)
-  const [cellDetail, setCellDetail] = useState<CellDetail | null>(null)
+  const [selectedRegion, setSelectedRegion] = useState<FireRiskRegion | null>(null)
+  const [regionDetail, setRegionDetail] = useState<RegionDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const requestIdRef = useRef(0)
@@ -33,40 +33,46 @@ export function MapPanel() {
   const toggleGrid = useCallback(async () => {
     const next = !showGrid
     setShowGrid(next)
-    if (next && !riskGrid && !gridLoading) {
+    if (next && !riskMap && !gridLoading) {
       setGridLoading(true)
       setGridError(null)
       try {
         const res = await fetch('/api/risk-grid')
         const data = await res.json()
-        if (data.ok) setRiskGrid(data.grid as FireRiskGrid)
-        else setGridError(data.error ?? 'Error al cargar la grilla')
+        if (data.ok) setRiskMap(data.grid as FireRiskRegionMap)
+        else setGridError(data.error ?? 'Error al cargar el mapa de riesgo')
       } catch {
         setGridError('Backend inalcanzable')
       } finally {
         setGridLoading(false)
       }
     }
-  }, [showGrid, riskGrid, gridLoading])
+  }, [showGrid, riskMap, gridLoading])
 
-  const handleCellClick = useCallback(async (cell: FireRiskCell) => {
+  const handleRegionClick = useCallback(async (region: FireRiskRegion) => {
     const reqId = ++requestIdRef.current
-    setSelectedCell(cell)
-    setCellDetail(null)
+    setSelectedRegion(region)
+    setRegionDetail(null)
     setDetailError(null)
     setDetailLoading(true)
     try {
       const res = await fetch('/api/cell-detail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cell }),
+        body: JSON.stringify({
+          region_id: region.id,
+          nombre: region.nombre,
+          score: region.score,
+          category: region.category,
+          factors: region.factors,
+        }),
       })
       const data = await res.json()
       if (reqId !== requestIdRef.current) return
-      if (data.ok) setCellDetail(data.detail as CellDetail)
-      else setDetailError('No se pudo cargar el detalle de la celda')
+      if (data.ok) setRegionDetail(data.detail as RegionDetail)
+      else setDetailError('No se pudo cargar el detalle de la región')
     } catch {
-      if (reqId === requestIdRef.current) setDetailError('No se pudo cargar el detalle de la celda')
+      if (reqId === requestIdRef.current) setDetailError('No se pudo cargar el detalle de la región')
     } finally {
       if (reqId === requestIdRef.current) setDetailLoading(false)
     }
@@ -84,32 +90,34 @@ export function MapPanel() {
 
         {/* Base Layer: Mapbox */}
         <MapboxPanel
-          riskGrid={showGrid ? riskGrid : null}
-          onCellClick={handleCellClick}
+          riskMap={showGrid ? riskMap : null}
+          onRegionClick={handleRegionClick}
           activeExpansion={activeExpansion}
           setActiveExpansion={setActiveExpansion}
         />
 
-        {/* Fire Details Overlay */}
-        <FireDetailOverlay />
+        {/* Fire Details Overlay — hidden in Fire Risk Grid mode */}
+        {!showGrid && <FireDetailOverlay />}
 
-        {/* Fire Risk Cell Panel */}
+        {/* Fire Risk Region Panel */}
         <FireRiskCellPanel
-          cell={selectedCell}
-          detail={cellDetail}
+          region={selectedRegion}
+          detail={regionDetail}
           loading={detailLoading}
           detailError={detailError}
-          onClose={() => { setSelectedCell(null); setCellDetail(null); setDetailLoading(false); setDetailError(null) }}
+          onClose={() => { setSelectedRegion(null); setRegionDetail(null); setDetailLoading(false); setDetailError(null) }}
         />
 
-        {/* Situational Intelligence Overlay */}
-        <SituationalOverlay />
+        {/* Situational Intelligence Overlay — hidden in Fire Risk Grid mode */}
+        {!showGrid && <SituationalOverlay />}
 
-        {/* Tactical Expansion HUD (Fixed Right side) */}
-        <TacticalExpansionWidget
-          activeExpansion={activeExpansion}
-          onExpansionChange={(k) => setActiveExpansion(prev => prev === k ? null : k)}
-        />
+        {/* Tactical Expansion HUD (Fixed Right side) — hidden in Fire Risk Grid mode */}
+        {!showGrid && (
+          <TacticalExpansionWidget
+            activeExpansion={activeExpansion}
+            onExpansionChange={(k) => setActiveExpansion(prev => prev === k ? null : k)}
+          />
+        )}
 
         {/* HUD: Grid & Corners */}
         <div className="absolute inset-0 pointer-events-none z-10">
@@ -118,7 +126,7 @@ export function MapPanel() {
           <div className="absolute top-3 right-3 w-3.5 h-3.5 border-t border-r border-white/20" />
           <div className="absolute bottom-3 left-3 w-3.5 h-3.5 border-b border-l border-white/20" />
           <div className="absolute bottom-3 right-3 w-3.5 h-3.5 border-b border-r border-white/20" />
-          <div className="absolute top-6 left-6 px-2.5 py-1.5 bg-[#0a0b0e/75] border border-border-2 rounded-sm backdrop-blur-md flex items-center gap-2">
+          <div className="absolute top-6 left-6 px-2.5 py-1.5 bg-[#0f172a] border border-border-2 rounded-sm backdrop-blur-md flex items-center gap-2">
             <span className="text-[10px] font-mono font-medium text-text-2 tracking-wider">
               {fires.length > 0
                 ? <>TRACKING <b className="text-foreground font-bold">{fires.length}</b> {fires.length === 1 ? "FIRE" : "FIRES"}</>
@@ -140,7 +148,7 @@ export function MapPanel() {
           className={`absolute top-6 right-6 z-30 flex items-center gap-2 px-2.5 py-1.5 rounded-md backdrop-blur-md transition-all duration-200 ${
             showGrid
               ? "bg-red/12 border border-red/45 shadow-[0_0_14px_rgba(255,51,51,0.18)]"
-              : "bg-[#0a0b0e]/75 border border-border-2 hover:border-red/40"
+              : "bg-[#0f172a] border border-border-2 hover:border-red/40"
           }`}
         >
           {gridLoading

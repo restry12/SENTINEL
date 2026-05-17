@@ -6,8 +6,7 @@ import { useSentinel } from '@/contexts/sentinel-context'
 import { useFireSelection, type FireIntensity } from '@/contexts/fire-selection-context'
 import { degToCompass } from '@/lib/utils'
 import { useGeolocation } from '@/hooks/use-geolocation'
-import type { FireRiskGrid, FireRiskCell } from '@/hooks/use-socket'
-import { cellPolygon } from '@/lib/risk-grid'
+import type { FireRiskRegionMap, FireRiskRegion } from '@/hooks/use-socket'
 
 function directionToDeg(dir: string): number | null {
   const map: Record<string, number> = {
@@ -107,13 +106,13 @@ const EXP_CONFIG: Record<ExpansionKey, {
 
 
 export function MapboxPanel({
-  riskGrid,
-  onCellClick,
+  riskMap,
+  onRegionClick,
   activeExpansion,
   setActiveExpansion
 }: {
-  riskGrid: FireRiskGrid | null,
-  onCellClick: (cell: FireRiskCell) => void,
+  riskMap: FireRiskRegionMap | null,
+  onRegionClick: (region: FireRiskRegion) => void,
   activeExpansion: ExpansionKey | null,
   setActiveExpansion: (k: ExpansionKey | null) => void
 }) {
@@ -124,8 +123,12 @@ export function MapboxPanel({
   const { sentinelUpdate } = useSentinel()
   const { selectedFire, setSelectedFire, selectFireRef } = useFireSelection()
   const userCoords = useGeolocation()
-  const onCellClickRef = useRef(onCellClick)
-  onCellClickRef.current = onCellClick
+  const onRegionClickRef = useRef(onRegionClick)
+  onRegionClickRef.current = onRegionClick
+  // Holds the latest regions so the click handler can recover full geometry
+  // from a clicked feature's id (geometry is not carried in feature props).
+  const regionsRef = useRef<FireRiskRegion[]>([])
+  regionsRef.current = riskMap?.regions ?? []
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -462,7 +465,7 @@ export function MapboxPanel({
     else map.once('style.load', apply)
   }, [sentinelUpdate])
 
-  // Grid source + fill/line layers — rebuilt whenever the grid changes.
+  // Region source + fill/line layers — rebuilt whenever the risk map changes.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapLoaded) return
@@ -476,23 +479,21 @@ export function MapboxPanel({
       if (map.getLayer(lineId)) map.removeLayer(lineId)
       if (map.getSource(srcId)) map.removeSource(srcId)
 
-      if (!riskGrid) return
+      if (!riskMap) return
 
-      const features = riskGrid.cells.map(c => ({
+      const features = riskMap.regions.map(r => ({
         type: 'Feature' as const,
+        id: r.id,
         properties: {
-          id: c.id,
-          category: c.category,
-          score: c.score,
-          fwi: c.factors.fwi,
-          historial: c.factors.historial,
-          terreno: c.factors.terreno,
-          zona: c.zona,
-          lat: c.lat,
-          lon: c.lon,
-          size: c.size,
+          id: r.id,
+          nombre: r.nombre,
+          category: r.category,
+          score: r.score,
+          fwi: r.factors.fwi,
+          historial: r.factors.historial,
+          terreno: r.factors.terreno,
         },
-        geometry: { type: 'Polygon' as const, coordinates: cellPolygon(c) },
+        geometry: r.geometry,
       }))
 
       map.addSource(srcId, {
@@ -515,15 +516,15 @@ export function MapboxPanel({
       })
       map.addLayer({
         id: lineId, type: 'line', source: srcId,
-        paint: { 'line-color': 'rgba(255,255,255,0.15)', 'line-width': 0.5 },
+        paint: { 'line-color': 'rgba(255,255,255,0.25)', 'line-width': 1 },
       })
     }
 
     if (map.isStyleLoaded()) apply()
     else map.once('style.load', apply)
-  }, [riskGrid, mapLoaded])
+  }, [riskMap, mapLoaded])
 
-  // Grid interactivity — registered once for the fixed layer id.
+  // Region interactivity — registered once for the fixed layer id.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapLoaded) return
@@ -533,16 +534,8 @@ export function MapboxPanel({
       const f = e.features?.[0]
       if (!f) return
       const p = f.properties as any
-      onCellClickRef.current({
-        id: p.id,
-        lat: p.lat,
-        lon: p.lon,
-        size: p.size,
-        score: p.score,
-        category: p.category,
-        factors: { fwi: p.fwi, historial: p.historial, terreno: p.terreno },
-        zona: p.zona,
-      })
+      const region = regionsRef.current.find(r => r.id === p.id)
+      if (region) onRegionClickRef.current(region)
     }
     const onEnter = () => { map.getCanvas().style.cursor = 'pointer' }
     const onLeave = () => { map.getCanvas().style.cursor = '' }
