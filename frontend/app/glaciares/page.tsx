@@ -9,12 +9,14 @@ import { GlacierRightPanel } from "@/components/glaciares/glacier-right-panel"
 import type { GlacierInfo, GlacierAnalysis, AgentResponse } from "@sentinel/types"
 import { Snowflake, ChevronLeft, Loader2 } from "lucide-react"
 
+type GlacierWithMass = GlacierInfo & { lastMassChange: number }
+
 export default function GlaciersPage() {
   return <AuthGuard><GlaciersPageInner /></AuthGuard>
 }
 
 function GlaciersPageInner() {
-  const [glaciers, setSelectedGlaciers] = useState<GlacierInfo[]>([])
+  const [glaciers, setSelectedGlaciers] = useState<GlacierWithMass[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedGlacierId, setSelectedGlacierId] = useState<string | null>(null)
   const [analysisData, setAnalysisData] = useState<GlacierAnalysis | null>(null)
@@ -23,7 +25,7 @@ function GlaciersPageInner() {
   useEffect(() => {
     fetch("http://localhost:3006/glaciers")
       .then(r => r.json())
-      .then((res: AgentResponse<GlacierInfo[]>) => {
+      .then((res: AgentResponse<GlacierWithMass[]>) => {
         if (res.success && res.data) {
           setSelectedGlaciers(res.data)
         }
