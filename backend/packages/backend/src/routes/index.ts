@@ -16,9 +16,23 @@ import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
 
-// Cuántos focos (top por FRP) se mandan a Make.com para enriquecer. Única
-// perilla: subir/bajar acá según cuánto aguante OpenAQ / el tiempo de corrida.
 const ENRICH_LIMIT = 150
+
+type RawCitizenBody = { fires?: unknown; lat?: unknown; lon?: unknown; socketId?: unknown }
+
+export function parseCitizenBody(body: RawCitizenBody): {
+  firms: unknown[]; socketId: string; lat: number | undefined; lon: number | undefined; pm25: number | undefined
+} | null {
+  const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : null
+  if (!socketId) return null
+  const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : null
+  if (!rawFires) return null
+  const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+  const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+  const pm25Values = rawFires.map(f => f.pm25).filter((v): v is number => typeof v === 'number')
+  const pm25 = pm25Values.length > 0 ? Math.max(...pm25Values) : undefined
+  return { firms: rawFires, socketId, lat, lon, pm25 }
+}
 
 // Max 10 analysis requests per IP every 15 minutes
 const triggerLimiter = rateLimit({
@@ -176,6 +190,51 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
 
     executeAndBroadcast(io, lat, lon, firms, undefined, pm25).catch((err) => {
       console.error('[trigger/full] background analysis error:', err instanceof Error ? err.message : err)
+    })
+  })
+
+  // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
+  // Receives { runId, socketId, lat, lon, weather, pm25 }
+  // runId references fires cached by /api/fires/filter; weather and pm25 at citizen's location
+  app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
+    if (isLocked()) {
+      res.status(202).json({ ok: false, accepted: false, error: 'Analysis in progress — try again shortly' })
+      return
+    }
+
+    const body = req.body as {
+      runId?: unknown
+      fires?: unknown
+      socketId?: unknown
+      lat?: unknown
+      lon?: unknown
+      weather?: unknown
+      pm25?: unknown
+    }
+
+    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : null
+    if (!socketId) {
+      res.status(400).json({ ok: false, error: 'socketId required' })
+      return
+    }
+
+    const runId = typeof body.runId === 'string' ? body.runId : undefined
+    const cachedFires = runId ? (getRun(runId) ?? []) : []
+    const rawFires = cachedFires.length > 0
+      ? cachedFires
+      : Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
+
+    const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+    const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+    const pm25 = typeof body.pm25 === 'number' ? body.pm25 : undefined
+    const weather = body.weather ?? undefined
+
+    const enriched = mapRawFiresToFireData(rawFires as Record<string, unknown>[])
+
+    res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
+
+    executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId).catch((err) => {
+      console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
     })
   })
 

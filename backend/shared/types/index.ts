@@ -68,6 +68,13 @@ export interface SentinelUpdate {
   naturalRoutes?: NaturalRoutes
 }
 
+export interface PredictionResult {
+  riskScore: number
+  riskLevel: 'low' | 'medium' | 'high' | 'critical'
+  summary?: string
+  [key: string]: unknown
+}
+
 export interface AlertPayload {
   riskLevel: 'high' | 'critical'
   fires: FireData[]
