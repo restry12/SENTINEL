@@ -38,7 +38,7 @@ const Tile = ({ label, value, unit, delta, deltaType = 'default', sparklinePoint
 export function TelemetryTiles() {
   const { t } = useLang()
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
       <Tile
         label={t('tileHotspots')}
         value="2,412"

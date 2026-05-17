@@ -48,7 +48,7 @@ export function VisualScene() {
   return (
     <section ref={sectionRef} className={styles.scene}>
       <div className={styles.sceneHeader}>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <div className="px-3 py-1 rounded-full border border-red/35 bg-[linear-gradient(180deg,rgba(255,51,51,0.15),rgba(255,51,51,0.05))] text-red flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-red animate-pulse" />
             <span className="text-[10px] font-black tracking-[0.2em] uppercase whitespace-nowrap">
@@ -57,7 +57,7 @@ export function VisualScene() {
           </div>
         </div>
 
-        <h1 className="text-[clamp(26px,2.8vw,48px)] font-black leading-[1.05] tracking-tight text-white uppercase">
+        <h1 className="text-[clamp(24px,2.5vw,40px)] font-black leading-[1.05] tracking-tight text-white uppercase">
           {t('heroTitleBefore')}{' '}
           <span className="text-orange drop-shadow-[0_0_15px_rgba(255,126,21,0.4)]">
             {t('heroTitleHighlight')}
@@ -65,11 +65,11 @@ export function VisualScene() {
           {t('heroTitleAfter')}
         </h1>
 
-        <p className="max-w-[500px] text-[13px] leading-relaxed text-text-dim hidden xl:block">
+        <p className="max-w-[500px] text-[12px] leading-relaxed text-text-dim hidden xl:block">
           {t('heroSub')}
         </p>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5">
           {pills.map((item, i) => (
             <span
               key={i}
