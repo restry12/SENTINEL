@@ -461,10 +461,21 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         const weather = props.weatherJson ? JSON.parse(props.weatherJson) : undefined
         const intensity: FireIntensity = props.frp >= 300 ? 'critical' : props.frp >= 100 ? 'high' : 'moderate'
 
+        // Per-fire wind — use fire's own weather if available, otherwise global
+        const fireWDeg   = weather?.deg   ?? wDeg
+        const fireWSpeed = weather?.speed ?? wSpeed
+        const fireSDeg   = (fireWDeg + 180) % 360
+        const fireSDirLabel = degToCompass(fireSDeg)
+        const fireWKmh   = Math.round(fireWSpeed * 3.6)
+        const fireA2  = computeFireSpreadArea(fireWSpeed, 2)
+        const fireA6  = computeFireSpreadArea(fireWSpeed, 6)
+        const fireA12 = computeFireSpreadArea(fireWSpeed, 12)
+
         const popupData: PopupData = {
           id: props.id, color, intensity: String(intensity),
           frp: props.frp, lat, lon,
-          sDirLabel, wKmh, a2, a6, a12,
+          sDirLabel: fireSDirLabel, wKmh: fireWKmh,
+          a2: fireA2, a6: fireA6, a12: fireA12,
           weather, pm25: props.pm25,
         }
 
@@ -486,8 +497,9 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
 
         setSelectedFire({
           id: props.id, lat, lon, frp: props.frp, brightness: props.brightness,
-          intensity, windImpactDir: sDirLabel, windKmh: wKmh,
-          expansion2h: a2, expansion6h: a6, expansion12h: a12,
+          intensity, windImpactDir: fireSDirLabel, windKmh: fireWKmh,
+          expansion2h: fireA2, expansion6h: fireA6, expansion12h: fireA12,
+          weather,
         })
         setActiveExpansion('2h')
 
