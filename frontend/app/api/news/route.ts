@@ -66,13 +66,21 @@ function parseRSS(xml: string): NewsArticle[] {
 
     const linkMatch = item.match(/<link>([^<]+)<\/link>/)
     const url = linkMatch ? linkMatch[1].trim() : ''
-    
+
+    // Extract image from various RSS media fields
+    const mediaThumbnail = item.match(/<media:thumbnail[^>]*url="([^"]+)"/)
+    const mediaContent   = item.match(/<media:content[^>]*url="([^"]+)"/)
+    const enclosureImg   = item.match(/<enclosure[^>]*url="([^"]+)"[^>]*type="image/)
+    const imgInDesc      = rawDesc.match(/<img[^>]+src="([^"]+)"/)
+    const imageUrl       = mediaThumbnail?.[1] || mediaContent?.[1] || enclosureImg?.[1] || imgInDesc?.[1] || undefined
+
     return [{
       title,
       source: source || 'Fuente externa',
       publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
       url,
       snippet: cleanDesc.slice(0, 180),
+      imageUrl,
     }]
   })
 }

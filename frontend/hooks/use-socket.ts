@@ -116,6 +116,16 @@ export interface PerFireExpansion {
   expansion_12h_km2: number
   velocidad_kmh: number
   direccion: string
+  regional_context?: {
+    region_name: string
+    country: string
+    vegetation_type: string
+    terrain_type: string
+    spread_multiplier: number
+    max_ros_kmh: number
+    reference_fires: string[]
+    context_summary: string
+  }
 }
 
 export interface SentinelUpdate {
