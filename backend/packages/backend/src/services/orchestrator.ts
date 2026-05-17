@@ -10,7 +10,6 @@ import type {
   AirAlerts,
   AuthorityReport,
   RoutesResult,
-  PredictionResult,
 } from '@sentinel/types'
 import { appendFireHistory } from './fire-history'
 
@@ -141,23 +140,18 @@ export async function runAnalysis(
   const airUrl = requireEnv('AGENT_AIR_URL')
   const routesUrl = requireEnv('AGENT_ROUTES_URL')
   const reportUrl = process.env.AGENT_REPORT_URL      // optional — skip silently if not set
-  const predictionUrl = process.env.AGENT_PREDICTION_URL  // optional — skip silently if not set
 
-  const [fireSettled, weatherAgentSettled, airAgentSettled, routesSettled, predictionSettled] = await Promise.allSettled([
+  const [fireSettled, weatherAgentSettled, airAgentSettled, routesSettled] = await Promise.allSettled([
     callAgent<FireAnalysis>(fireUrl, { firms: fires, weather }),
     callAgent<unknown>(weatherUrl, { weather, firms: fires }),
     callAgent<AirAlerts>(airUrl, { openaq: airQuality, firms: fires }),
     callAgent<RoutesResult>(routesUrl, { firms: fires }),
-    predictionUrl
-      ? callAgent<PredictionResult>(predictionUrl, { weather, firms: fires })
-      : Promise.reject(new Error('AGENT_PREDICTION_URL not set')),
   ])
 
   if (fireSettled.status === 'rejected') console.warn('[orchestrator] agent-fire failed:', fireSettled.reason)
   if (weatherAgentSettled.status === 'rejected') console.warn('[orchestrator] agent-weather failed:', weatherAgentSettled.reason)
   if (airAgentSettled.status === 'rejected') console.warn('[orchestrator] agent-air failed:', airAgentSettled.reason)
   if (routesSettled.status === 'rejected') console.warn('[orchestrator] agent-routes failed:', routesSettled.reason)
-  if (predictionSettled.status === 'rejected') console.warn('[orchestrator] agent-prediction failed:', predictionSettled.reason)
 
   // Extract LLM outputs
   const fireAnalysis =
@@ -173,11 +167,6 @@ export async function runAnalysis(
   const routesResult =
     routesSettled.status === 'fulfilled' && routesSettled.value.success
       ? routesSettled.value.data
-      : null
-
-  const predictionResult =
-    predictionSettled.status === 'fulfilled' && predictionSettled.value.success
-      ? predictionSettled.value.data
       : null
 
   // Step 3: agent-report (A4) — needs A1+A2+A3 output, runs after step 2
@@ -216,6 +205,5 @@ export async function runAnalysis(
     airAlerts: airAlerts ?? undefined,
     report,
     naturalRoutes: routesResult?.naturalRoutes ?? undefined,
-    prediction: predictionResult ?? undefined,
   }
 }
