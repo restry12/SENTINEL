@@ -225,8 +225,9 @@ export function MapboxPanel({
         const fireSDirLabel = degToCompass(fireSDeg)
         const fireWKmh   = Math.round(fireWSpeed * 3.6)
 
+        const roundCoord = (v: number) => Math.round(v * 10000) / 10000
         const perFire = sentinelUpdate?.perFireExpansions
-          ?.find(e => e.lat === lat && e.lon === lon)
+          ?.find(e => roundCoord(e.lat) === roundCoord(lat) && roundCoord(e.lon) === roundCoord(lon))
         const toArea = (km2: number) => ({ km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) })
         const fireA2  = perFire ? toArea(perFire.expansion_2h_km2)  : undefined
         const fireA6  = perFire ? toArea(perFire.expansion_6h_km2)  : undefined
