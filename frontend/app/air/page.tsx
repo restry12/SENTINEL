@@ -38,12 +38,11 @@ function AirPageInner() {
   const { tx } = useLang()
   const { sentinelUpdate: u } = useSentinel()
 
-  // Real env from weather data (speed is m/s → km/h)
   const liveEnv: EnvData = {
-    wind:         { speed: u ? Math.round(u.weather.speed * 3.6) : 0, fromDeg: u?.weather.deg ?? 0 },
-    humidity:     u?.weather.humidity ?? 0,
-    tempC:        u?.weather.temp ?? 0,
-    visibilityKm: u?.weather.visibility != null ? Math.round(u.weather.visibility / 100) / 10 : null,
+    wind:         { speed: 0, fromDeg: 0 },
+    humidity:     0,
+    tempC:        0,
+    visibilityKm: null,
   }
 
   // Real fires from NASA FIRMS data (FireData uses .lon, FirePoint uses .lng)

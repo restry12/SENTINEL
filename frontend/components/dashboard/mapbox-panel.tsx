@@ -215,15 +215,6 @@ export function MapboxPanel({
       if (selectFireRef) selectFireRef.current = null
     }
 
-    const wDeg   = sentinelUpdate?.weather?.deg   ?? 315
-    const wSpeed = sentinelUpdate?.weather?.speed ?? 6.7
-    const sDeg   = (wDeg + 180) % 360
-    const sDirLabel = degToCompass(sDeg)
-    const wKmh  = Math.round(wSpeed * 3.6)
-    const a2  = computeFireSpreadArea(wSpeed, 2)
-    const a6  = computeFireSpreadArea(wSpeed, 6)
-    const a12 = computeFireSpreadArea(wSpeed, 12)
-
     const apply = () => {
       cleanup()
       const fires = sentinelUpdate?.fires ?? []
@@ -238,8 +229,8 @@ export function MapboxPanel({
         const weather = weatherJson ? JSON.parse(weatherJson) : undefined
         const intensity: FireIntensity = frp >= 300 ? 'critical' : frp >= 100 ? 'high' : 'moderate'
 
-        const fireWDeg   = weather?.deg   ?? wDeg
-        const fireWSpeed = weather?.speed ?? wSpeed
+        const fireWDeg   = weather?.deg   ?? 0
+        const fireWSpeed = weather?.speed ?? 0
         const fireSDeg   = (fireWDeg + 180) % 360
         const fireSDirLabel = degToCompass(fireSDeg)
         const fireWKmh   = Math.round(fireWSpeed * 3.6)
@@ -523,8 +514,8 @@ export function MapboxPanel({
       const config = EXP_CONFIG[activeExpansion]
       const poly = makeFireSpreadPolygon(
         selectedFire.lat, selectedFire.lon,
-        selectedFire.weather?.deg ?? 315,
-        selectedFire.weather?.speed ?? 6.7,
+        selectedFire.weather?.deg ?? 0,
+        selectedFire.weather?.speed ?? 0,
         config.hours
       )
 
