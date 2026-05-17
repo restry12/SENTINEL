@@ -9,7 +9,7 @@ import {
   Search, TrendingUp, Shield, Globe, Clock, Filter,
   Flame, Wind, Info, Building2, ChevronRight, Activity
 } from 'lucide-react'
-import type { NewsArticle, NewsResponse } from '@/app/api/news/route'
+import type { NewsArticle, NewsResponse } from '@/app/api/news/types'
 
 // --- Visual Components ---
 
@@ -284,6 +284,11 @@ function NewsContent() {
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState('Todo')
   const [search, setSearch] = useState('')
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const fetchNews = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -319,7 +324,7 @@ function NewsContent() {
 
   const featuredArticle = filteredArticles[0]
   const otherArticles = filteredArticles.slice(1)
-  const cachedAtTime = data?.cachedAt ? new Date(data.cachedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : null
+  const cachedAtTime = (mounted && data?.cachedAt) ? new Date(data.cachedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : null
 
   return (
     <div className="flex-1 overflow-y-auto px-6 py-10 lg:px-12 scrollbar-none">
