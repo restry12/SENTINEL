@@ -1,6 +1,8 @@
 import type { FireData, WeatherData, FireAnalysis, RiskAssessment, ExpansionData, GeoJSONFeature, PerFireExpansion, RegionalContext } from '@sentinel/types'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
+type PerFireExpansionFields = Pick<PerFireExpansion, 'expansion_2h_km2' | 'expansion_6h_km2' | 'expansion_12h_km2' | 'velocidad_kmh' | 'direccion'>
+
 export function degreesToCardinal(deg: number): string {
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
   return dirs[Math.round(deg / 45) % 8]
@@ -73,6 +75,43 @@ Infiere el contexto regional y devuelve el JSON de calibración.`
 
   const raw = await callOpenRouter(MODELS.large, system, user)
   return parseJSON<RegionalContext>(raw, 'A_context')
+}
+
+// A2 per-fire: expansion predictor calibrated with regional context
+async function runA2PerFire(
+  fire: FireData,
+  weather: WeatherData,
+  ctx: RegionalContext,
+): Promise<PerFireExpansionFields> {
+  const windKmh = Math.round(weather.speed * 3.6)
+  const windDir = degreesToCardinal((weather.deg + 180) % 360)
+
+  const system = `Eres un experto en modelado de propagación de incendios forestales en América Latina.
+Recibes datos de un foco específico y un contexto regional que DEBES usar como restricción absoluta.
+Responde SOLO con JSON válido, sin texto adicional, sin markdown, sin bloques de código.
+El JSON debe tener exactamente esta estructura:
+{
+  "expansion_2h_km2": número,
+  "expansion_6h_km2": número,
+  "expansion_12h_km2": número,
+  "velocidad_kmh": número,
+  "direccion": "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW"
+}
+RESTRICCIONES ABSOLUTAS (no negociables):
+1. velocidad_kmh NUNCA puede superar max_ros_kmh del contexto regional
+2. expansion_12h_km2 NUNCA puede superar 3 × (max_ros_kmh × 12)² × π / 4
+3. Los valores deben ser coherentes con reference_fires del contexto regional
+4. La progresión debe ser realista: expansion_2h_km2 < expansion_6h_km2 < expansion_12h_km2
+5. Aplicar spread_multiplier del contexto regional sobre la tasa base calculada por el viento`
+
+  const user = `FOCO: lat ${fire.lat}, lon ${fire.lon}, FRP ${fire.frp} MW
+CLIMA: viento ${windKmh} km/h dirección ${windDir}, humedad ${weather.humidity}%
+CONTEXTO REGIONAL:
+${JSON.stringify(ctx, null, 2)}
+Calcula la expansión del incendio respetando las restricciones absolutas del contexto regional.`
+
+  const raw = await callOpenRouter(MODELS.large, system, user)
+  return parseJSON<PerFireExpansionFields>(raw, 'A2PerFire')
 }
 
 // A1: Risk Evaluator
