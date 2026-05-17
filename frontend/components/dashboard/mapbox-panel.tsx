@@ -114,6 +114,7 @@ export function MapboxPanel({
 }) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
+  const [mapLoaded, setMapLoaded] = useState(false)
   const pulseRafRef = useRef<number | null>(null)
   const { sentinelUpdate } = useSentinel()
   const { selectedFire, setSelectedFire, selectFireRef } = useFireSelection()
@@ -121,6 +122,7 @@ export function MapboxPanel({
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
+    
     mapboxgl.accessToken = TOKEN
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
@@ -129,6 +131,7 @@ export function MapboxPanel({
       zoom: 9,
       projection: 'globe' as any,
     })
+    
     map.on('style.load', () => {
       map.setFog({
         'color': 'rgba(56, 189, 248, 0.15)',
@@ -137,8 +140,11 @@ export function MapboxPanel({
         'space-color': 'rgb(2, 2, 5)',
         'star-intensity': 0.9,
       })
+      setMapLoaded(true)
     })
+    
     mapRef.current = map
+<<<<<<< Updated upstream
 
     const observer = new ResizeObserver(() => {
       map.resize()
@@ -149,12 +155,18 @@ export function MapboxPanel({
       observer.disconnect()
       map.remove()
       mapRef.current = null 
+=======
+    return () => { 
+      map.remove()
+      mapRef.current = null
+      setMapLoaded(false) 
+>>>>>>> Stashed changes
     }
   }, [])
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !userCoords) return
+    if (!map || !mapLoaded || !userCoords) return
     const apply = () => {
       if (!map.getStyle()) return
       const data = {
@@ -182,11 +194,11 @@ export function MapboxPanel({
     }
     if (map.isStyleLoaded()) apply()
     else map.once('style.load', apply)
-  }, [userCoords])
+  }, [userCoords, mapLoaded])
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map || !mapLoaded) return
 
     const SRC = 'fires-src'
     const CLUSTERS = 'fires-clusters'
@@ -220,6 +232,86 @@ export function MapboxPanel({
     const apply = () => {
       cleanup()
       const fires = sentinelUpdate?.fires ?? []
+
+      function openFire(
+        lat: number, lon: number,
+        id: string, frp: number, brightness: number,
+        weatherJson: string, pm25: number | null,
+        critical: boolean,
+      ) {
+        const color = critical ? '#ef4444' : '#f97316'
+        const weather = weatherJson ? JSON.parse(weatherJson) : undefined
+        const intensity: FireIntensity = frp >= 300 ? 'critical' : frp >= 100 ? 'high' : 'moderate'
+
+        const fireWDeg   = weather?.deg   ?? wDeg
+        const fireWSpeed = weather?.speed ?? wSpeed
+        const fireSDeg   = (fireWDeg + 180) % 360
+        const fireSDirLabel = degToCompass(fireSDeg)
+        const fireWKmh   = Math.round(fireWSpeed * 3.6)
+        const fireA2  = computeFireSpreadArea(fireWSpeed, 2)
+        const fireA6  = computeFireSpreadArea(fireWSpeed, 6)
+        const fireA12 = computeFireSpreadArea(fireWSpeed, 12)
+
+        const popupData: PopupData = {
+          id, color, intensity: String(intensity),
+          frp, lat, lon,
+          sDirLabel: fireSDirLabel, wKmh: fireWKmh,
+          a2: fireA2, a6: fireA6, a12: fireA12,
+          weather, pm25,
+        }
+
+        currentPopupRef.current?.popup.remove()
+
+        const m = mapRef.current
+        if (!m) return
+
+        const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '320px' })
+          .setLngLat([lon, lat])
+          .setHTML(buildPopupHTML(popupData, '2h'))
+          .addTo(m)
+
+        popup.getElement()?.addEventListener('click', (ev) => {
+          const btn = (ev.target as HTMLElement).closest('[data-sentinel-key]')
+          if (!btn) return
+          const key = btn.getAttribute('data-sentinel-key') as ExpansionKey
+          setActiveExpansion(prev => prev === key ? null : key)
+        })
+
+        currentPopupRef.current = { popup, data: popupData }
+
+        setSelectedFire({
+          id, lat, lon, frp, brightness,
+          intensity, windImpactDir: fireSDirLabel, windKmh: fireWKmh,
+          expansion2h: fireA2, expansion6h: fireA6, expansion12h: fireA12,
+          weather,
+        })
+        setActiveExpansion('2h')
+
+        const sel = m.getSource('fires-selected-src') as mapboxgl.GeoJSONSource
+        sel?.setData({
+          type: 'FeatureCollection',
+          features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [lon, lat] } }],
+        } as any)
+
+        m.flyTo({ 
+          center: [lon, lat], 
+          zoom: Math.max(m.getZoom(), 11), 
+          duration: 1500, 
+          essential: true 
+        })
+      }
+
+      // Register for HotspotSearch — updated each time fires reload
+      selectFireRef.current = (idx, allFires) => {
+        const m = mapRef.current
+        if (!m) return
+        const f = allFires[idx]
+        if (!f) return
+        const id = `FIRE-${String(idx + 1).padStart(3, '0')}`
+        const isCritical = (sentinelUpdate?.riskLevel === 'critical') || f.frp >= 300
+        openFire(f.lat, f.lon, id, f.frp, f.brightness, f.weather ? JSON.stringify(f.weather) : '', f.pm25 ?? null, isCritical)
+      }
+
       if (fires.length === 0) return
 
       const features = fires.map((f, i) => ({
@@ -324,6 +416,7 @@ export function MapboxPanel({
         })
       })
 
+<<<<<<< Updated upstream
       // Shared handler — called from map click AND from HotspotSearch
       function openFire(
         lat: number, lon: number,
@@ -379,6 +472,9 @@ export function MapboxPanel({
       }
 
       // Click a fire → flyTo + context
+=======
+      // Click a fire → flyTo + popup + selectedFire context
+>>>>>>> Stashed changes
       map.on('click', POINTS, (e) => {
         const feat = e.features?.[0]
         if (!feat) return
@@ -408,7 +504,11 @@ export function MapboxPanel({
 
     if (map.isStyleLoaded()) apply()
     else map.once('style.load', apply)
+<<<<<<< Updated upstream
   }, [sentinelUpdate, setSelectedFire, setActiveExpansion, selectFireRef])
+=======
+  }, [sentinelUpdate, setSelectedFire, mapLoaded])
+>>>>>>> Stashed changes
 
   useEffect(() => {
     const map = mapRef.current
@@ -525,8 +625,17 @@ export function MapboxPanel({
   }, [showHeatmap, sentinelUpdate?.prediction])
 
   return (
+<<<<<<< Updated upstream
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
+=======
+    <div className="absolute inset-0 w-full h-full bg-[#04050a] z-0">
+      <div 
+        ref={mapContainerRef} 
+        className="w-full h-full" 
+        style={{ position: 'relative', width: '100%', height: '100%' }}
+      />
+>>>>>>> Stashed changes
     </div>
   )
 }

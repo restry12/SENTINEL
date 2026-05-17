@@ -1,0 +1,127 @@
+<h2>¿Dónde debería aparecer el buscador de focos?</h2>
+<p class="subtitle">Primera decisión de diseño — la posición define cómo el usuario interactúa con el mapa</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="overlay" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0d1117;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#94a3b8;height:200px;position:relative;overflow:hidden;">
+        <!-- Topbar -->
+        <div style="background:#0d1117;border-bottom:1px solid #1e293b;height:28px;display:flex;align-items:center;gap:8px;padding:0 8px;margin:-12px -12px 8px -12px;padding:0 8px;">
+          <div style="width:60px;height:8px;background:#334155;border-radius:2px;"></div>
+          <div style="flex:1;display:flex;justify-content:center;gap:6px;">
+            <div style="width:40px;height:8px;background:#334155;border-radius:2px;"></div>
+            <div style="width:40px;height:8px;background:#334155;border-radius:2px;"></div>
+          </div>
+        </div>
+        <!-- Layout -->
+        <div style="display:flex;height:calc(100% - 28px);gap:0;">
+          <!-- Left panel -->
+          <div style="width:55px;background:#0a0c10;border-right:1px solid #1e293b;flex-shrink:0;"></div>
+          <!-- Map -->
+          <div style="flex:1;background:linear-gradient(135deg,#0f172a,#1a2744);position:relative;">
+            <!-- Overlay widget en el mapa -->
+            <div style="position:absolute;top:10px;right:10px;background:rgba(13,17,23,0.92);border:1px solid rgba(251,146,60,0.5);border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:6px;box-shadow:0 0 20px rgba(251,146,60,0.2);">
+              <span style="font-size:14px;">🔍</span>
+              <div style="width:80px;height:8px;background:#1e293b;border-radius:2px;"></div>
+            </div>
+            <!-- Resultados dropdown -->
+            <div style="position:absolute;top:34px;right:10px;background:rgba(13,17,23,0.95);border:1px solid #1e293b;border-radius:8px;padding:4px;width:120px;">
+              <div style="padding:4px 6px;border-radius:4px;background:rgba(239,68,68,0.15);margin-bottom:2px;font-size:9px;color:#ef4444;">🔴 FIRE-001 · 824MW</div>
+              <div style="padding:4px 6px;font-size:9px;color:#94a3b8;">🟠 FIRE-002 · 612MW</div>
+              <div style="padding:4px 6px;font-size:9px;color:#94a3b8;">🟠 FIRE-003 · 445MW</div>
+            </div>
+            <!-- Fire dots -->
+            <div style="position:absolute;bottom:40px;left:30px;width:8px;height:8px;background:#ef4444;border-radius:50%;box-shadow:0 0 10px #ef4444;"></div>
+            <div style="position:absolute;bottom:60px;left:60px;width:6px;height:6px;background:#f97316;border-radius:50%;box-shadow:0 0 8px #f97316;"></div>
+          </div>
+          <!-- Right panel -->
+          <div style="width:55px;background:#0a0c10;border-left:1px solid #1e293b;flex-shrink:0;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Overlay sobre el mapa</h3>
+      <p>Widget flotante en la esquina superior derecha del mapa. Mínima intrusión, siempre visible junto al mapa. Dropdown de resultados aparece debajo.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="topbar" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0d1117;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#94a3b8;height:200px;position:relative;overflow:hidden;">
+        <!-- Topbar con search -->
+        <div style="background:#0d1117;border-bottom:1px solid #1e293b;height:30px;display:flex;align-items:center;gap:8px;padding:0 8px;margin:-12px -12px 8px -12px;padding:0 8px;">
+          <div style="width:50px;height:8px;background:#334155;border-radius:2px;"></div>
+          <div style="flex:1;display:flex;justify-content:center;gap:6px;">
+            <div style="width:35px;height:8px;background:#334155;border-radius:2px;"></div>
+            <div style="width:35px;height:8px;background:#334155;border-radius:2px;"></div>
+          </div>
+          <!-- Search en topbar -->
+          <div style="background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.4);border-radius:6px;padding:3px 8px;display:flex;align-items:center;gap:4px;">
+            <span style="font-size:10px;">🔍</span>
+            <div style="width:60px;height:6px;background:#1e293b;border-radius:2px;"></div>
+          </div>
+        </div>
+        <!-- Layout -->
+        <div style="display:flex;height:calc(100% - 28px);gap:0;">
+          <div style="width:55px;background:#0a0c10;border-right:1px solid #1e293b;flex-shrink:0;"></div>
+          <div style="flex:1;background:linear-gradient(135deg,#0f172a,#1a2744);position:relative;">
+            <div style="position:absolute;bottom:40px;left:30px;width:8px;height:8px;background:#ef4444;border-radius:50%;box-shadow:0 0 10px #ef4444;"></div>
+            <div style="position:absolute;bottom:60px;left:60px;width:6px;height:6px;background:#f97316;border-radius:50%;box-shadow:0 0 8px #f97316;"></div>
+          </div>
+          <div style="width:55px;background:#0a0c10;border-left:1px solid #1e293b;flex-shrink:0;"></div>
+        </div>
+        <!-- Dropdown debajo del topbar -->
+        <div style="position:absolute;top:42px;right:8px;background:rgba(13,17,23,0.97);border:1px solid #1e293b;border-radius:8px;padding:4px;width:130px;z-index:10;">
+          <div style="padding:4px 6px;border-radius:4px;background:rgba(239,68,68,0.15);margin-bottom:2px;font-size:9px;color:#ef4444;">🔴 FIRE-001 · 824MW</div>
+          <div style="padding:4px 6px;font-size:9px;color:#94a3b8;">🟠 FIRE-002 · 612MW</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>En el Top Bar</h3>
+      <p>Integrado en la barra de navegación superior. El dropdown aparece debajo. Consistente con el resto de controles globales.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="leftpanel" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0d1117;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#94a3b8;height:200px;position:relative;overflow:hidden;">
+        <!-- Topbar -->
+        <div style="background:#0d1117;border-bottom:1px solid #1e293b;height:28px;display:flex;align-items:center;gap:8px;margin:-12px -12px 8px -12px;padding:0 8px;">
+          <div style="width:60px;height:8px;background:#334155;border-radius:2px;"></div>
+          <div style="flex:1;display:flex;justify-content:center;gap:6px;">
+            <div style="width:40px;height:8px;background:#334155;border-radius:2px;"></div>
+          </div>
+        </div>
+        <!-- Layout -->
+        <div style="display:flex;height:calc(100% - 28px);gap:0;">
+          <!-- Left panel con search integrado -->
+          <div style="width:75px;background:#0a0c10;border-right:1px solid #1e293b;flex-shrink:0;padding:6px;">
+            <!-- Search box -->
+            <div style="background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.3);border-radius:5px;padding:4px 6px;display:flex;align-items:center;gap:3px;margin-bottom:5px;">
+              <span style="font-size:9px;">🔍</span>
+              <div style="width:100%;height:5px;background:#1e293b;border-radius:2px;"></div>
+            </div>
+            <!-- Lista de resultados -->
+            <div style="font-size:8px;space-y:2px;">
+              <div style="padding:3px 4px;border-radius:3px;background:rgba(239,68,68,0.2);color:#ef4444;margin-bottom:2px;">FIRE-001</div>
+              <div style="padding:3px 4px;color:#94a3b8;margin-bottom:2px;">FIRE-002</div>
+              <div style="padding:3px 4px;color:#94a3b8;">FIRE-003</div>
+            </div>
+          </div>
+          <div style="flex:1;background:linear-gradient(135deg,#0f172a,#1a2744);position:relative;">
+            <div style="position:absolute;bottom:40px;left:30px;width:8px;height:8px;background:#ef4444;border-radius:50%;box-shadow:0 0 10px #ef4444;"></div>
+            <div style="position:absolute;bottom:60px;left:60px;width:6px;height:6px;background:#f97316;border-radius:50%;box-shadow:0 0 8px #f97316;"></div>
+          </div>
+          <div style="width:55px;background:#0a0c10;border-left:1px solid #1e293b;flex-shrink:0;"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>En el Panel Izquierdo</h3>
+      <p>Search bar en la parte superior del panel izquierdo. La lista de resultados reemplaza temporalmente el contenido del panel. Sin popups flotantes.</p>
+    </div>
+  </div>
+
+</div>
