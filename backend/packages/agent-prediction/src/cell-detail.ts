@@ -1,75 +1,28 @@
-import type { CellInfrastructure, CellSocialImpact } from '@sentinel/types'
-
-export function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
-  const R = 6371
-  const dLat = ((bLat - aLat) * Math.PI) / 180
-  const dLon = ((bLon - aLon) * Math.PI) / 180
-  const s =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s))
-}
-
-const TYPE_WEIGHT: Record<CellInfrastructure['type'], number> = {
-  hospital: 30,
-  kindergarten: 25,
-  school: 20,
-  police: 12,
-  fire_station: 8,
-}
-
-const TYPE_LABEL: Record<CellInfrastructure['type'], string> = {
-  hospital: 'hospital(es)',
-  kindergarten: 'jardín(es) infantil(es)',
-  school: 'escuela(s)',
-  police: 'comisaría(s)',
-  fire_station: 'cuartel(es) de bomberos',
-}
-
-export function socialImpact(infra: CellInfrastructure[]): CellSocialImpact {
-  const raw = infra.reduce((s, i) => s + TYPE_WEIGHT[i.type], 0)
-  const score = Math.min(100, raw)
-  const counts = new Map<CellInfrastructure['type'], number>()
-  for (const i of infra) counts.set(i.type, (counts.get(i.type) ?? 0) + 1)
-  const parts = [...counts.entries()].map(([t, n]) => `${n} ${TYPE_LABEL[t]}`)
-  const resumen = parts.length > 0
-    ? `Infraestructura sensible en la celda: ${parts.join(', ')}.`
-    : 'Sin infraestructura sensible registrada en la celda.'
-  return { score, resumen }
-}
-
-import type { FireRiskCell, CellDetail } from '@sentinel/types'
+import type { RiskCategory, RiskFactors, RegionDetail } from '@sentinel/types'
+import { CHILE_REGIONS, regionBbox } from './regions'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter'
 
-const AMENITY_TYPE: Record<string, CellInfrastructure['type']> = {
-  hospital: 'hospital',
-  school: 'school',
-  kindergarten: 'kindergarten',
-  fire_station: 'fire_station',
-  police: 'police',
+type Prioridad = RegionDetail['prioridad']
+
+interface OverpassCountElement {
+  tags?: { total?: string; nodes?: string; ways?: string; relations?: string }
 }
 
-interface OverpassNode {
-  lat?: number
-  lon?: number
-  center?: { lat: number; lon: number }
-  tags?: Record<string, string>
+function priorityFromScore(score: number): Prioridad {
+  if (score >= 80) return 'critica'
+  if (score >= 60) return 'alta'
+  if (score >= 40) return 'media'
+  return 'baja'
 }
 
-export async function fetchInfrastructure(cell: FireRiskCell): Promise<CellInfrastructure[]> {
-  const latMin = cell.lat
-  const latMax = cell.lat + cell.size
-  const lonMin = cell.lon
-  const lonMax = cell.lon + cell.size
-  const centerLat = cell.lat + cell.size / 2
-  const centerLon = cell.lon + cell.size / 2
-  const query = `[out:json][timeout:25];
-(
-  nwr["amenity"~"^(hospital|school|kindergarten|fire_station|police)$"](${latMin},${lonMin},${latMax},${lonMax});
-);
-out center;`
+// Counts sensible facilities (hospital/school/kindergarten/fire_station/police)
+// inside a bbox via a single Overpass `out count` query. Degrades to 0.
+async function fetchInfrastructureCount(bbox: {
+  latMin: number; latMax: number; lonMin: number; lonMax: number
+}): Promise<number> {
+  const query = `[out:json][timeout:25];(nwr["amenity"~"^(hospital|school|kindergarten|fire_station|police)$"](${bbox.latMin},${bbox.lonMin},${bbox.latMax},${bbox.lonMax}););out count;`
   try {
     const res = await fetch(OVERPASS_URL, {
       method: 'POST',
@@ -77,87 +30,87 @@ out center;`
       body: query,
       signal: AbortSignal.timeout(30000),
     })
-    if (!res.ok) return []
-    const data = (await res.json()) as { elements?: OverpassNode[] }
-    return (data.elements ?? [])
-      .filter(n => n.tags?.name && n.tags?.amenity && AMENITY_TYPE[n.tags.amenity])
-      .map(n => {
-        const lat = n.lat ?? n.center?.lat
-        const lon = n.lon ?? n.center?.lon
-        return { node: n, lat, lon }
-      })
-      .filter((x): x is { node: OverpassNode; lat: number; lon: number } =>
-        typeof x.lat === 'number' && typeof x.lon === 'number')
-      .map(x => ({
-        name: x.node.tags!.name,
-        type: AMENITY_TYPE[x.node.tags!.amenity],
-        lat: x.lat,
-        lon: x.lon,
-        distance_km: Math.round(haversineKm(centerLat, centerLon, x.lat, x.lon) * 10) / 10,
-      }))
-      .sort((a, b) => a.distance_km - b.distance_km)
+    if (!res.ok) return 0
+    const data = (await res.json()) as { elements?: OverpassCountElement[] }
+    const el = data.elements?.[0]
+    if (!el?.tags) return 0
+    const raw = el.tags.total ?? el.tags.nodes ?? el.tags.ways ?? el.tags.relations
+    const n = Number(raw)
+    return Number.isFinite(n) && n >= 0 ? n : 0
   } catch {
-    return []
+    return 0
   }
 }
 
-function priorityFromScore(score: number): CellDetail['prioridad'] {
-  if (score >= 80) return 'critica'
-  if (score >= 60) return 'alta'
-  if (score >= 40) return 'media'
-  return 'baja'
-}
-
-interface CellLLMOutput {
+interface RegionLLMOutput {
   explicacion: string
   recomendaciones: string[]
-  prioridad: CellDetail['prioridad']
+  prioridad: Prioridad
 }
 
-async function runCellLLM(
-  cell: FireRiskCell,
-  infra: CellInfrastructure[],
-  impact: CellSocialImpact,
-): Promise<CellLLMOutput> {
+async function runRegionLLM(input: {
+  nombre: string
+  score: number
+  category: RiskCategory
+  factors: RiskFactors
+  infraestructura_total: number
+}): Promise<RegionLLMOutput> {
   const system = `Eres un experto en gestión de emergencias por incendios forestales en Chile.
-Recibes el riesgo de una celda geográfica y la infraestructura crítica que contiene.
+Recibes el riesgo agregado de una región administrativa y la cantidad de infraestructura crítica que contiene.
 Responde SOLO con JSON válido, sin markdown ni texto adicional, con esta estructura exacta:
 {
-  "explicacion": "por qué esta celda tiene este nivel de riesgo, 2-3 frases",
+  "explicacion": "por qué esta región tiene este nivel de riesgo, 2-3 frases",
   "recomendaciones": ["accion 1", "accion 2", "accion 3"],
   "prioridad": "baja" | "media" | "alta" | "critica"
 }`
-  const user = `Celda ${cell.id} — zona: ${cell.zona}
-Score de riesgo: ${cell.score}/100 (categoría: ${cell.category})
-Factores: FWI ${cell.factors.fwi}, Historial ${cell.factors.historial}, Terreno ${cell.factors.terreno}
-Impacto social: ${impact.score}/100 — ${impact.resumen}
-Infraestructura: ${infra.length > 0
-    ? infra.map(i => `${i.type} "${i.name}" a ${i.distance_km} km`).join('; ')
-    : 'ninguna registrada'}
+  const user = `Región: ${input.nombre}
+Score de riesgo: ${input.score}/100 (categoría: ${input.category})
+Factores: FWI ${input.factors.fwi}, Historial ${input.factors.historial}, Terreno ${input.factors.terreno}
+Infraestructura sensible (hospitales, escuelas, jardines, bomberos, comisarías): ${input.infraestructura_total}
 
-Genera el análisis de intervención para esta celda.`
+Genera el análisis de intervención para esta región.`
   const raw = await callOpenRouter(MODELS.large, system, user)
-  const parsed = parseJSON<Partial<CellLLMOutput>>(raw, 'Agent 6 (cell-detail)')
+  const parsed = parseJSON<Partial<RegionLLMOutput>>(raw, 'Agent 6 (region-detail)')
   return {
     explicacion: typeof parsed.explicacion === 'string' ? parsed.explicacion : '',
     recomendaciones: Array.isArray(parsed.recomendaciones)
       ? parsed.recomendaciones.filter((x): x is string => typeof x === 'string')
       : [],
     prioridad: ['baja', 'media', 'alta', 'critica'].includes(parsed.prioridad as string)
-      ? (parsed.prioridad as CellDetail['prioridad'])
-      : priorityFromScore(cell.score),
+      ? (parsed.prioridad as Prioridad)
+      : priorityFromScore(input.score),
   }
 }
 
-export async function buildCellDetail(cell: FireRiskCell): Promise<CellDetail> {
-  const infrastructure = await fetchInfrastructure(cell)
-  const impact = socialImpact(infrastructure)
+export async function buildRegionDetail(input: {
+  region_id: number
+  nombre: string
+  score: number
+  category: RiskCategory
+  factors: RiskFactors
+}): Promise<RegionDetail> {
+  const region = CHILE_REGIONS.find(r => r.id === input.region_id)
+
+  let infraestructura_total = 0
+  if (region) {
+    infraestructura_total = await fetchInfrastructureCount(regionBbox(region.geometry))
+  }
+
+  const resumen_infraestructura = infraestructura_total > 0
+    ? `~${infraestructura_total} instalaciones sensibles (hospitales, escuelas, jardines, bomberos y comisarías) en la región.`
+    : 'Sin datos de infraestructura sensible para la región.'
 
   let explicacion = ''
   let recomendaciones: string[] = []
-  let prioridad = priorityFromScore(cell.score)
+  let prioridad = priorityFromScore(input.score)
   try {
-    const llm = await runCellLLM(cell, infrastructure, impact)
+    const llm = await runRegionLLM({
+      nombre: input.nombre,
+      score: input.score,
+      category: input.category,
+      factors: input.factors,
+      infraestructura_total,
+    })
     explicacion = llm.explicacion
     recomendaciones = llm.recomendaciones
     prioridad = llm.prioridad
@@ -166,9 +119,10 @@ export async function buildCellDetail(cell: FireRiskCell): Promise<CellDetail> {
   }
 
   return {
-    cell_id: cell.id,
-    infrastructure,
-    social_impact: impact,
+    region_id: input.region_id,
+    nombre: input.nombre,
+    infraestructura_total,
+    resumen_infraestructura,
     explicacion,
     recomendaciones,
     prioridad,

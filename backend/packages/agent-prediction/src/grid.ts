@@ -1,4 +1,13 @@
-import type { WeatherData, RiskCategory, RiskFactors } from '@sentinel/types'
+import { createClient } from '@supabase/supabase-js'
+import type {
+  WeatherData,
+  RiskCategory,
+  RiskFactors,
+  FireData,
+  FireRiskRegion,
+  FireRiskRegionMap,
+} from '@sentinel/types'
+import { CHILE_REGIONS, TERRAIN_BY_REGION, pointInRegion } from './regions'
 
 export function toTempCelsius(temp: number | undefined): number {
   if (temp === undefined) return 20
@@ -30,46 +39,14 @@ export function categoryFor(score: number): RiskCategory {
   return 'bajo'
 }
 
-import { CELL_DEG } from './zones'
-
 export interface Hotspot {
   lat: number
   lon: number
 }
 
-// Proximity kernel: each hotspot adds weight 1.0 to its own cell and a
-// linear falloff to cells within a 2-cell radius. Result keyed "row,col"
-// (integer grid indices), normalized so the hottest cell is 100.
-export function computeHistorial(hotspots: Hotspot[]): Map<string, number> {
-  const raw = new Map<string, number>()
-  for (const h of hotspots) {
-    const hRow = Math.floor(h.lat / CELL_DEG)
-    const hCol = Math.floor(h.lon / CELL_DEG)
-    for (let dr = -2; dr <= 2; dr++) {
-      for (let dc = -2; dc <= 2; dc++) {
-        const dist = Math.sqrt(dr * dr + dc * dc)
-        const w = Math.max(0, 1 - dist / 3)
-        if (w <= 0) continue
-        const k = `${hRow + dr},${hCol + dc}`
-        raw.set(k, (raw.get(k) ?? 0) + w)
-      }
-    }
-  }
-  const result = new Map<string, number>()
-  if (raw.size === 0) return result
-  const max = Math.max(...raw.values())
-  for (const [k, v] of raw) {
-    result.set(k, Math.round((v / max) * 100))
-  }
-  return result
-}
-
-import { createClient } from '@supabase/supabase-js'
-import type { FireData, FireRiskCell, FireRiskGrid } from '@sentinel/types'
-import { iterateCells, cellId } from './zones'
-
 const HISTORY_DAYS = 30
 
+// 30-day fire history from Supabase. Degrades to [] without env / on error.
 async function fetchHistoryHotspots(): Promise<Hotspot[]> {
   const url = process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_KEY
@@ -94,36 +71,40 @@ function average(xs: number[]): number {
   return xs.reduce((s, x) => s + x, 0) / xs.length
 }
 
-export async function buildFireRiskGrid(
+// Builds a 16-region risk map: each of Chile's administrative regions gets an
+// aggregate 0-100 score from weather (FWI), real fire history and terrain.
+export async function buildFireRiskRegionMap(
   weather: WeatherData,
   firms: FireData[],
-): Promise<FireRiskGrid> {
+): Promise<FireRiskRegionMap> {
   const fwi = Math.round(computeFwi(weather) * 100)
 
   const history = await fetchHistoryHotspots()
   const live: Hotspot[] = firms.map(f => ({ lat: f.lat, lon: f.lon }))
-  const historial = computeHistorial([...history, ...live])
+  const hotspots: Hotspot[] = [...history, ...live]
 
-  const cells: FireRiskCell[] = iterateCells().map(rc => {
-    // A cell's SW corner is an exact 0.25 multiple, so round() here matches the
-    // floor() that computeHistorial uses to bucket hotspots.
-    const row = Math.round(rc.lat / CELL_DEG)
-    const col = Math.round(rc.lon / CELL_DEG)
-    const factors: RiskFactors = {
-      fwi,
-      historial: historial.get(`${row},${col}`) ?? 0,
-      terreno: Math.round(rc.zone.terrain * 100),
+  // Count hotspots per region, then normalize so the busiest region = 100.
+  const counts = CHILE_REGIONS.map(region => {
+    let count = 0
+    for (const h of hotspots) {
+      if (pointInRegion(h.lon, h.lat, region.geometry)) count++
     }
+    return count
+  })
+  const maxCount = counts.length > 0 ? Math.max(...counts) : 0
+
+  const regions: FireRiskRegion[] = CHILE_REGIONS.map((region, i) => {
+    const historial = maxCount > 0 ? Math.round((counts[i] / maxCount) * 100) : 0
+    const terreno = Math.round((TERRAIN_BY_REGION[region.id] ?? 0) * 100)
+    const factors: RiskFactors = { fwi, historial, terreno }
     const score = combineScore(factors)
     return {
-      id: cellId(rc.lat, rc.lon),
-      lat: rc.lat,
-      lon: rc.lon,
-      size: CELL_DEG,
+      id: region.id,
+      nombre: region.nombre,
       score,
       category: categoryFor(score),
       factors,
-      zona: rc.zone.name,
+      geometry: region.geometry,
     }
   })
 
@@ -132,9 +113,8 @@ export async function buildFireRiskGrid(
     : { lat: -38.5, lon: -72.0 }
 
   return {
-    cells,
+    regions,
     generated_at: new Date().toISOString(),
     weather_point: weatherPoint,
-    bbox: { latMin: -56, latMax: -17.5, lonMin: -76, lonMax: -66 },
   }
 }

@@ -175,7 +175,7 @@ export interface RoutesResult {
   naturalRoutes: NaturalRoutes | null
 }
 
-// ─── Agent 6 — Fire Risk Grid ────────────────────────────────────────────────
+// ─── Agent 6 — Fire Risk by Region ───────────────────────────────────────────
 
 export type RiskCategory = 'bajo' | 'medio' | 'alto' | 'critico'
 
@@ -185,45 +185,34 @@ export interface RiskFactors {
   terreno: number    // 0-100 — vegetation zone proxy
 }
 
-export interface FireRiskCell {
-  id: string                 // e.g. "M-17"
-  lat: number                // SW corner
-  lon: number                // SW corner
-  size: number               // cell size in degrees (0.25)
-  score: number              // 0-100
+export interface RegionGeometry {
+  type: 'Polygon' | 'MultiPolygon'
+  coordinates: number[][][] | number[][][][]
+}
+
+export interface FireRiskRegion {
+  id: number               // codregion 1-16
+  nombre: string           // region name from GeoJSON properties.Region
+  score: number            // 0-100
   category: RiskCategory
-  factors: RiskFactors
-  zona: string               // vegetation band name
+  factors: RiskFactors     // each 0-100
+  geometry: RegionGeometry
 }
 
-export interface FireRiskGrid {
-  cells: FireRiskCell[]
+export interface FireRiskRegionMap {
+  regions: FireRiskRegion[]
   generated_at: string
-  weather_point: { lat: number; lon: number }   // limitation: single weather point
-  bbox: { latMin: number; latMax: number; lonMin: number; lonMax: number }
+  weather_point: { lat: number; lon: number }   // single-weather-point limitation
 }
 
-export interface CellInfrastructure {
-  name: string
-  type: 'hospital' | 'school' | 'kindergarten' | 'fire_station' | 'police'
-  lat: number
-  lon: number
-  distance_km: number
-}
-
-export interface CellSocialImpact {
-  score: number              // 0-100
-  poblacion_estimada?: number
-  resumen: string
-}
-
-export interface CellDetail {
-  cell_id: string
-  infrastructure: CellInfrastructure[]
-  social_impact: CellSocialImpact
-  explicacion: string                                // Mistral
-  recomendaciones: string[]                          // Mistral
-  prioridad: 'baja' | 'media' | 'alta' | 'critica'   // Mistral, score-fallback
+export interface RegionDetail {
+  region_id: number
+  nombre: string
+  infraestructura_total: number          // count of sensible facilities (Overpass)
+  resumen_infraestructura: string
+  explicacion: string                    // Mistral
+  recomendaciones: string[]              // Mistral
+  prioridad: 'baja' | 'media' | 'alta' | 'critica'
 }
 
 // Agent contract — POST /analyze
