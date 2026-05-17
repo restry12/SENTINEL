@@ -753,6 +753,11 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
 
     if (map.isStyleLoaded()) draw()
     else map.once('style.load', draw)
+
+    return () => {
+      map.off('style.load', draw)
+      cleanup()
+    }
   }, [showHeatmap, sentinelUpdate?.prediction])
 
   return (
