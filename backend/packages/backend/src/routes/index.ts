@@ -220,7 +220,8 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
         method: 'POST',
         headers: webhookHeaders,
         body: JSON.stringify({
-          lat, lon, socketId,
+          lat, lon,
+          ...(socketId ? { socketId } : {}),
           west:  Math.round((lon - 3) * 10) / 10,
           south: Math.round((lat - 3) * 10) / 10,
           east:  Math.round((lon + 3) * 10) / 10,

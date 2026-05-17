@@ -214,6 +214,7 @@ export function useSocket() {
   const [status, setStatus] = useState<SocketStatus>({ state: "idle" })
   const [connected, setConnected] = useState(false)
   const socketRef = useRef<Socket | null>(null)
+  const pendingCitizenTrigger = useRef<{ lat: number; lon: number } | null>(null)
 
   useEffect(() => {
     // 1. Instant paint from the browser's own cache of the last analysis.
@@ -248,7 +249,19 @@ export function useSocket() {
     const socket: Socket = io(url, { transports: ["websocket"] })
     socketRef.current = socket
 
-    socket.on("connect", () => setConnected(true))
+    socket.on("connect", () => {
+      setConnected(true)
+      // Fire any queued citizen trigger now that we have a valid socket.id
+      if (pendingCitizenTrigger.current) {
+        const { lat, lon } = pendingCitizenTrigger.current
+        pendingCitizenTrigger.current = null
+        fetch('/api/trigger/citizen-init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lon, socketId: socket.id }),
+        }).catch((err) => console.error('[triggerCitizen] queued trigger failed:', err))
+      }
+    })
     socket.on("disconnect", () => setConnected(false))
 
     socket.on("update", (data: SentinelUpdate) => {
@@ -271,18 +284,19 @@ export function useSocket() {
   }, [])
 
   const triggerCitizen = useCallback((lat: number, lon: number) => {
-    // Use HTTP proxy (BACKEND_URL server-side) so the trigger works regardless
-    // of whether NEXT_PUBLIC_SOCKET_URL is set or the socket is connected.
-    // The socket is still used to receive the analysis result back.
-    fetch('/api/trigger/citizen-init', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lat, lon, socketId: socketRef.current?.id ?? null }),
-    }).catch((err) => {
-      console.error('[triggerCitizen] HTTP trigger failed:', err)
-      // Last resort: try direct socket emit
-      socketRef.current?.emit('trigger-citizen', { lat, lon })
-    })
+    const socket = socketRef.current
+    const socketId = socket?.connected ? socket.id : null
+    if (socketId) {
+      // Socket already connected — fire immediately with the real socketId
+      fetch('/api/trigger/citizen-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lon, socketId }),
+      }).catch((err) => console.error('[triggerCitizen] HTTP trigger failed:', err))
+    } else {
+      // Socket not connected yet — queue it; connect handler fires it with socket.id
+      pendingCitizenTrigger.current = { lat, lon }
+    }
   }, [])
 
   return { sentinelUpdate, status, connected, trigger, triggerCitizen }
