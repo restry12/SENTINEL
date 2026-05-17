@@ -64,14 +64,14 @@ export function MapPanel() {
               title={showHeatmap ? "Ocultar heatmap de predicción" : "Mostrar heatmap de predicción A6"}
             >
               <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_6px_var(--red)] animate-pulse shrink-0" />
-              {activeCrit ? (
-                <span className="text-[9.5px] font-bold tracking-[0.1em] text-red uppercase tabular-nums transition-all duration-500">
+              <span className="text-[9.5px] font-bold tracking-[0.14em] text-red uppercase">Critical Risk</span>
+              {activeCrit && (
+                <span className="text-[9.5px] font-bold tracking-[0.08em] text-text-dim uppercase tabular-nums transition-all duration-500">
+                  &nbsp;<span className="text-text-muted">|</span>&nbsp;
                   {Math.abs(activeCrit.lat).toFixed(2)}°{activeCrit.lat < 0 ? "S" : "N"}&nbsp;
                   {Math.abs(activeCrit.lon).toFixed(2)}°{activeCrit.lon < 0 ? "W" : "E"}&nbsp;
-                  <span className="text-text-dim">|</span>&nbsp;{activeCrit.frp.toFixed(0)}MW
+                  <span className="text-text-muted">|</span>&nbsp;{activeCrit.frp.toFixed(0)}MW
                 </span>
-              ) : (
-                <span className="text-[9.5px] font-bold tracking-[0.14em] text-text-dim uppercase">Critical Fire</span>
               )}
             </div>
             <div className="flex items-center gap-2">
