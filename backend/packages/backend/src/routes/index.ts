@@ -258,8 +258,25 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
 
     const last = getLastUpdate()
-    const fires = last?.fires ?? []
+    const allFires = last?.fires ?? []
     const weather = last?.weather ?? { speed: 0, deg: 0 }
+
+    // Exclude fires from unrelated regions — only keep fires within 300 km of the user.
+    // The last analysis may cover a different area (e.g. southern Chile) if Make.com's
+    // citizen webhook hasn't responded yet, which would produce nonsensical distances.
+    const MAX_FIRE_RADIUS_KM = 300
+    const fires = allFires.filter((f) => {
+      const dLat = (f.lat - userLat) * Math.PI / 180
+      const dLon = (f.lon - userLon) * Math.PI / 180
+      const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(userLat * Math.PI / 180) * Math.cos(f.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+      return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= MAX_FIRE_RADIUS_KM
+    })
+
+    if (fires.length === 0) {
+      console.warn(`[citizen-routes] no fires within ${MAX_FIRE_RADIUS_KM} km of user (${allFires.length} total in last update) — Make.com webhook likely still in flight`)
+      return
+    }
 
     try {
       const response = await fetch(`${agentRoutesUrl}/analyze/citizen`, {
@@ -322,7 +339,37 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
 
     res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
 
-    executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId ?? undefined).catch((err) => {
+    const agentRoutesUrlCitizen = process.env.AGENT_ROUTES_URL
+    ;(async () => {
+      await executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId ?? undefined)
+      // After the full analysis updates last, call citizen routes with the fresh local fires
+      if (!lat || !lon || !agentRoutesUrlCitizen) return
+      const freshUpdate = getLastUpdate()
+      const freshFires = freshUpdate?.fires ?? enriched
+      const freshWeather = freshUpdate?.weather ?? { speed: 0, deg: 0 }
+      try {
+        const response = await fetch(`${agentRoutesUrlCitizen}/analyze/citizen`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userLat: lat,
+            userLon: lon,
+            fires: freshFires,
+            weather: {
+              wind_speed_kmh: Math.round((freshWeather.speed ?? 0) * 3.6),
+              wind_dir_deg: freshWeather.deg ?? 0,
+            },
+          }),
+        })
+        const data = await response.json() as { success: boolean; data: unknown }
+        if (data.success) {
+          const emitter = socketId ? io.to(socketId) : io
+          emitter.emit('citizen-routes', data.data)
+        }
+      } catch (err) {
+        console.error('[trigger/citizen] citizen-routes call failed:', err instanceof Error ? err.message : err)
+      }
+    })().catch((err) => {
       console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
     })
   })
