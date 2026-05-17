@@ -213,7 +213,7 @@
 .sceneHeader {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
   animation: fadeIn 0.9s 0.1s ease both;
 }
