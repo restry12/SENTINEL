@@ -8,6 +8,7 @@ import { TornadoLeftPanel } from "@/components/tornado/tornado-left-panel"
 import { TornadoRightPanel } from "@/components/tornado/tornado-right-panel"
 import { TORNADO_CELLS } from "@/components/tornado/world-tornado-map"
 import type { TornadoCell } from "@/components/tornado/world-tornado-map"
+import { MobileDrawer } from "@/components/ui/mobile-drawer"
 
 const WorldTornadoMap = dynamic(
   () => import("@/components/tornado/world-tornado-map").then(m => m.WorldTornadoMap),
@@ -30,7 +31,7 @@ function TornadoPageInner() {
   }, [])
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-[calc(100dvh-4rem)] md:h-screen w-screen flex flex-col bg-background overflow-hidden">
       <TopBar />
       <main className="flex-1 relative overflow-hidden">
 
@@ -41,15 +42,19 @@ function TornadoPageInner() {
         />
 
         {/* Left panel */}
-        <TornadoLeftPanel
-          cells={TORNADO_CELLS}
-          selectedCell={selectedCell}
-          onCellSelect={handleCellSelect}
-          onBack={handleBack}
-        />
+        <div className="hidden md:block">
+          <TornadoLeftPanel
+            cells={TORNADO_CELLS}
+            selectedCell={selectedCell}
+            onCellSelect={handleCellSelect}
+            onBack={handleBack}
+          />
+        </div>
 
         {/* Right panel */}
-        <TornadoRightPanel selectedCell={selectedCell} />
+        <div className="hidden md:block">
+          <TornadoRightPanel selectedCell={selectedCell} />
+        </div>
 
         {/* EF Scale Legend */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
@@ -70,6 +75,17 @@ function TornadoPageInner() {
             ))}
           </div>
         </div>
+
+        {/* ── MOBILE DRAWER ── */}
+        <MobileDrawer title="Monitoreo de Tornados" triggerLabel="Ver celdas">
+          <TornadoLeftPanel
+            cells={TORNADO_CELLS}
+            selectedCell={selectedCell}
+            onCellSelect={handleCellSelect}
+            onBack={handleBack}
+          />
+          <TornadoRightPanel selectedCell={selectedCell} />
+        </MobileDrawer>
 
       </main>
     </div>
