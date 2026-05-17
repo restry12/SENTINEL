@@ -20,6 +20,19 @@ interface FireData {
   timestamp: string
 }
 
+interface PerFireRegionalContext {
+  region_name: string
+  country: string
+  vegetation_type?: string
+}
+
+interface PerFireExpansion {
+  lat: number
+  lon: number
+  frp: number
+  regional_context?: PerFireRegionalContext
+}
+
 interface SentinelSnapshot {
   timestamp: string
   fires: FireData[]
@@ -43,6 +56,7 @@ interface SentinelSnapshot {
     analisis_72h: string
     confianza: string
   }
+  perFireExpansions?: PerFireExpansion[]
 }
 
 interface NewsArticle {
@@ -52,14 +66,17 @@ interface NewsArticle {
   publishedAt: string
 }
 
+type ChatMode = 'citizen' | 'expert'
+
 interface ChatRequest {
   message: string
   history: ChatMessage[]
   sentinelSnapshot: SentinelSnapshot | null
   newsArticles: NewsArticle[]
+  mode?: ChatMode
 }
 
-function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[]): string {
+function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[], mode: ChatMode): string {
   let prompt = `Eres SENTINEL AI, asistente del sistema SENTINEL de monitoreo de incendios forestales en CHILE. Respondes exclusivamente en español.
 
 ## REGLA ANTI-INVENCIÓN (CRÍTICA)
@@ -164,13 +181,14 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   try {
     const body: ChatRequest = await req.json()
-    const { message, history, sentinelSnapshot, newsArticles } = body
+    const { message, history, sentinelSnapshot, newsArticles, mode } = body
 
     if (!message?.trim()) {
       return new Response(JSON.stringify({ error: 'message required' }), { status: 400 })
     }
 
-    const systemPrompt = buildSystemPrompt(sentinelSnapshot, newsArticles ?? [])
+    const chatMode: ChatMode = mode === 'expert' ? 'expert' : 'citizen'
+    const systemPrompt = buildSystemPrompt(sentinelSnapshot, newsArticles ?? [], chatMode)
 
     // Cap history to last 20 messages to avoid runaway token cost from a buggy / hostile client.
     const safeHistory = (history ?? []).slice(-20)
