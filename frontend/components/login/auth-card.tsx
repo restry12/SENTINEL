@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 
 export function AuthCard() {
   const [activeTab, setActiveTab] = React.useState<'login' | 'register'>('login')
-  const { t } = useLang()
+  const { t, lang } = useLang()
 
   return (
     <div className={`${styles.authCard} w-full`}>
@@ -38,11 +38,11 @@ export function AuthCard() {
       <div className="relative overflow-hidden min-h-[400px]">
         {activeTab === 'login' ? (
           <div className="animate-in fade-in slide-in-from-left-4 duration-300">
-            <LoginForm />
+            <LoginForm key={lang} />
           </div>
         ) : (
           <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-            <RegisterForm />
+            <RegisterForm key={lang} />
           </div>
         )}
       </div>
