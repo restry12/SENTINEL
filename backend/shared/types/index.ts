@@ -108,6 +108,7 @@ export interface ExpansionData {
   expansion_12h: ExpansionPolygon
   velocidad_propagacion_kmh: number
   direccion_principal: string
+  direccion_principal_deg?: number   // propagation direction in degrees (0-360°)
 }
 
 export interface PerFireExpansion {
@@ -175,6 +176,7 @@ export interface NaturalRoute {
   instrucciones: string
   estado: 'LIBRE' | 'CONGESTIONADA' | 'BLOQUEADA'
   prioridad: 1 | 2 | 3
+  bearing_deg?: number   // initial compass bearing (0-360°) from route origin to destination
 }
 
 export interface NaturalRoutes {
