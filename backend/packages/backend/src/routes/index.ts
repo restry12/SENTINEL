@@ -193,8 +193,8 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   })
 
   // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
-  // Receives { fires, socketId, lat, lon, weather, pm25 }
-  // weather and pm25 are at the citizen's location (not per-fire)
+  // Receives { runId, socketId, lat, lon, weather, pm25 }
+  // runId references fires cached by /api/fires/filter; weather and pm25 at citizen's location
   app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
     if (isLocked()) {
       res.status(202).json({ ok: false, accepted: false, error: 'Analysis in progress — try again shortly' })
@@ -202,6 +202,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
 
     const body = req.body as {
+      runId?: unknown
       fires?: unknown
       socketId?: unknown
       lat?: unknown
@@ -216,13 +217,18 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       return
     }
 
-    const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
+    const runId = typeof body.runId === 'string' ? body.runId : undefined
+    const cachedFires = runId ? (getRun(runId) ?? []) : []
+    const rawFires = cachedFires.length > 0
+      ? cachedFires
+      : Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
+
     const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
     const pm25 = typeof body.pm25 === 'number' ? body.pm25 : undefined
     const weather = body.weather ?? undefined
 
-    const enriched = mapRawFiresToFireData(rawFires)
+    const enriched = mapRawFiresToFireData(rawFires as Record<string, unknown>[])
 
     res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
 
