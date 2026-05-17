@@ -7,6 +7,28 @@ import { useFireSelection, type FireIntensity } from '@/contexts/fire-selection-
 import { degToCompass } from '@/lib/utils'
 import { useGeolocation } from '@/hooks/use-geolocation'
 
+function directionToDeg(dir: string): number | null {
+  const map: Record<string, number> = {
+    N: 0, NORTE: 0,
+    NNE: 22.5,
+    NE: 45, NORESTE: 45,
+    ENE: 67.5,
+    E: 90, ESTE: 90,
+    ESE: 112.5,
+    SE: 135, SURESTE: 135,
+    SSE: 157.5,
+    S: 180, SUR: 180,
+    SSO: 202.5, SSW: 202.5,
+    SO: 225, SUROESTE: 225, SW: 225,
+    OSO: 247.5, WSW: 247.5,
+    O: 270, OESTE: 270, W: 270,
+    ONO: 292.5, WNW: 292.5,
+    NO: 315, NOROESTE: 315, NW: 315,
+    NNO: 337.5, NNW: 337.5,
+  }
+  return map[dir.toUpperCase().trim()] ?? null
+}
+
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
   "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
