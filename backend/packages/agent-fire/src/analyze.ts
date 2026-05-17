@@ -1,12 +1,12 @@
 import type { FireData, WeatherData, FireAnalysis, RiskAssessment, ExpansionData, GeoJSONFeature, PerFireExpansion } from '@sentinel/types'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
-function degreesToCardinal(deg: number): string {
+export function degreesToCardinal(deg: number): string {
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
   return dirs[Math.round(deg / 45) % 8]
 }
 
-function centroid(fires: FireData[]): { lat: number; lon: number } {
+export function centroid(fires: { lat: number; lon: number }[]): { lat: number; lon: number } {
   const lat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
   const lon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
   return { lat: parseFloat(lat.toFixed(4)), lon: parseFloat(lon.toFixed(4)) }
