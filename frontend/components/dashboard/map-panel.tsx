@@ -23,6 +23,7 @@ export function MapPanel() {
 
   const criticalFires = fires.filter(f => f.frp > 35).sort((a, b) => b.frp - a.frp)
   const [critIdx, setCritIdx] = useState(0)
+  const [showHeatmap, setShowHeatmap] = useState(false)
   useEffect(() => {
     if (criticalFires.length < 2) return
     const t = setInterval(() => setCritIdx(i => (i + 1) % criticalFires.length), 2500)
@@ -57,7 +58,11 @@ export function MapPanel() {
 
         <div className="hidden xl:flex items-center gap-6">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 min-w-[140px]">
+            <div
+              className={`flex items-center gap-2 min-w-[140px] cursor-pointer select-none rounded px-1.5 py-0.5 transition-all duration-200 ${showHeatmap ? 'bg-red/10 ring-1 ring-red/40' : 'hover:bg-white/5'}`}
+              onClick={() => setShowHeatmap(h => !h)}
+              title={showHeatmap ? "Ocultar heatmap de predicción" : "Mostrar heatmap de predicción A6"}
+            >
               <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_6px_var(--red)] animate-pulse shrink-0" />
               {activeCrit ? (
                 <span className="text-[9.5px] font-bold tracking-[0.1em] text-red uppercase tabular-nums transition-all duration-500">
@@ -91,7 +96,7 @@ export function MapPanel() {
         </div>
 
         {/* Base Layer: Mapbox */}
-        <MapboxPanel />
+        <MapboxPanel showHeatmap={showHeatmap} />
 
         {/* HUD: Grid & Corners */}
         <div className="absolute inset-0 pointer-events-none z-10">

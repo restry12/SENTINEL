@@ -170,7 +170,7 @@ function buildPopupHTML(d: PopupData, active: ExpansionKey | null): string {
 
 interface MarkerEntry { marker: mapboxgl.Marker; popup: mapboxgl.Popup; data: PopupData }
 
-export function MapboxPanel() {
+export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<MarkerEntry[]>([])
@@ -448,6 +448,67 @@ export function MapboxPanel() {
     if (map.isStyleLoaded()) drawExpansion()
     else map.once('style.load', drawExpansion)
   }, [selectedFire, activeExpansion, sentinelUpdate])
+
+  // A6 prediction heatmap — toggled by clicking Critical Fire legend
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const SRC = 'prediction-heatmap'
+    const FILL = 'prediction-heatmap-fill'
+    const LINE = 'prediction-heatmap-line'
+
+    const cleanup = () => {
+      if (map.getLayer(LINE)) map.removeLayer(LINE)
+      if (map.getLayer(FILL)) map.removeLayer(FILL)
+      if (map.getSource(SRC)) map.removeSource(SRC)
+    }
+
+    const draw = () => {
+      cleanup()
+      if (!showHeatmap) return
+      const grid = sentinelUpdate?.prediction?.grid ?? []
+      if (grid.length === 0) return
+
+      const D = 0.25
+      const features = grid.map(c => ({
+        type: 'Feature' as const,
+        properties: { risk: c.risk_score },
+        geometry: {
+          type: 'Polygon' as const,
+          coordinates: [[
+            [c.lon,     c.lat    ],
+            [c.lon + D, c.lat    ],
+            [c.lon + D, c.lat + D],
+            [c.lon,     c.lat + D],
+            [c.lon,     c.lat    ],
+          ]],
+        },
+      }))
+
+      map.addSource(SRC, { type: 'geojson', data: { type: 'FeatureCollection', features } as any })
+      map.addLayer({
+        id: FILL, type: 'fill', source: SRC,
+        paint: {
+          'fill-color': [
+            'step', ['get', 'risk'],
+            '#22c55e',   // green  risk ≤ 0.35
+            0.35, '#eab308',  // yellow
+            0.5,  '#f97316',  // orange
+            0.75, '#ef4444',  // red
+          ],
+          'fill-opacity': 0.35,
+        },
+      })
+      map.addLayer({
+        id: LINE, type: 'line', source: SRC,
+        paint: { 'line-color': 'rgba(255,255,255,0.05)', 'line-width': 0.5 },
+      })
+    }
+
+    if (map.isStyleLoaded()) draw()
+    else map.once('style.load', draw)
+  }, [showHeatmap, sentinelUpdate?.prediction])
 
   return (
     <div className="absolute inset-0 w-full h-full">
