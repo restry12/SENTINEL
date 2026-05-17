@@ -164,3 +164,9 @@ Root Directory = `frontend/`, Production Branch = `main`, Install `npm install`
 `NEXT_PUBLIC_SOCKET_URL` y `BACKEND_URL` = `https://sentinel-0zkq.onrender.com`.
 Importante: setear `ALLOWED_ORIGIN` en Render = la URL pública de Vercel, si no
 el socket rechaza la conexión.
+
+### Archivos ignorados localmente
+
+`frontend/next-env.d.ts` es autogenerado por Next.js y aparece siempre como
+modificado. Está marcado con `git update-index --assume-unchanged` — no commitear.
+Si vuelve a aparecer: `git update-index --assume-unchanged frontend/next-env.d.ts`.
