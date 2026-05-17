@@ -200,7 +200,7 @@ export function ChatPage() {
                     )}
                   >
                     <Icon className="w-3 h-3" />
-                    {label}
+                    <span className="hidden sm:inline">{label}</span>
                   </button>
                 )
               })}
