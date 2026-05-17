@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { Search } from 'lucide-react'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { useFireSelection } from '@/contexts/fire-selection-context'
@@ -20,13 +20,23 @@ export function HotspotSearch() {
 
   const fires = sentinelUpdate?.fires ?? []
 
-  const indexedFires = fires
-    .map((f, i) => ({ fire: f, index: i, id: `FIRE-${String(i + 1).padStart(3, '0')}` }))
-    .sort((a, b) => b.fire.frp - a.fire.frp)
+  const indexedFires = useMemo(
+    () =>
+      fires
+        .map((f, i) => ({ fire: f, index: i, id: `FIRE-${String(i + 1).padStart(3, '0')}` }))
+        .sort((a, b) => b.fire.frp - a.fire.frp),
+    [fires]
+  )
 
-  const displayFires = query.trim()
-    ? indexedFires.filter(f => f.id.includes(query.toUpperCase().trim()))
-    : indexedFires.slice(0, 10)
+  const trimmedQuery = query.trim().toUpperCase()
+
+  const displayFires = useMemo(
+    () =>
+      trimmedQuery
+        ? indexedFires.filter(f => f.id.includes(trimmedQuery))
+        : indexedFires.slice(0, 10),
+    [indexedFires, trimmedQuery]
+  )
 
   useEffect(() => {
     if (!open) return
@@ -82,7 +92,7 @@ export function HotspotSearch() {
             ) : (
               displayFires.map(({ fire, index, id }, rank) => {
                 const color = frpColor(fire.frp)
-                const isTop = rank === 0 && !query.trim()
+                const isTop = rank === 0 && !trimmedQuery
                 return (
                   <button
                     key={id}
@@ -115,9 +125,9 @@ export function HotspotSearch() {
             )}
           </div>
 
-          {!query.trim() && indexedFires.length > 10 && (
+          {!trimmedQuery && indexedFires.length > 10 && (
             <p className="text-[8px] text-text-muted text-center mt-2 pt-2 border-t border-border">
-              + {indexedFires.length - 10} focos más · click para volar al foco
+              + {indexedFires.length - 10} focos más · busca por ID para ver más
             </p>
           )}
         </div>
