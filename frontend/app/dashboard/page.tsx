@@ -39,7 +39,7 @@ function DashboardContent() {
   }, [refresh])
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden relative selection:bg-orange/30">
+    <div className="h-[calc(100dvh-4rem)] md:h-screen flex flex-col bg-background overflow-hidden relative selection:bg-orange/30">
       <TopBar />
 
       {/* Main Content Area - Full Screen Map HUD */}
