@@ -4,12 +4,35 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { TopBar } from '@/components/dashboard/top-bar'
 import { AuthGuard } from '@/components/auth-guard'
 import { useLang } from '@/contexts/language-context'
-import { 
-  ExternalLink, RefreshCw, Newspaper, AlertTriangle, 
+import { useSentinel } from '@/contexts/sentinel-context'
+import type { AuthorityReport } from '@/hooks/use-socket'
+import {
+  ExternalLink, RefreshCw, Newspaper, AlertTriangle,
   Search, TrendingUp, Shield, Globe, Clock, Filter,
-  Flame, Wind, Info, Building2, ChevronRight, Activity
+  Info, ChevronRight, Activity, FileText, AlertCircle,
+  Users, MapPin, Zap
 } from 'lucide-react'
 import type { NewsArticle, NewsResponse } from '@/app/api/news/types'
+
+// --- Report accumulation in localStorage ---
+
+const REPORTS_LS_KEY = 'sentinel_reports'
+
+function loadReports(): AuthorityReport[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(REPORTS_LS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveReport(report: AuthorityReport): AuthorityReport[] {
+  const existing = loadReports()
+  if (existing.some(r => r.reporte_id === report.reporte_id)) return existing
+  const updated = [report, ...existing]
+  try { window.localStorage.setItem(REPORTS_LS_KEY, JSON.stringify(updated)) } catch {}
+  return updated
+}
 
 // --- Visual Components ---
 
@@ -155,6 +178,33 @@ function NewsFilters({ activeFilter, setFilter, searchQuery, setSearch }: {
   )
 }
 
+function isFire(title: string) {
+  const t = title.toLowerCase()
+  return t.includes('incendio') || t.includes('fuego') || t.includes('quema')
+}
+
+function articleColor(title: string): string {
+  const t = title.toLowerCase()
+  if (t.includes('incendio') || t.includes('fuego') || t.includes('quema'))
+    return "linear-gradient(135deg, #7f1d1d 0%, #3f0a0a 100%)"
+  if (t.includes('contaminaci') || t.includes('calidad') || t.includes('aire') || t.includes('smog'))
+    return "linear-gradient(135deg, #14532d 0%, #052e10 100%)"
+  if (t.includes('lluvia') || t.includes('inundaci') || t.includes('agua'))
+    return "linear-gradient(135deg, #1e3a5f 0%, #0a1a30 100%)"
+  if (t.includes('sismo') || t.includes('terremoto'))
+    return "linear-gradient(135deg, #4a3000 0%, #1c1000 100%)"
+  return "linear-gradient(135deg, #1e293b 0%, #0a0f1a 100%)"
+}
+
+function ArticleImagePlaceholder({ title, className = "" }: { title: string; className?: string }) {
+  return (
+    <div
+      className={`w-full h-full ${className}`}
+      style={{ background: articleColor(title) }}
+    />
+  )
+}
+
 function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: boolean }) {
   if (loading) return <div className="w-full h-80 rounded-2xl border border-white/5 bg-surface/30 animate-pulse" />
   if (!article) return null
@@ -167,32 +217,23 @@ function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: bo
       
       <div className="flex flex-col lg:flex-row h-full">
         {/* Visual Side */}
-        <div className="w-full lg:w-2/5 h-64 lg:h-auto relative bg-surface/40 flex items-center justify-center overflow-hidden">
-           <div className="absolute inset-0 opacity-20 group-hover:scale-110 transition-transform duration-1000">
-              <div className="absolute inset-0 bg-gradient-to-br from-orange/20 to-blue/20 mix-blend-overlay" />
-              <div className="absolute inset-0 grid grid-cols-12 grid-rows-12 gap-1 p-4">
-                {Array.from({ length: 48 }).map((_, i) => (
-                  <div key={i} className="bg-white/5 border border-white/5 rounded-sm" />
-                ))}
-              </div>
-           </div>
-           <div className="relative z-10 flex flex-col items-center gap-4">
-              <div className={`p-5 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl ${variant === 'orange' ? 'text-orange animate-pulse' : 'text-blue'}`}>
-                 {variant === 'orange' ? <Flame className="w-12 h-12" /> : <Wind className="w-12 h-12" />}
-              </div>
-              <div className="flex flex-col items-center">
-                 <span className="text-[10px] font-black tracking-[0.4em] text-white/40 uppercase">Breaking</span>
-                 <span className="text-[11px] font-mono text-white/20 italic">Intelligence Stream</span>
-              </div>
-           </div>
-           <div className="absolute top-4 left-4 flex gap-1">
-             <div className="w-1 h-1 rounded-full bg-orange" />
-             <div className="w-1 h-1 rounded-full bg-orange/40" />
-             <div className="w-1 h-1 rounded-full bg-orange/20" />
-           </div>
-           <div className="absolute bottom-4 right-4">
-              <span className="text-[8px] font-mono text-white/30 tracking-widest uppercase">Sentinel-V3.8 // A4-Report</span>
-           </div>
+        <div className="w-full lg:w-2/5 h-64 lg:h-auto relative bg-surface/40 overflow-hidden">
+          {article.imageUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={article.imageUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-80 group-hover:opacity-100"
+            />
+          ) : (
+            <ArticleImagePlaceholder title={article.title} className="absolute inset-0" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#04050a]/60" />
+          <div className="absolute top-4 left-4 flex gap-1">
+            <div className="w-1 h-1 rounded-full bg-orange" />
+            <div className="w-1 h-1 rounded-full bg-orange/40" />
+            <div className="w-1 h-1 rounded-full bg-orange/20" />
+          </div>
         </div>
 
         {/* Content Side */}
@@ -229,19 +270,33 @@ function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: bo
 }
 
 function ArticleCard({ article }: { article: NewsArticle }) {
-  const isFire = article.title.toLowerCase().includes('incendio') || article.title.toLowerCase().includes('fuego')
-  
   return (
     <a
       href={article.url || '#'}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex flex-col p-6 rounded-xl border border-white/5 bg-surface/30 hover:border-white/15 hover:bg-surface/50 transition-all duration-300 backdrop-blur-md relative"
+      className="group flex flex-col rounded-xl border border-white/5 bg-surface/30 hover:border-white/15 hover:bg-surface/50 transition-all duration-300 backdrop-blur-md relative overflow-hidden"
     >
-      <div className="absolute top-0 left-0 w-8 h-[1px] bg-white/20 group-hover:bg-orange transition-colors" />
-      
+      <div className="absolute top-0 left-0 w-8 h-[1px] bg-white/20 group-hover:bg-orange transition-colors z-10" />
+
+      {/* Article image */}
+      <div className="w-full h-36 relative overflow-hidden shrink-0">
+        {article.imageUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={article.imageUrl}
+            alt=""
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
+          />
+        ) : (
+          <ArticleImagePlaceholder title={article.title} />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#04050a]/80 to-transparent" />
+      </div>
+
+      <div className="flex flex-col p-6 flex-1">
       <div className="flex items-start justify-between gap-4 mb-5">
-        <Badge variant={isFire ? 'orange' : 'default'}>{article.source}</Badge>
+        <Badge variant={isFire(article.title) ? 'orange' : 'default'}>{article.source}</Badge>
         <div className="flex items-center gap-1.5 text-[9px] font-bold text-text-dim uppercase tracking-wider">
           <Clock className="w-3 h-3" />
           {formatRelativeTime(article.publishedAt)}
@@ -262,7 +317,105 @@ function ArticleCard({ article }: { article: NewsArticle }) {
         </span>
         <ExternalLink className="w-3.5 h-3.5 text-text-muted group-hover:text-orange transition-all duration-300" />
       </div>
+      </div>
     </a>
+  )
+}
+
+const NIVEL_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  'NIVEL 1': { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-400' },
+  'NIVEL 2': { bg: 'bg-orange/10', border: 'border-orange/30', text: 'text-orange-soft' },
+  'NIVEL 3': { bg: 'bg-red/10', border: 'border-red/30', text: 'text-red-soft' },
+}
+
+function ReportCard({ report }: { report: AuthorityReport }) {
+  const colors = NIVEL_COLORS[report.nivel_emergencia] ?? NIVEL_COLORS['NIVEL 1']
+
+  return (
+    <div className="group flex flex-col rounded-xl border border-white/5 bg-surface/30 hover:border-white/15 hover:bg-surface/50 transition-all duration-300 backdrop-blur-md relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-8 h-[1px] bg-white/20 group-hover:bg-orange transition-colors z-10" />
+
+      {/* Header */}
+      <div className="p-6 pb-4 border-b border-white/5">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <Badge variant="red">{report.nivel_emergencia}</Badge>
+          <div className="flex items-center gap-1.5 text-[9px] font-bold text-text-dim uppercase tracking-wider">
+            <Clock className="w-3 h-3" />
+            {formatRelativeTime(report.timestamp)}
+          </div>
+        </div>
+        <div className="text-[10px] font-mono text-text-muted mb-2">{report.reporte_id}</div>
+        <div className="flex items-center gap-2 text-[12px] text-white font-bold">
+          <MapPin className="w-3.5 h-3.5 text-orange/60 shrink-0" />
+          {report.zona_impacto}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-6 space-y-4 flex-1">
+        <p className="text-[12px] text-text-muted leading-relaxed font-medium line-clamp-4">
+          {report.resumen_ejecutivo}
+        </p>
+
+        <div className="flex items-center gap-2">
+          <Users className="w-3.5 h-3.5 text-orange/60" />
+          <span className="text-[11px] text-text-muted font-medium">Población en riesgo:</span>
+          <span className="text-[12px] text-white font-black">{report.poblacion_en_riesgo_estimada.toLocaleString('es-CL')}</span>
+        </div>
+
+        {report.acciones_inmediatas.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-orange-soft uppercase tracking-wider">
+              <Zap className="w-3 h-3" />
+              Acciones Inmediatas
+            </div>
+            <ul className="space-y-1">
+              {report.acciones_inmediatas.slice(0, 3).map((a, i) => (
+                <li key={i} className="flex items-start gap-2 text-[11px] text-text-muted leading-snug">
+                  <span className="text-orange mt-0.5 shrink-0">&#8250;</span>
+                  {a}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {report.zonas_evacuacion_prioritaria.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-red-soft uppercase tracking-wider">
+              <AlertCircle className="w-3 h-3" />
+              Zonas de Evacuación
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {report.zonas_evacuacion_prioritaria.map((z, i) => (
+                <span key={i} className="px-2 py-0.5 rounded border border-red/20 bg-red/5 text-[9px] font-bold text-red-soft uppercase">
+                  {z}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-6 py-3 border-t border-white/5 flex items-center justify-between">
+        <div className="flex flex-wrap gap-1.5">
+          {report.recursos_recomendados.slice(0, 2).map((r, i) => (
+            <span key={i} className="px-2 py-0.5 rounded border border-white/10 bg-white/5 text-[9px] font-bold text-text-dim uppercase">
+              {r}
+            </span>
+          ))}
+          {report.recursos_recomendados.length > 2 && (
+            <span className="px-2 py-0.5 text-[9px] font-bold text-text-dim">
+              +{report.recursos_recomendados.length - 2}
+            </span>
+          )}
+        </div>
+        <span className={`px-2 py-0.5 rounded text-[9px] font-black tracking-widest uppercase border ${colors.bg} ${colors.border} ${colors.text}`}>
+          {report.nivel_emergencia}
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -279,16 +432,27 @@ function SidebarModule({ title, icon: Icon, children }: { title: string, icon?: 
 
 function NewsContent() {
   const { tx } = useLang()
+  const { sentinelUpdate } = useSentinel()
   const [data, setData] = useState<NewsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [filter, setFilter] = useState('Todo')
   const [search, setSearch] = useState('')
   const [mounted, setMounted] = useState(false)
+  const [viewMode, setViewMode] = useState<'news' | 'reports'>('news')
+  const [reports, setReports] = useState<AuthorityReport[]>([])
 
   useEffect(() => {
     setMounted(true)
+    setReports(loadReports())
   }, [])
+
+  // Accumulate new reports as they arrive from the socket
+  useEffect(() => {
+    if (!sentinelUpdate?.report) return
+    const updated = saveReport(sentinelUpdate.report)
+    setReports(updated)
+  }, [sentinelUpdate?.report])
 
   const fetchNews = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -322,6 +486,11 @@ function NewsContent() {
     })
   }, [data, filter, search])
 
+  const sortedReports = useMemo(() =>
+    [...reports].sort((a, b) => a.reporte_id.localeCompare(b.reporte_id)),
+    [reports]
+  )
+
   const featuredArticle = filteredArticles[0]
   const otherArticles = filteredArticles.slice(1)
   const cachedAtTime = (mounted && data?.cachedAt) ? new Date(data.cachedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : null
@@ -337,12 +506,45 @@ function NewsContent() {
           isRefreshing={refreshing}
         />
 
-        <NewsFilters 
-          activeFilter={filter} 
-          setFilter={setFilter} 
-          searchQuery={search} 
-          setSearch={setSearch} 
+        {/* View mode toggle */}
+        <div className="flex items-center gap-2 pt-6">
+          <button
+            onClick={() => setViewMode('news')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all duration-300 border ${
+              viewMode === 'news'
+                ? 'bg-orange/15 border-orange/40 text-orange-soft shadow-[0_0_15px_rgba(255,126,21,0.1)]'
+                : 'bg-white/5 border-white/10 text-text-muted hover:border-white/20 hover:text-text-2'
+            }`}
+          >
+            <Newspaper className="w-3.5 h-3.5" />
+            Noticias
+          </button>
+          <button
+            onClick={() => setViewMode('reports')}
+            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all duration-300 border ${
+              viewMode === 'reports'
+                ? 'bg-orange/15 border-orange/40 text-orange-soft shadow-[0_0_15px_rgba(255,126,21,0.1)]'
+                : 'bg-white/5 border-white/10 text-text-muted hover:border-white/20 hover:text-text-2'
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Reportes Automatizados
+            {sortedReports.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-orange/20 text-orange text-[9px] font-black leading-none">
+                {sortedReports.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {viewMode === 'news' && (
+        <NewsFilters
+          activeFilter={filter}
+          setFilter={setFilter}
+          searchQuery={search}
+          setSearch={setSearch}
         />
+        )}
 
         {data?.error && (
           <div className="flex items-center gap-3 p-4 mb-8 rounded-xl border border-red/20 bg-red/5 text-red-soft text-[12px] font-bold">
@@ -353,32 +555,53 @@ function NewsContent() {
 
         <div className="flex flex-col xl:flex-row gap-10">
           <div className="flex-1 space-y-10">
-            <section>
-               <SectionLabel icon={TrendingUp}>Información Destacada</SectionLabel>
-               <FeaturedCard article={featuredArticle} loading={loading} />
-            </section>
+            {viewMode === 'news' ? (
+              <>
+                <section>
+                   <SectionLabel icon={TrendingUp}>Información Destacada</SectionLabel>
+                   <FeaturedCard article={featuredArticle} loading={loading} />
+                </section>
 
-            <section className="space-y-6">
-               <SectionLabel icon={Activity}>Feed de Inteligencia Global</SectionLabel>
-               {loading ? (
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   {Array.from({ length: 4 }).map((_, i) => (
-                     <div key={i} className="h-48 rounded-xl border border-white/5 bg-surface/30 animate-pulse" />
-                   ))}
-                 </div>
-               ) : otherArticles.length > 0 ? (
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   {otherArticles.map((article, i) => (
-                     <ArticleCard key={i} article={article} />
-                   ))}
-                 </div>
-               ) : (
-                 <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-dashed border-white/10 bg-white/2">
-                   <Shield className="w-12 h-12 text-text-muted mb-4 opacity-20" />
-                   <p className="text-text-muted font-bold text-[14px] uppercase tracking-widest italic">Sin registros adicionales bajo este criterio</p>
-                 </div>
-               )}
-            </section>
+                <section className="space-y-6">
+                   <SectionLabel icon={Activity}>Feed de Inteligencia Global</SectionLabel>
+                   {loading ? (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       {Array.from({ length: 4 }).map((_, i) => (
+                         <div key={i} className="h-48 rounded-xl border border-white/5 bg-surface/30 animate-pulse" />
+                       ))}
+                     </div>
+                   ) : otherArticles.length > 0 ? (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       {otherArticles.map((article, i) => (
+                         <ArticleCard key={i} article={article} />
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-dashed border-white/10 bg-white/2">
+                       <Shield className="w-12 h-12 text-text-muted mb-4 opacity-20" />
+                       <p className="text-text-muted font-bold text-[14px] uppercase tracking-widest italic">Sin registros adicionales bajo este criterio</p>
+                     </div>
+                   )}
+                </section>
+              </>
+            ) : (
+              <section className="space-y-6">
+                <SectionLabel icon={FileText}>Reportes Automatizados</SectionLabel>
+                {sortedReports.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {sortedReports.map((report) => (
+                      <ReportCard key={report.reporte_id} report={report} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-24 rounded-2xl border border-dashed border-white/10 bg-white/2">
+                    <FileText className="w-12 h-12 text-text-muted mb-4 opacity-20" />
+                    <p className="text-text-muted font-bold text-[14px] uppercase tracking-widest italic">Sin reportes disponibles</p>
+                    <p className="text-text-dim text-[11px] mt-2 font-medium">Los reportes se generan automáticamente con cada ciclo de análisis</p>
+                  </div>
+                )}
+              </section>
+            )}
           </div>
 
           <aside className="w-full xl:w-80 space-y-6 shrink-0">

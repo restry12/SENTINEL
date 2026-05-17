@@ -118,6 +118,18 @@ export interface PerFireExpansion {
   expansion_12h_km2: number
   velocidad_kmh: number
   direccion: string
+  regional_context: RegionalContext
+}
+
+export interface RegionalContext {
+  region_name: string
+  country: string
+  vegetation_type: string
+  terrain_type: string
+  spread_multiplier: number   // 0.5–2.0 relative to base rate
+  max_ros_kmh: number         // absolute ceiling for rate of spread in this region
+  reference_fires: string[]   // real historical fires used as calibration anchors
+  context_summary: string     // brief narrative fed to A2
 }
 
 // Combined output of agent-fire (A1 + A2)

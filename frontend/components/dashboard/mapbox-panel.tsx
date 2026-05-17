@@ -37,24 +37,31 @@ const TOKEN =
 
 type ExpansionKey = '2h' | '6h' | '12h'
 
-// Elliptical fire spread model (simplified Rothermel).
+// Elliptical fire spread model — shape from wind, size from LLM area (km²).
 function makeFireSpreadPolygon(
   lat: number, lon: number,
   windDegFrom: number, windSpeedMs: number,
-  hours: number
+  expansionKm2: number
 ) {
   const windKmh = windSpeedMs * 3.6
   const spreadRad = ((windDegFrom + 180) % 360) * (Math.PI / 180)
   const sinS = Math.sin(spreadRad)
   const cosS = Math.cos(spreadRad)
 
-  const ros_forward = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
+  // Shape ratios from wind (Rothermel simplified)
+  const ros_forward = Math.max(0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002, 0.5)
   const ros_backing = 0.3
   const ros_flank = Math.sqrt(ros_forward * ros_backing)
 
-  const d_forward = ros_forward * hours
-  const d_backing = ros_backing * hours
-  const d_flank = Math.max(ros_flank * hours, 0.3)
+  // Scale the ellipse so its area matches expansionKm2: area = π * a * b
+  // a = k*(ros_forward+ros_backing)/2, b = k*ros_flank
+  // → k = sqrt(expansionKm2 / (π * (ros_forward+ros_backing)/2 * ros_flank))
+  const shapeArea = Math.PI * ((ros_forward + ros_backing) / 2) * ros_flank
+  const k = Math.sqrt(Math.max(expansionKm2, 0.01) / shapeArea)
+
+  const d_forward = k * ros_forward
+  const d_backing = k * ros_backing
+  const d_flank = Math.max(k * ros_flank, 0.05)
 
   const a = (d_forward + d_backing) / 2
   const b = d_flank
@@ -84,16 +91,6 @@ function makeFireSpreadPolygon(
   }
 }
 
-function computeFireSpreadArea(windSpeedMs: number, hours: number) {
-  const windKmh = windSpeedMs * 3.6
-  const ros_f = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
-  const ros_b = 0.3
-  const ros_l = Math.sqrt(ros_f * ros_b)
-  const a = (ros_f * hours + ros_b * hours) / 2
-  const b = Math.max(ros_l * hours, 0.3)
-  const km2 = Math.PI * a * b
-  return { km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) }
-}
 
 const EXP_CONFIG: Record<ExpansionKey, {
   hours: number
@@ -137,8 +134,8 @@ export function MapboxPanel({
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: [-71.90, -38.28],
-      zoom: 9,
+      center: [-80, -5],
+      zoom: 2.5,
       projection: 'globe' as any,
     })
     
@@ -224,15 +221,6 @@ export function MapboxPanel({
       if (selectFireRef) selectFireRef.current = null
     }
 
-    const wDeg   = sentinelUpdate?.weather?.deg   ?? 315
-    const wSpeed = sentinelUpdate?.weather?.speed ?? 6.7
-    const sDeg   = (wDeg + 180) % 360
-    const sDirLabel = degToCompass(sDeg)
-    const wKmh  = Math.round(wSpeed * 3.6)
-    const a2  = computeFireSpreadArea(wSpeed, 2)
-    const a6  = computeFireSpreadArea(wSpeed, 6)
-    const a12 = computeFireSpreadArea(wSpeed, 12)
-
     const apply = () => {
       cleanup()
       const fires = sentinelUpdate?.fires ?? []
@@ -247,14 +235,19 @@ export function MapboxPanel({
         const weather = weatherJson ? JSON.parse(weatherJson) : undefined
         const intensity: FireIntensity = frp >= 300 ? 'critical' : frp >= 100 ? 'high' : 'moderate'
 
-        const fireWDeg   = weather?.deg   ?? wDeg
-        const fireWSpeed = weather?.speed ?? wSpeed
+        const fireWDeg   = weather?.deg   ?? 0
+        const fireWSpeed = weather?.speed ?? 0
         const fireSDeg   = (fireWDeg + 180) % 360
         const fireSDirLabel = degToCompass(fireSDeg)
         const fireWKmh   = Math.round(fireWSpeed * 3.6)
-        const fireA2  = computeFireSpreadArea(fireWSpeed, 2)
-        const fireA6  = computeFireSpreadArea(fireWSpeed, 6)
-        const fireA12 = computeFireSpreadArea(fireWSpeed, 12)
+
+        const roundCoord = (v: number) => Math.round(v * 10000) / 10000
+        const perFire = sentinelUpdate?.perFireExpansions
+          ?.find(e => roundCoord(e.lat) === roundCoord(lat) && roundCoord(e.lon) === roundCoord(lon))
+        const toArea = (km2: number) => ({ km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) })
+        const fireA2  = perFire ? toArea(perFire.expansion_2h_km2)  : undefined
+        const fireA6  = perFire ? toArea(perFire.expansion_6h_km2)  : undefined
+        const fireA12 = perFire ? toArea(perFire.expansion_12h_km2) : undefined
 
         const m = mapRef.current
         if (!m) return
@@ -265,7 +258,7 @@ export function MapboxPanel({
           expansion2h: fireA2, expansion6h: fireA6, expansion12h: fireA12,
           weather,
         })
-        setActiveExpansion('2h')
+        setActiveExpansion(perFire ? '2h' : null)
 
         const sel = m.getSource('fires-selected-src') as mapboxgl.GeoJSONSource
         sel?.setData({
@@ -563,14 +556,19 @@ export function MapboxPanel({
       if (map.getLayer(expLineId)) map.removeLayer(expLineId)
       if (map.getSource(expId)) map.removeSource(expId)
 
-      if (!selectedFire || !activeExpansion) return
+      if (!selectedFire || !activeExpansion || !selectedFire.weather) return
 
       const config = EXP_CONFIG[activeExpansion]
+      const expansionKm2 =
+        activeExpansion === '2h'  ? selectedFire.expansion2h?.km2 :
+        activeExpansion === '6h'  ? selectedFire.expansion6h?.km2 :
+                                    selectedFire.expansion12h?.km2
+      if (expansionKm2 == null) return
       const poly = makeFireSpreadPolygon(
         selectedFire.lat, selectedFire.lon,
-        selectedFire.weather?.deg ?? 315,
-        selectedFire.weather?.speed ?? 6.7,
-        config.hours
+        selectedFire.weather?.deg ?? 0,
+        selectedFire.weather?.speed ?? 0,
+        expansionKm2
       )
 
       map.addSource(expId, { type: 'geojson', data: poly as any })

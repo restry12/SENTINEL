@@ -157,12 +157,10 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     const firms = mergeEnriched(full, enriched)
 
     const first = rawFires[0]
-    const weather = first
-      ? { speed: first.speed as number, deg: first.deg as number, humidity: first.humidity as number, temp: first.temp as number | undefined }
-      : undefined
-
     const lat = typeof first?.lat === 'number' ? first.lat : undefined
     const lon = typeof first?.lon === 'number' ? first.lon : undefined
+    // Sin weather global: cada foco trae sus propios datos de clima por lat/lon.
+    // El orchestrator usará EMPTY_WEATHER como fallback (speed:0, deg:0, humidity:0).
 
     // pm25 más alto entre todos los focos — el peor aire es el más relevante para riesgo
     // Make.com manda null cuando OpenAQ no tiene estación cerca → el filtro lo descarta
@@ -176,7 +174,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     // not via this HTTP response, so Make.com only needs the ACK.
     res.status(202).json({ ok: true, accepted: true, fires: firms.length })
 
-    executeAndBroadcast(io, lat, lon, firms, weather, pm25).catch((err) => {
+    executeAndBroadcast(io, lat, lon, firms, undefined, pm25).catch((err) => {
       console.error('[trigger/full] background analysis error:', err instanceof Error ? err.message : err)
     })
   })

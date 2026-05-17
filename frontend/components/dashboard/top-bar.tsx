@@ -1,6 +1,6 @@
 "use client"
 
-import { Shield } from "lucide-react"
+import { Sparkles } from "lucide-react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -70,8 +70,8 @@ export function TopBar() {
         </div>
 
         {/* Tactical Status & Navigation */}
-        <div className="flex-1 flex items-center justify-center gap-6">
-          <div className={`flex items-center gap-4 px-6 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl transition-all duration-500 ${
+        <div className="flex-1 flex items-center gap-6">
+          <div className={`mr-auto flex items-center gap-4 px-6 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl transition-all duration-500 ${
             riskLevel === 'critical' ? 'border-red/30 bg-red/5' : ''
           }`}>
             <div className="flex items-center gap-3 pr-4 border-r border-white/10">
@@ -81,10 +81,9 @@ export function TopBar() {
             
             <nav className="flex items-center gap-1">
               {([
-                { href: '/dashboard',         label: tx.navDashboard },
-                { href: '/air',               label: tx.navAir },
-                { href: '/news',              label: tx.navNews ?? 'Noticias' },
-                { href: '/dashboard/citizen', label: 'Ciudadano' },
+                { href: '/dashboard', label: tx.navDashboard },
+                { href: '/air',       label: tx.navAir },
+                { href: '/news',      label: tx.navNews ?? 'Noticias' },
               ] as const).map(({ href, label }) => (
                 <Link
                   key={href}
@@ -101,8 +100,31 @@ export function TopBar() {
             </nav>
           </div>
 
-          {/* New Search Component from Main */}
-          <HotspotSearch />
+          {/* Right-aligned utility group */}
+          <div className="flex items-center gap-3">
+            <HotspotSearch />
+
+            {/* SENTINEL AI — attention-grabbing CTA */}
+            <Link
+              href="/chat"
+              className="group relative inline-flex items-center"
+            >
+              {/* Soft contained glow */}
+              <span
+                aria-hidden
+                className={`pointer-events-none absolute inset-0 rounded-full blur-[6px] transition-opacity duration-500 bg-gradient-to-r from-blue/60 via-fuchsia-500/50 to-orange/60 ${
+                  pathname === '/chat' ? 'opacity-70' : 'opacity-40 group-hover:opacity-70'
+                }`}
+              />
+              {/* Gradient ring via padding */}
+              <span className="relative rounded-full p-[1.5px] bg-gradient-to-r from-blue via-fuchsia-400 to-orange">
+                <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#0b1220] text-[11px] font-black tracking-[0.2em] uppercase text-white">
+                  <Sparkles className="w-3.5 h-3.5 text-blue drop-shadow-[0_0_4px_rgba(56,189,248,0.9)] animate-pulse" />
+                  <span>{tx.navChat ?? 'SENTINEL AI'}</span>
+                </span>
+              </span>
+            </Link>
+          </div>
 
         </div>
 
@@ -127,10 +149,6 @@ export function TopBar() {
           >
             {lang.toUpperCase()}
           </button>
-          
-          <div className="w-10 h-10 rounded-full border border-white/20 bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center text-white/50 hover:text-white transition-colors cursor-pointer">
-            <Shield className="w-5 h-5" />
-          </div>
         </div>
       </header>
     </div>
