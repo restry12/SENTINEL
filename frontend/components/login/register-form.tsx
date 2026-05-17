@@ -16,31 +16,33 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { useLang } from '@/lib/i18n/language-context'
 import styles from '@/app/login/login.module.css'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
-const registerSchema = z
-  .object({
-    name: z.string().min(2, { message: 'Nombre demasiado corto' }),
-    email: z.string().email({ message: 'Email inválido' }),
-    phone: z
-      .string()
-      .regex(/^\+?[1-9]\d{7,14}$/, { message: 'Número de teléfono inválido (ej: +56912345678)' }),
-    city: z.string().min(2, { message: 'Comuna/Ciudad requerida' }),
-    password: z.string().min(10, { message: 'La clave debe tener al menos 10 caracteres' }),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Las claves no coinciden',
-    path: ['confirmPassword'],
-  })
-
-type RegisterFormValues = z.infer<typeof registerSchema>
-
 export function RegisterForm() {
   const [isLoading, setIsLoading] = React.useState(false)
   const router = useRouter()
+  const { t } = useLang()
+
+  const registerSchema = z
+    .object({
+      name: z.string().min(2, { message: t('zodRegNameShort') }),
+      email: z.string().email({ message: t('zodRegEmail') }),
+      phone: z
+        .string()
+        .regex(/^\+?[1-9]\d{7,14}$/, { message: t('zodRegPhone') }),
+      city: z.string().min(2, { message: t('zodRegCity') }),
+      password: z.string().min(10, { message: t('zodRegPasswordMin') }),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: t('zodRegPasswordMatch'),
+      path: ['confirmPassword'],
+    })
+
+  type RegisterFormValues = z.infer<typeof registerSchema>
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -71,21 +73,15 @@ export function RegisterForm() {
       const result = await response.json()
 
       if (response.ok && result.ok) {
-        toast.success('Cuenta creada', {
-          description: 'Cuenta registrada. Inicie sesión para continuar.',
-        })
-        setTimeout(() => {
-          router.push('/login')
-        }, 1200)
+        toast.success(t('registerSuccessTitle'), { description: t('registerSuccessDesc') })
+        setTimeout(() => router.push('/login'), 1200)
       } else {
-        toast.error('Error de registro', {
-          description: result.error ?? 'No se pudo crear la cuenta.',
+        toast.error(t('registerErrorTitle'), {
+          description: result.error ?? t('registerErrorDesc'),
         })
       }
-    } catch (error) {
-      toast.error('Error de conexión', {
-        description: 'No se pudo contactar el servidor de autenticación.',
-      })
+    } catch {
+      toast.error(t('registerConnErrorTitle'), { description: t('registerConnErrorDesc') })
     } finally {
       setIsLoading(false)
     }
@@ -94,10 +90,8 @@ export function RegisterForm() {
   return (
     <div className="grid gap-6">
       <div className={styles.authHeader}>
-        <h1 className={styles.authTitle}>Registro de Operador</h1>
-        <p className={styles.authSub}>
-          Cree su cuenta para recibir alertas críticas y gestionar zonas de cobertura.
-        </p>
+        <h1 className={styles.authTitle}>{t('registerTitle')}</h1>
+        <p className={styles.authSub}>{t('registerSub')}</p>
       </div>
 
       <Form {...form}>
@@ -109,7 +103,7 @@ export function RegisterForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-mono tracking-[0.2em] text-sentinel-text-3 uppercase">
-                    Nombre Completo
+                    {t('registerNameLabel')}
                   </FormLabel>
                   <FormControl>
                     <Input
@@ -129,7 +123,7 @@ export function RegisterForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-mono tracking-[0.2em] text-sentinel-text-3 uppercase">
-                    Teléfono (Alertas)
+                    {t('registerPhoneLabel')}
                   </FormLabel>
                   <FormControl>
                     <Input
@@ -152,11 +146,11 @@ export function RegisterForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-[10px] font-mono tracking-[0.2em] text-sentinel-text-3 uppercase">
-                  Email Institucional
+                  {t('registerEmailLabel')}
                 </FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="operador@institucion.cl"
+                    placeholder={t('registerEmailPlaceholder')}
                     type="email"
                     autoCapitalize="none"
                     disabled={isLoading}
@@ -175,11 +169,11 @@ export function RegisterForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-[10px] font-mono tracking-[0.2em] text-sentinel-text-3 uppercase">
-                  Comuna / Ciudad
+                  {t('registerCityLabel')}
                 </FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Ej: Valparaíso"
+                    placeholder={t('registerCityPlaceholder')}
                     disabled={isLoading}
                     className="bg-sentinel-bg-1/50 border-sentinel-line-strong h-10"
                     {...field}
@@ -197,11 +191,11 @@ export function RegisterForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-mono tracking-[0.2em] text-sentinel-text-3 uppercase">
-                    Clave
+                    {t('registerPasswordLabel')}
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Min. 10 car."
+                      placeholder={t('registerPasswordPlaceholder')}
                       type="password"
                       disabled={isLoading}
                       className="bg-sentinel-bg-1/50 border-sentinel-line-strong h-10"
@@ -218,11 +212,11 @@ export function RegisterForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-mono tracking-[0.2em] text-sentinel-text-3 uppercase">
-                    Confirmar
+                    {t('registerConfirmLabel')}
                   </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Repetir clave"
+                      placeholder={t('registerConfirmPlaceholder')}
                       type="password"
                       disabled={isLoading}
                       className="bg-sentinel-bg-1/50 border-sentinel-line-strong h-10"
@@ -240,11 +234,7 @@ export function RegisterForm() {
             disabled={isLoading}
             className="w-full bg-sentinel-green hover:bg-sentinel-green-2 text-sentinel-bg-0 font-mono tracking-widest uppercase text-xs h-11 mt-4"
           >
-            {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              'Crear Cuenta Operativa'
-            )}
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : t('registerButton')}
           </Button>
         </form>
       </Form>
