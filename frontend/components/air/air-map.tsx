@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import type { Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl"
+import type { Map as MapboxMap, Marker as MapboxMarker, GeoJSONSource } from "mapbox-gl"
 import { drawFrame }         from "./smoke-engine"
 import type { WindData, FirePoint, InfrastructurePoint } from "./types"
+import { useGeolocation } from "@/hooks/use-geolocation"
 
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
@@ -23,6 +24,7 @@ export function AirMap({ wind, fires, infrastructure }: Props) {
   const windRef         = useRef<WindData>(wind)
   const firesRef        = useRef<FirePoint[]>(fires)
   const [mapReady, setMapReady] = useState(false)
+  const userCoords = useGeolocation()
 
   // Keep wind ref current so the RAF loop always uses latest wind
   useEffect(() => { windRef.current = wind }, [wind])
@@ -175,6 +177,35 @@ export function AirMap({ wind, fires, infrastructure }: Props) {
       infraMarkersRef.current = []
     }
   }, [infrastructure, mapReady])
+
+  // User GPS position marker
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !userCoords) return
+
+    const data = {
+      type: "Feature" as const,
+      properties: {},
+      geometry: { type: "Point" as const, coordinates: [userCoords.lon, userCoords.lat] },
+    }
+    const src = map.getSource("user-loc") as GeoJSONSource | undefined
+    if (src) {
+      src.setData(data)
+    } else {
+      map.addSource("user-loc", { type: "geojson", data })
+      map.addLayer({
+        id: "user-loc-halo", type: "circle", source: "user-loc",
+        paint: { "circle-radius": 20, "circle-color": "#3b82f6", "circle-opacity": 0.18, "circle-blur": 1 },
+      })
+      map.addLayer({
+        id: "user-loc-dot", type: "circle", source: "user-loc",
+        paint: {
+          "circle-radius": 7, "circle-color": "#3b82f6",
+          "circle-stroke-width": 2, "circle-stroke-color": "rgba(255,255,255,0.9)",
+        },
+      })
+    }
+  }, [userCoords, mapReady])
 
   const hospitals = infrastructure.filter(i => i.type === "hospital").length
   const schools   = infrastructure.filter(i => i.type === "school").length

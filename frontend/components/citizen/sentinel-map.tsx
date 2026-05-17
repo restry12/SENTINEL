@@ -1,210 +1,317 @@
 "use client"
 
-import React from 'react'
-import type { ScreenRisk } from '@/lib/citizen-mock-data'
+import { useEffect, useRef } from "react"
+import type { Map as MapboxMap, Marker as MapboxMarker } from "mapbox-gl"
+
+const TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
+  "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
+
+const COLORS = { user: "#3b82f6", fire: "#ef4444", safe: "#22c55e" } as const
 
 interface SentinelMapProps {
   size?: number
-  showPropagation?: boolean
-  showRoute?: boolean
-  riskLevel?: ScreenRisk
+  user: { lat: number; lon: number }
+  fires: { id: string; lat: number; lon: number; frp: number }[]
+  route: { bearing_deg: number; distancia_km: number; destino: string; label: string }
+  expansion: { direccion_principal_deg: number; velocidad_propagacion_kmh: number }
 }
 
-export function SentinelMap({
-  size = 360,
-  showPropagation = true,
-  showRoute = true,
-}: SentinelMapProps) {
-  const C = {
-    bg: '#0a0a0a',
-    gridMinor: 'rgba(232,230,224,0.04)',
-    gridMajor: 'rgba(232,230,224,0.08)',
-    contour: 'rgba(232,230,224,0.10)',
-    road: 'rgba(232,230,224,0.16)',
-    roadMajor: 'rgba(232,230,224,0.28)',
-    water: 'rgba(59,130,246,0.10)',
-    waterEdge: 'rgba(59,130,246,0.32)',
-    fire: '#ef4444',
-    safe: '#22c55e',
-    info: '#3b82f6',
-    fg: '#e8e6e0',
+// Destination-point formula — given start, bearing and distance, returns the
+// geographic point reached travelling along a great-circle path.
+function destinationPoint(
+  lat: number,
+  lon: number,
+  bearingDeg: number,
+  distanceKm: number,
+): { lat: number; lon: number } {
+  const R = 6371
+  const d = distanceKm / R
+  const theta = (bearingDeg * Math.PI) / 180
+  const phi1 = (lat * Math.PI) / 180
+  const lambda1 = (lon * Math.PI) / 180
+
+  const phi2 = Math.asin(
+    Math.sin(phi1) * Math.cos(d) + Math.cos(phi1) * Math.sin(d) * Math.cos(theta),
+  )
+  const lambda2 =
+    lambda1 +
+    Math.atan2(
+      Math.sin(theta) * Math.sin(d) * Math.cos(phi1),
+      Math.cos(d) - Math.sin(phi1) * Math.sin(phi2),
+    )
+
+  return { lat: (phi2 * 180) / Math.PI, lon: (lambda2 * 180) / Math.PI }
+}
+
+// Teardrop propagation ring — a closed polygon around the fire that reaches
+// fully downwind (along `dirDeg`) and tapers upwind. Conveys spread direction.
+function propagationRing(
+  origin: { lat: number; lon: number },
+  dirDeg: number,
+  reachKm: number,
+): [number, number][] {
+  const ring: [number, number][] = []
+  const N = 64
+  for (let i = 0; i <= N; i++) {
+    const bearing = (i / N) * 360
+    const align = (Math.cos(((bearing - dirDeg) * Math.PI) / 180) + 1) / 2
+    const radius = reachKm * (0.34 + 0.66 * align)
+    const p = destinationPoint(origin.lat, origin.lon, bearing, radius)
+    ring.push([p.lon, p.lat])
   }
+  return ring
+}
 
-  const U    = { x: 196, y: 250 }
-  const F1   = { x: 96,  y: 138 }
-  const F2   = { x: 52,  y: 78  }
-  const SAFE = { x: 296, y: 64  }
-
-  const route = [U, { x: 218, y: 220 }, { x: 244, y: 172 }, { x: 268, y: 120 }, SAFE]
-  const routePath = 'M ' + route.map(p => `${p.x} ${p.y}`).join(' L ')
-
-  const poly2h  = 'M 92,138 L 132,128 L 158,150 L 148,176 L 116,184 L 88,168 Z'
-  const poly6h  = 'M 70,118 L 138,98  L 198,130 L 220,168 L 174,206 L 128,212 L 80,196 L 56,166 Z'
-  const poly12h = 'M 40,82  L 130,52  L 232,84  L 286,130 L 264,200 L 200,238 L 132,244 L 70,222 L 30,170 L 24,118 Z'
-
-  const grid: React.ReactElement[] = []
-  for (let i = 0; i <= 360; i += 24) {
-    const major = i % 72 === 0
-    grid.push(<line key={'gx'+i} x1={i} y1={0} x2={i} y2={360} stroke={major ? C.gridMajor : C.gridMinor} strokeWidth={major ? 0.5 : 0.3} />)
-    grid.push(<line key={'gy'+i} x1={0} y1={i} x2={360} y2={i} stroke={major ? C.gridMajor : C.gridMinor} strokeWidth={major ? 0.5 : 0.3} />)
+// A GeoJSON Point source descriptor.
+function pointSource(lon: number, lat: number) {
+  return {
+    type: "geojson" as const,
+    data: {
+      type: "Feature" as const,
+      properties: {},
+      geometry: { type: "Point" as const, coordinates: [lon, lat] },
+    },
   }
+}
+
+// Small text-only label. Placed via a DOM marker with a pixel offset — text
+// does not need pixel-perfect anchoring, so a DOM marker is fine here.
+function makeLabelEl(text: string, color: string): HTMLDivElement {
+  const el = document.createElement("div")
+  el.textContent = text
+  Object.assign(el.style, {
+    fontFamily: "monospace",
+    fontSize: "8.5px",
+    fontWeight: "700",
+    letterSpacing: "0.08em",
+    color,
+    background: "rgba(10,10,10,0.7)",
+    padding: "1px 4px",
+    borderRadius: "3px",
+    pointerEvents: "none",
+    whiteSpace: "nowrap",
+  } as CSSStyleDeclaration)
+  return el
+}
+
+export function SentinelMap({ size = 360, user, fires, route, expansion }: SentinelMapProps) {
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<MapboxMap | null>(null)
+  const markersRef = useRef<MapboxMarker[]>([])
+  const pulseRafRef = useRef<number>(0)
+
+  useEffect(() => {
+    // Inject Mapbox CSS from CDN — bypasses any Turbopack resolution issues
+    if (!document.getElementById("mbgl-css")) {
+      const link = document.createElement("link")
+      link.id = "mbgl-css"
+      link.rel = "stylesheet"
+      link.href = "https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css"
+      document.head.appendChild(link)
+    }
+
+    const el = mapContainerRef.current
+    if (!el) return
+    if (mapRef.current) return
+
+    let cancelled = false
+
+    const dest = destinationPoint(
+      user.lat,
+      user.lon,
+      route.bearing_deg,
+      route.distancia_km,
+    )
+
+    import("mapbox-gl")
+      .then(({ default: mapboxgl }) => {
+        if (cancelled) return
+
+        mapboxgl.accessToken = TOKEN
+
+        const map = new mapboxgl.Map({
+          container: el,
+          style: "mapbox://styles/mapbox/satellite-streets-v12",
+          center: [user.lon, user.lat],
+          zoom: 15,
+          attributionControl: false,
+        })
+        mapRef.current = map
+
+        map.on("load", () => {
+          if (cancelled) return
+
+          // ── Fire propagation alert zones (+2H / +6H / +12H) ──────────────
+          // Teardrop shapes oriented along the real propagation bearing.
+          const fire0 = fires[0]
+          if (fire0) {
+            const dir = expansion.direccion_principal_deg
+            const zones = [
+              { id: "exp-12h", reach: 0.98, fill: "rgba(239,68,68,0.10)", line: "rgba(239,68,68,0.32)", label: "+12H" },
+              { id: "exp-6h",  reach: 0.62, fill: "rgba(239,68,68,0.17)", line: "rgba(239,68,68,0.50)", label: "+6H"  },
+              { id: "exp-2h",  reach: 0.32, fill: "rgba(239,68,68,0.32)", line: "#ef4444",              label: "+2H"  },
+            ]
+            zones.forEach((z) => {
+              const ring = propagationRing(fire0, dir, z.reach)
+              map.addSource(z.id, {
+                type: "geojson",
+                data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } },
+              })
+              map.addLayer({ id: `${z.id}-fill`, type: "fill", source: z.id, paint: { "fill-color": z.fill } })
+              map.addLayer({
+                id: `${z.id}-line`, type: "line", source: z.id,
+                paint: { "line-color": z.line, "line-width": 1, "line-dasharray": [2, 2] },
+              })
+              const tip = destinationPoint(fire0.lat, fire0.lon, dir, z.reach)
+              markersRef.current.push(
+                new mapboxgl.Marker({ element: makeLabelEl(z.label, "rgba(252,165,165,0.95)") })
+                  .setLngLat([tip.lon, tip.lat])
+                  .addTo(map),
+              )
+            })
+          }
+
+          // ── Escape route line: user → safe destination ───────────────────
+          map.addSource("escape-route", {
+            type: "geojson",
+            data: {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "LineString", coordinates: [[user.lon, user.lat], [dest.lon, dest.lat]] },
+            },
+          })
+          map.addLayer({
+            id: "escape-route-glow", type: "line", source: "escape-route",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": COLORS.safe, "line-width": 10, "line-opacity": 0.25, "line-blur": 4 },
+          })
+          map.addLayer({
+            id: "escape-route-line", type: "line", source: "escape-route",
+            layout: { "line-cap": "round", "line-join": "round" },
+            paint: { "line-color": COLORS.safe, "line-width": 3 },
+          })
+
+          // ── Points as GL circle layers ───────────────────────────────────
+          // Rendered by the same WebGL pipeline as the route line, so they
+          // align pixel-perfectly with it (no DOM-marker anchor drift).
+
+          // Fire foci — glow + pulsing ring + core
+          fires.forEach((f, i) => {
+            map.addSource(`fire-${i}`, pointSource(f.lon, f.lat))
+            map.addLayer({
+              id: `fire-${i}-glow`, type: "circle", source: `fire-${i}`,
+              paint: { "circle-radius": 22, "circle-color": COLORS.fire, "circle-opacity": 0.22, "circle-blur": 1 },
+            })
+            map.addLayer({
+              id: `fire-${i}-pulse`, type: "circle", source: `fire-${i}`,
+              paint: {
+                "circle-radius": 9, "circle-color": COLORS.fire, "circle-opacity": 0,
+                "circle-stroke-width": 2, "circle-stroke-color": COLORS.fire, "circle-stroke-opacity": 0.7,
+              },
+            })
+            map.addLayer({
+              id: `fire-${i}-core`, type: "circle", source: `fire-${i}`,
+              paint: {
+                "circle-radius": 8, "circle-color": COLORS.fire,
+                "circle-stroke-width": 2, "circle-stroke-color": "rgba(255,255,255,0.9)",
+              },
+            })
+          })
+
+          // User position
+          map.addSource("pt-user", pointSource(user.lon, user.lat))
+          map.addLayer({
+            id: "pt-user", type: "circle", source: "pt-user",
+            paint: {
+              "circle-radius": 7, "circle-color": COLORS.user,
+              "circle-stroke-width": 2, "circle-stroke-color": "rgba(255,255,255,0.9)",
+            },
+          })
+
+          // Safe zone
+          map.addSource("pt-safe", pointSource(dest.lon, dest.lat))
+          map.addLayer({
+            id: "pt-safe", type: "circle", source: "pt-safe",
+            paint: {
+              "circle-radius": 7, "circle-color": COLORS.safe,
+              "circle-stroke-width": 2, "circle-stroke-color": "rgba(255,255,255,0.9)",
+            },
+          })
+
+          // Pulsing alert ring on the fire foci
+          const pulseStart = performance.now()
+          const PULSE_MS = 1800
+          const animatePulse = () => {
+            if (cancelled || !mapRef.current) return
+            const t = ((performance.now() - pulseStart) % PULSE_MS) / PULSE_MS
+            const radius = 9 + t * 24
+            const opacity = 0.7 * (1 - t)
+            fires.forEach((_, i) => {
+              const id = `fire-${i}-pulse`
+              if (map.getLayer(id)) {
+                map.setPaintProperty(id, "circle-radius", radius)
+                map.setPaintProperty(id, "circle-stroke-opacity", opacity)
+              }
+            })
+            pulseRafRef.current = requestAnimationFrame(animatePulse)
+          }
+          animatePulse()
+
+          // ── Text labels (DOM markers, offset below their point) ──────────
+          markersRef.current.push(
+            new mapboxgl.Marker({ element: makeLabelEl("TÚ", "#dbeafe"), offset: [0, 16] })
+              .setLngLat([user.lon, user.lat]).addTo(map),
+          )
+          fires.forEach((f) => {
+            markersRef.current.push(
+              new mapboxgl.Marker({ element: makeLabelEl(`FRP ${Math.round(f.frp)}`, "#fca5a5"), offset: [0, 18] })
+                .setLngLat([f.lon, f.lat]).addTo(map),
+            )
+          })
+          markersRef.current.push(
+            new mapboxgl.Marker({ element: makeLabelEl(route.label, "#bbf7d0"), offset: [0, 18] })
+              .setLngLat([dest.lon, dest.lat]).addTo(map),
+          )
+
+          // ── Frame the scene tight and lock the view close ────────────────
+          const bounds = new mapboxgl.LngLatBounds()
+          bounds.extend([user.lon, user.lat])
+          bounds.extend([dest.lon, dest.lat])
+          fires.forEach((f) => bounds.extend([f.lon, f.lat]))
+          map.fitBounds(bounds, { padding: 54, maxZoom: 17, duration: 0 })
+
+          // Emergency screen — forbid zooming out past the initial frame and
+          // keep panning within the scene.
+          map.setMinZoom(map.getZoom())
+          const sw = bounds.getSouthWest()
+          const ne = bounds.getNorthEast()
+          const dLat = (ne.lat - sw.lat) * 0.6 || 0.01
+          const dLon = (ne.lng - sw.lng) * 0.6 || 0.01
+          map.setMaxBounds([
+            [sw.lng - dLon, sw.lat - dLat],
+            [ne.lng + dLon, ne.lat + dLat],
+          ])
+        })
+      })
+      .catch((err) => console.error("[SentinelMap] mapbox-gl load failed:", err))
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(pulseRafRef.current)
+      markersRef.current.forEach((m) => m.remove())
+      markersRef.current = []
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+      }
+    }
+  }, [user, fires, route, expansion])
 
   return (
-    <svg
-      viewBox="0 0 360 360"
-      width={size} height={size}
-      style={{ display: 'block', background: C.bg, borderRadius: 14 }}
-      preserveAspectRatio="xMidYMid slice"
-    >
-      <defs>
-        <radialGradient id="smFireGlow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%"  stopColor="#fb923c" stopOpacity="0.95" />
-          <stop offset="40%" stopColor="#ef4444" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="smUserGlow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%"  stopColor={C.info} stopOpacity="0.55" />
-          <stop offset="100%" stopColor={C.info} stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="smSafeGlow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%"  stopColor={C.safe} stopOpacity="0.45" />
-          <stop offset="100%" stopColor={C.safe} stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="smPropGrad" cx="0.32" cy="0.55" r="0.7">
-          <stop offset="0%"   stopColor="#ef4444" stopOpacity="0.5" />
-          <stop offset="60%"  stopColor="#ef4444" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#ef4444" stopOpacity="0.04" />
-        </radialGradient>
-        <marker id="smPropArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 Z" fill={C.fire} />
-        </marker>
-        <marker id="smRouteArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 Z" fill={C.safe} />
-        </marker>
-      </defs>
-
-      <rect width="360" height="360" fill={C.bg} />
-
-      {/* Topographic contours */}
-      <g fill="none" stroke={C.contour} strokeWidth="0.6">
-        <path d="M -10 290 Q 80 260 180 280 T 380 250" />
-        <path d="M -10 260 Q 90 220 200 245 T 380 215" />
-        <path d="M -10 220 Q 110 180 220 200 T 380 170" />
-        <path d="M -10 170 Q 130 130 240 150 T 380 120" />
-        <path d="M -10 120 Q 150 80  260 100 T 380 70" />
-        <path d="M -10 70  Q 170 30  290 50  T 380 20" />
-      </g>
-
-      <g>{grid}</g>
-
-      <path d="M 340 0 Q 320 80 332 160 Q 348 240 322 360 L 360 360 L 360 0 Z" fill={C.water} stroke={C.waterEdge} strokeWidth="0.6" />
-
-      {/* Roads */}
-      <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M 0 282 L 196 250 L 268 200 L 360 188" stroke={C.roadMajor} strokeWidth="2.2" />
-        <path d="M 0 282 L 196 250 L 268 200 L 360 188" stroke="rgba(232,230,224,0.55)" strokeWidth="0.4" strokeDasharray="4 6" />
-        <path d="M 60 360 L 80 240 L 130 140 L 160 40" stroke={C.road} strokeWidth="1.2" />
-        <path d="M 360 100 L 280 110 L 200 130 L 120 200 L 40 230" stroke={C.road} strokeWidth="1.2" />
-        <path d="M 220 360 L 230 280 L 244 172 L 260 80" stroke={C.road} strokeWidth="1.2" />
-        <path d="M 0 60 L 90 80 L 180 60 L 280 38" stroke={C.road} strokeWidth="1.2" />
-      </g>
-
-      {/* Propagation polygons */}
-      {showPropagation && (
-        <g style={{ transformOrigin: `${F1.x}px ${F1.y}px`, animation: 'spread-poly 1200ms ease-out both' }}>
-          <path d={poly12h} fill="url(#smPropGrad)" stroke="rgba(239,68,68,0.32)" strokeWidth="0.6" strokeDasharray="2 3" />
-          <path d={poly6h}  fill="url(#smPropGrad)" stroke="rgba(239,68,68,0.5)"  strokeWidth="0.8" strokeDasharray="3 2" opacity="0.85" />
-          <path d={poly2h}  fill="rgba(239,68,68,0.35)" stroke={C.fire} strokeWidth="1.1" />
-          <g style={{ font: '600 8px monospace' } as React.CSSProperties} fill="rgba(239,68,68,0.85)">
-            <text x="148" y="178" textAnchor="middle">+2H</text>
-            <text x="208" y="200" textAnchor="middle" opacity="0.85">+6H</text>
-            <text x="262" y="216" textAnchor="middle" opacity="0.7">+12H</text>
-          </g>
-        </g>
-      )}
-
-      {/* Propagation vector */}
-      {showPropagation && (
-        <g>
-          <line
-            x1={F1.x} y1={F1.y} x2={F1.x + 78} y2={F1.y + 60}
-            stroke={C.fire} strokeWidth="2.5"
-            markerEnd="url(#smPropArrow)" strokeLinecap="round"
-          />
-          <line
-            x1={F1.x + 6} y1={F1.y + 8} x2={F1.x + 64} y2={F1.y + 56}
-            stroke={C.fire} strokeWidth="1" opacity="0.4" strokeDasharray="3 4"
-          />
-          <g transform={`translate(${F1.x + 84}, ${F1.y + 70})`}>
-            <rect x="-2" y="-9" width="68" height="22" rx="3" fill="rgba(10,10,10,0.85)" stroke="rgba(239,68,68,0.5)" strokeWidth="0.5" />
-            <text x="2" y="-1" style={{ font: '600 7px monospace' } as React.CSSProperties} fill={C.fire}>2.4 KM/H</text>
-            <text x="2" y="9"  style={{ font: '500 7px monospace' } as React.CSSProperties} fill="rgba(232,230,224,0.7)">RUMBO 041°</text>
-          </g>
-        </g>
-      )}
-
-      {/* Escape route */}
-      {showRoute && (
-        <g>
-          <path d={routePath} fill="none" stroke={C.safe} strokeOpacity="0.18" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-          <path d={routePath} fill="none" stroke={C.safe} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" markerEnd="url(#smRouteArrow)" />
-          <path d={routePath} fill="none" stroke="#86efac" strokeWidth="1" strokeDasharray="2 8" strokeLinecap="round" strokeLinejoin="round">
-            <animate attributeName="stroke-dashoffset" from="0" to="-30" dur="1.6s" repeatCount="indefinite" />
-          </path>
-          {route.slice(1, -1).map((p, i) => (
-            <circle key={i} cx={p.x} cy={p.y} r="3.2" fill={C.bg} stroke={C.safe} strokeWidth="1.4" />
-          ))}
-        </g>
-      )}
-
-      {/* Safe zone */}
-      {showRoute && (
-        <g>
-          <circle cx={SAFE.x} cy={SAFE.y} r="28" fill="url(#smSafeGlow)" />
-          <circle cx={SAFE.x} cy={SAFE.y} r="9" fill={C.bg} stroke={C.safe} strokeWidth="1.8" />
-          <path d={`M ${SAFE.x-4} ${SAFE.y} L ${SAFE.x-1} ${SAFE.y+3} L ${SAFE.x+4} ${SAFE.y-3}`} stroke={C.safe} strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          <text x={SAFE.x + 14} y={SAFE.y - 4} style={{ font: '600 9px sans-serif' } as React.CSSProperties} fill={C.fg}>Cerro Chepe</text>
-          <text x={SAFE.x + 14} y={SAFE.y + 6} style={{ font: '500 7px monospace' } as React.CSSProperties} fill="rgba(232,230,224,0.55)">PUNTO DE ENCUENTRO</text>
-        </g>
-      )}
-
-      {/* Fire foci */}
-      <g>
-        <circle cx={F2.x} cy={F2.y} r="22" fill="url(#smFireGlow)" style={{ animation: 'pulse-soft 1.6s ease-in-out infinite' }} />
-        <circle cx={F2.x} cy={F2.y} r="3" fill={C.fire} />
-        <circle cx={F1.x} cy={F1.y} r="36" fill="url(#smFireGlow)" style={{ animation: 'pulse-soft 1.4s ease-in-out infinite' }} />
-        <circle cx={F1.x} cy={F1.y} r="20" fill="none" stroke={C.fire} strokeWidth="1" style={{ transformOrigin: `${F1.x}px ${F1.y}px`, animation: 'ping 1.8s ease-out infinite' }} />
-        <circle cx={F1.x} cy={F1.y} r="5.5" fill={C.fire} style={{ animation: 'ember 1.2s ease-in-out infinite' }} />
-        <circle cx={F1.x} cy={F1.y} r="2.5" fill="#fde68a" />
-        <text x={F1.x - 26} y={F1.y - 28} style={{ font: '600 7px monospace' } as React.CSSProperties} fill={C.fire}>FRP 184</text>
-      </g>
-
-      {/* User position */}
-      <g>
-        <circle cx={U.x} cy={U.y} r="38" fill="url(#smUserGlow)" />
-        <circle cx={U.x} cy={U.y} r="22" fill="none" stroke={C.info} strokeWidth="1.2" strokeOpacity="0.5" style={{ transformOrigin: `${U.x}px ${U.y}px`, animation: 'ping 2.2s ease-out infinite' }} />
-        <path d={`M ${U.x} ${U.y} L ${U.x - 20} ${U.y - 36} A 42 42 0 0 1 ${U.x + 20} ${U.y - 36} Z`} fill={C.info} fillOpacity="0.18" />
-        <circle cx={U.x} cy={U.y} r="6.5" fill={C.info} stroke={C.bg} strokeWidth="1.6" />
-        <circle cx={U.x} cy={U.y} r="2.4" fill="#dbeafe" />
-        <text x={U.x + 12} y={U.y + 14} style={{ font: '600 8px sans-serif' } as React.CSSProperties} fill={C.fg}>TÚ</text>
-        <text x={U.x + 12} y={U.y + 23} style={{ font: '500 7px monospace' } as React.CSSProperties} fill="rgba(232,230,224,0.55)">±12M</text>
-      </g>
-
-      {/* Compass rose */}
-      <g transform="translate(20, 24)" opacity="0.55">
-        <circle cx="0" cy="0" r="11" fill="none" stroke="rgba(232,230,224,0.3)" strokeWidth="0.6" />
-        <path d="M 0 -10 L 2.5 0 L 0 2 L -2.5 0 Z" fill={C.fire} />
-        <path d="M 0 10 L 2.5 0 L 0 -2 L -2.5 0 Z" fill="rgba(232,230,224,0.4)" />
-        <text x="0" y="-13" textAnchor="middle" style={{ font: '600 6px monospace' } as React.CSSProperties} fill={C.fg}>N</text>
-      </g>
-
-      {/* Scale bar */}
-      <g transform="translate(20, 332)" opacity="0.65">
-        <line x1="0" y1="0" x2="46" y2="0" stroke="rgba(232,230,224,0.5)" strokeWidth="1" />
-        <line x1="0" y1="-2" x2="0" y2="2" stroke="rgba(232,230,224,0.5)" strokeWidth="1" />
-        <line x1="46" y1="-2" x2="46" y2="2" stroke="rgba(232,230,224,0.5)" strokeWidth="1" />
-        <text x="50" y="3" style={{ font: '500 7px monospace' } as React.CSSProperties} fill="rgba(232,230,224,0.7)">500 M</text>
-      </g>
-    </svg>
+    <div
+      ref={mapContainerRef}
+      style={{ width: size, height: size, display: "block", background: "#0a0a0a" }}
+    />
   )
 }
