@@ -229,8 +229,9 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
         }),
       }).catch((err) => console.error('[citizen-init] webhook error:', err instanceof Error ? err.message : err))
     } else {
-      console.warn('[citizen-init] MAKE_CITIZEN_WEBHOOK_URL not set — running degraded analysis')
-      executeAndBroadcast(io, lat, lon, [], undefined, undefined, socketId).catch(console.error)
+      // Without Make.com we have no local fires — the citizen flow needs fresh NASA data.
+      // Log and no-op; the frontend /api/citizen-routes endpoint handles stale-fire filtering.
+      console.warn('[citizen-init] MAKE_CITIZEN_WEBHOOK_URL not set — citizen analysis unavailable')
     }
 
     res.status(202).json({ ok: true, accepted: true })
@@ -303,14 +304,11 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   })
 
   // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
-  // Receives { runId, socketId, lat, lon, weather, pm25 }
-  // runId references fires cached by /api/fires/filter; weather and pm25 at citizen's location
+  // Receives { fires, socketId, lat, lon } — fires are already local to the user's 2 km bbox.
+  // Does NOT run executeAndBroadcast (that would overwrite the global last-update and clear
+  // all hotspots for every connected client). Only computes escape routes and emits
+  // citizen-routes to the requesting socket.
   app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
-    if (isLocked()) {
-      res.status(202).json({ ok: false, accepted: false, error: 'Analysis in progress — try again shortly' })
-      return
-    }
-
     const body = req.body as {
       runId?: unknown
       fires?: unknown
@@ -321,7 +319,6 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       pm25?: unknown
     }
 
-    // socketId optional — if present, result targets that socket; otherwise broadcasts to all
     const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
 
     const runId = typeof body.runId === 'string' ? body.runId : undefined
@@ -332,21 +329,26 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
 
     const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
-    const pm25 = typeof body.pm25 === 'number' ? body.pm25 : undefined
-    const weather = body.weather ?? undefined
 
     const enriched = mapRawFiresToFireData(rawFires as Record<string, unknown>[])
 
     res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
 
+    if (!lat || !lon || enriched.length === 0) {
+      // No fires within the 2 km bbox — user is not in immediate danger, nothing to route
+      return
+    }
+
     const agentRoutesUrlCitizen = process.env.AGENT_ROUTES_URL
+    if (!agentRoutesUrlCitizen) return
+
+    // Use per-fire weather from Make.com; fall back to last known global weather
+    const firstFireWeather = enriched[0]?.weather
+    const fallbackWeather = getLastUpdate()?.weather ?? { speed: 0, deg: 0 }
+    const windSpeedMs = firstFireWeather?.speed ?? fallbackWeather.speed ?? 0
+    const windDirDeg = firstFireWeather?.deg ?? fallbackWeather.deg ?? 0
+
     ;(async () => {
-      await executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId ?? undefined)
-      // After the full analysis updates last, call citizen routes with the fresh local fires
-      if (!lat || !lon || !agentRoutesUrlCitizen) return
-      const freshUpdate = getLastUpdate()
-      const freshFires = freshUpdate?.fires ?? enriched
-      const freshWeather = freshUpdate?.weather ?? { speed: 0, deg: 0 }
       try {
         const response = await fetch(`${agentRoutesUrlCitizen}/analyze/citizen`, {
           method: 'POST',
@@ -354,10 +356,10 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
           body: JSON.stringify({
             userLat: lat,
             userLon: lon,
-            fires: freshFires,
+            fires: enriched,
             weather: {
-              wind_speed_kmh: Math.round((freshWeather.speed ?? 0) * 3.6),
-              wind_dir_deg: freshWeather.deg ?? 0,
+              wind_speed_kmh: Math.round(windSpeedMs * 3.6),
+              wind_dir_deg: windDirDeg,
             },
           }),
         })
@@ -370,7 +372,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
         console.error('[trigger/citizen] citizen-routes call failed:', err instanceof Error ? err.message : err)
       }
     })().catch((err) => {
-      console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
+      console.error('[trigger/citizen] background error:', err instanceof Error ? err.message : err)
     })
   })
 
