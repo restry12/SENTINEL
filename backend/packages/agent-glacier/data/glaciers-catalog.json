@@ -1,0 +1,11 @@
+[
+  { "id": "glaciar-grey", "name": "Glaciar Grey", "country": "Chile", "region": "Magallanes", "lat": -51.05, "lon": -73.15, "altitude": 200, "area_km2": 270 },
+  { "id": "perito-moreno", "name": "Perito Moreno", "country": "Argentina", "region": "Santa Cruz", "lat": -50.48, "lon": -73.05, "altitude": 180, "area_km2": 250 },
+  { "id": "aletsch-glacier", "name": "Aletsch Glacier", "country": "Suiza", "region": "Valais", "lat": 46.41, "lon": 8.04, "altitude": 2400, "area_km2": 81.7 },
+  { "id": "columbia-glacier", "name": "Columbia Glacier", "country": "USA", "region": "Alaska", "lat": 61.13, "lon": -147.11, "altitude": 0, "area_km2": 1000 },
+  { "id": "mer-de-glace", "name": "Mer de Glace", "country": "Francia", "region": "Haute-Savoie", "lat": 45.91, "lon": 6.95, "altitude": 1900, "area_km2": 32 },
+  { "id": "vatnajokull", "name": "Vatnajökull", "country": "Islandia", "region": "Austurland", "lat": 64.25, "lon": -16.85, "altitude": 1500, "area_km2": 7900 },
+  { "id": "franz-josef", "name": "Franz Josef Glacier", "country": "Nueva Zelanda", "region": "West Coast", "lat": -43.46, "lon": 170.18, "altitude": 300, "area_km2": 32 },
+  { "id": "quelccaya", "name": "Quelccaya Ice Cap", "country": "Perú", "region": "Cusco", "lat": -13.93, "lon": -70.83, "altitude": 5600, "area_km2": 44 },
+  { "id": "baltoro", "name": "Baltoro Glacier", "country": "Pakistán", "region": "Gilgit-Baltistan", "lat": 35.74, "lon": 76.22, "altitude": 4500, "area_km2": 754 }
+]
