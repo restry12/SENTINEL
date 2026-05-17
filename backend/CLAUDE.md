@@ -132,6 +132,7 @@ AGENT_REPORT_URL  # opcional
 NASA_FIRMS_API_KEY / OPENWEATHER_API_KEY / OPENAQ_API_KEY / OPENROUTE_API_KEY
 OPENROUTER_API_KEY  # LLM de todos los agentes (mistral-large)
 MAKE_WEBHOOK_URL  # opcional
+MAKE_CITIZEN_WEBHOOK_URL  # opcional — webhook del escenario ciudadano de Make.com
 ```
 
 ### Lógica de riesgo (orchestrator)
