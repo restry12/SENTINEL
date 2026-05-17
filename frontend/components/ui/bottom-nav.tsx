@@ -2,13 +2,15 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutGrid, Wind, Newspaper, UserCircle } from "lucide-react"
+import { LayoutGrid, Wind, Tornado, MessageCircle, Newspaper, UserCircle } from "lucide-react"
 
 const tabs = [
-  { href: "/dashboard",          label: "Dashboard",  Icon: LayoutGrid },
-  { href: "/air",                label: "Aire",        Icon: Wind },
-  { href: "/news",               label: "Noticias",    Icon: Newspaper },
-  { href: "/dashboard/citizen",  label: "Ciudadano",   Icon: UserCircle },
+  { href: "/dashboard",         label: "Dashboard",  Icon: LayoutGrid },
+  { href: "/air",               label: "Aire",        Icon: Wind },
+  { href: "/tornado",           label: "Tornado",     Icon: Tornado },
+  { href: "/chat",              label: "AI",          Icon: MessageCircle },
+  { href: "/news",              label: "Noticias",    Icon: Newspaper },
+  { href: "/dashboard/citizen", label: "Ciudadano",   Icon: UserCircle },
 ] as const
 
 export function BottomNav() {
@@ -25,17 +27,17 @@ export function BottomNav() {
           <Link
             key={href}
             href={href}
-            className="flex flex-1 flex-col items-center justify-center gap-1 py-2 transition-colors"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors"
           >
             <Icon
-              className={`w-5 h-5 transition-colors ${
+              className={`w-4 h-4 transition-colors ${
                 active
                   ? "text-orange drop-shadow-[0_0_6px_rgba(255,126,21,0.6)]"
                   : "text-text-muted"
               }`}
             />
             <span
-              className={`text-[9px] font-bold tracking-widest uppercase transition-colors ${
+              className={`text-[8px] font-bold tracking-wider uppercase transition-colors ${
                 active ? "text-orange" : "text-text-muted"
               }`}
             >
