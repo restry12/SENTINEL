@@ -1,17 +1,27 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Bot, Zap, Newspaper, Activity } from "lucide-react"
+import { Bot, Zap, Newspaper, Activity, User, Briefcase } from "lucide-react"
 import { TopBar } from "@/components/dashboard/top-bar"
 import { useSentinel } from "@/contexts/sentinel-context"
 import { MessageBubble, type Message } from "./message-bubble"
 import { ChatInput } from "./chat-input"
 
-const SUGGESTIONS = [
-  "¿Cuál es el foco más peligroso ahora?",
-  "¿Qué hacer si hay humo en mi zona?",
-  "Resume la situación actual de incendios",
-  "¿Cuáles son las rutas de evacuación activas?",
+type ChatMode = 'citizen' | 'expert'
+const MODE_LS_KEY = 'sentinel_chat_mode'
+
+const CITIZEN_SUGGESTIONS = [
+  "¿Estoy en peligro ahora mismo?",
+  "¿Qué hago si veo humo cerca de mi casa?",
+  "¿Es seguro que mis hijos salgan a jugar hoy?",
+  "¿Cuándo se espera que mejore el aire?",
+]
+
+const EXPERT_SUGGESTIONS = [
+  "¿Cuál es el foco con mayor FRP actualmente?",
+  "Resumen operacional: focos activos, AQI, viento",
+  "Predicción 6h y 24h de propagación",
+  "Rutas de evacuación activas y estado",
 ]
 
 // crypto.randomUUID requires a secure context (HTTPS/localhost) and is missing
@@ -26,6 +36,26 @@ function makeId(): string {
 
 export function ChatPage() {
   const { sentinelUpdate } = useSentinel()
+  const [mode, setMode] = useState<ChatMode>('citizen')
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(MODE_LS_KEY)
+      if (stored === 'citizen' || stored === 'expert') setMode(stored)
+    } catch {
+      /* localStorage unavailable — keep default */
+    }
+  }, [])
+
+  const updateMode = (next: ChatMode) => {
+    setMode(next)
+    try {
+      window.localStorage.setItem(MODE_LS_KEY, next)
+    } catch {
+      /* non-critical */
+    }
+  }
+
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [newsArticles, setNewsArticles] = useState<Array<{ title: string; snippet?: string; source: string; publishedAt: string }>>([])
@@ -83,6 +113,7 @@ export function ChatPage() {
           history,
           sentinelSnapshot: sentinelUpdate,
           newsArticles,
+          mode,
         }),
         signal: controller.signal,
       })
@@ -228,7 +259,7 @@ function WelcomeScreen({ onSuggestion }: { onSuggestion: (s: string) => void }) 
         <p className="text-white/30 text-xs mt-1">Tengo acceso a datos en vivo, noticias y conocimiento operacional</p>
       </div>
       <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
-        {SUGGESTIONS.map(s => (
+        {CITIZEN_SUGGESTIONS.map(s => (
           <button
             key={s}
             onClick={() => onSuggestion(s)}
