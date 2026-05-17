@@ -104,6 +104,23 @@ export function ChatPage() {
       { id: assistantId, role: 'assistant', content: '', timestamp: new Date() },
     ])
 
+  const playVoice = async (text: string) => {
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+      if (res.ok) {
+        const blob = await res.blob()
+        const audio = new Audio(URL.createObjectURL(blob))
+        audio.play()
+      }
+    } catch (e) {
+      console.error('Error playing voice:', e)
+    }
+  }
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -128,6 +145,7 @@ export function ChatPage() {
       // trailing incomplete line in `buffer` and prepend it to the next chunk.
       // Without this, JSON.parse fails on partial lines and tokens are lost.
       let buffer = ''
+      let fullResponseText = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -145,6 +163,7 @@ export function ChatPage() {
             const parsed = JSON.parse(data)
             const token: string = parsed.choices?.[0]?.delta?.content ?? ''
             if (token) {
+              fullResponseText += token
               setMessages(prev =>
                 prev.map(m =>
                   m.id === assistantId ? { ...m, content: m.content + token } : m
@@ -155,6 +174,10 @@ export function ChatPage() {
             // malformed SSE line — skip
           }
         }
+      }
+
+      if (fullResponseText.trim()) {
+        playVoice(fullResponseText.trim())
       }
     } catch (err) {
       // AbortError = intentional cancel (unmount / clear / new send). Leave
