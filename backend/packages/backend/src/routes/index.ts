@@ -16,7 +16,7 @@ import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
 
-const ENRICH_LIMIT = 150
+const ENRICH_LIMIT = 50
 
 type RawCitizenBody = { fires?: unknown; lat?: unknown; lon?: unknown; socketId?: unknown }
 
