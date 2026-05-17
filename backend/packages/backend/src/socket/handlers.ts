@@ -57,6 +57,57 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
       })
     })
 
+    socket.on('trigger-citizen', (data: { lat?: number; lon?: number }) => {
+      // Per-socket rate limit (shared map with 'trigger')
+      const lastTrigger = socketLastTrigger.get(socket.id) ?? 0
+      const elapsed = Date.now() - lastTrigger
+      if (elapsed < SOCKET_TRIGGER_COOLDOWN_MS) {
+        const waitSec = Math.ceil((SOCKET_TRIGGER_COOLDOWN_MS - elapsed) / 1000)
+        socket.emit('status', {
+          state: 'error',
+          message: `Demasiadas peticiones. Espera ${waitSec}s antes de analizar otra zona.`,
+        } satisfies StatusPayload)
+        return
+      }
+
+      const lat = typeof data.lat === 'number' && isFinite(data.lat) ? data.lat : undefined
+      const lon = typeof data.lon === 'number' && isFinite(data.lon) ? data.lon : undefined
+
+      if (!lat || !lon) {
+        socket.emit('status', {
+          state: 'error',
+          message: 'Coordenadas inválidas. Se requiere lat y lon.',
+        } satisfies StatusPayload)
+        return
+      }
+
+      socketLastTrigger.set(socket.id, Date.now())
+      socket.emit('status', { state: 'loading' } satisfies StatusPayload)
+
+      const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
+
+      if (citizenWebhookUrl) {
+        // Delegate to Make.com — it fetches FIRMS/Weather/AQ and calls back to /api/trigger/citizen
+        fetch(citizenWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lon, socketId: socket.id }),
+        }).catch((err) => {
+          console.error('[trigger-citizen] Make.com webhook call failed:', err)
+          socket.emit('status', {
+            state: 'error',
+            message: 'No se pudo iniciar el análisis ciudadano.',
+          } satisfies StatusPayload)
+        })
+      } else {
+        // Fallback: run degraded analysis with empty data
+        console.warn('[trigger-citizen] MAKE_CITIZEN_WEBHOOK_URL not set — running degraded analysis')
+        executeAndBroadcast(io, lat, lon, [], undefined, undefined, socket.id).catch((err) => {
+          console.error('[trigger-citizen] fallback analysis error:', err)
+        })
+      }
+    })
+
     socket.on('start-polling', (data: { intervalMs: number }) => {
       if (!data.intervalMs || data.intervalMs < MIN_POLL_INTERVAL_MS) {
         socket.emit('status', {
