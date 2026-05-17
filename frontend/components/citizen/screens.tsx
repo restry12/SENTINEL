@@ -44,12 +44,11 @@ export function SentinelStatusStrip({ riskLevel = 'critical' }: StatusStripProps
 
 function SentinelLogo({ size = 18 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="12" r="10" stroke="var(--foreground)" strokeWidth="1.5" />
-      <circle cx="12" cy="12" r="6" stroke="var(--foreground)" strokeWidth="1" opacity="0.6" />
-      <circle cx="12" cy="12" r="2.2" fill="var(--critical)" />
-      <path d="M 12 2 L 12 6" stroke="var(--critical)" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
+    <img
+      src="/sentinel-logo.png"
+      alt="SENTINEL"
+      style={{ height: size, width: 'auto', objectFit: 'contain', display: 'block' }}
+    />
   )
 }
 
@@ -102,7 +101,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 // ── Screen 01: Locating GPS ────────────────────────────────────────────────
 
 interface ScreenLocatingProps {
-  onLocated?: () => void
+  onLocated?: (coords?: { lat: number; lon: number }) => void
   riskLevel?: ScreenRisk
 }
 
@@ -110,10 +109,34 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
   const [phase, setPhase] = useState(0)
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase(1), 900)
-    const t2 = setTimeout(() => setPhase(2), 2000)
-    const t3 = setTimeout(() => onLocated?.(), 3400)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+    let done = false
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    const finish = (coords?: { lat: number; lon: number }) => {
+      if (done) return
+      done = true
+      setPhase(2)
+      timers.push(setTimeout(() => onLocated?.(coords), 700))
+    }
+
+    // Triangulating step
+    timers.push(setTimeout(() => { if (!done) setPhase(1) }, 800))
+
+    // Request the real device GPS location
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => finish({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        () => finish(), // permission denied / unavailable → fall back to demo scene
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      )
+    } else {
+      timers.push(setTimeout(() => finish(), 2200))
+    }
+
+    // Safety net — never hang on the locating screen
+    timers.push(setTimeout(() => finish(), 9500))
+
+    return () => timers.forEach(clearTimeout)
   }, [onLocated])
 
   return (
@@ -192,11 +215,14 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
 interface ScreenAlertProps {
   riskLevel?: ScreenRisk
   route: NaturalRoute
+  user: { lat: number; lon: number; accuracy_m: number; heading_deg: number }
+  fires: { id: string; lat: number; lon: number; frp: number; dist_km: number }[]
+  expansion: { direccion_principal_deg: number; velocidad_propagacion_kmh: number }
   onCompass?: () => void
   onTrapped?: () => void
 }
 
-export function ScreenAlert({ riskLevel = 'critical', route, onCompass, onTrapped }: ScreenAlertProps) {
+export function ScreenAlert({ riskLevel = 'critical', route, user, fires, expansion, onCompass, onTrapped }: ScreenAlertProps) {
   return (
     <div className="screen scanlines" style={{
       width: '100%', height: '100%',
@@ -213,7 +239,7 @@ export function ScreenAlert({ riskLevel = 'critical', route, onCompass, onTrappe
         borderRadius: 14, overflow: 'hidden',
         border: '1px solid rgba(255,255,255,0.1)',
       }}>
-        <SentinelMap size={374} />
+        <SentinelMap size={374} user={user} fires={fires} route={route} expansion={expansion} />
         <div className="font-mono" style={{
           position: 'absolute', top: 8, right: 10,
           fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em',
@@ -318,24 +344,31 @@ interface ScreenTrappedConfirmProps {
 export function ScreenTrappedConfirm({ onCancel, onConfirm }: ScreenTrappedConfirmProps) {
   const [holdProgress, setHoldProgress] = useState(0)
   const holdingRef = useRef(false)
+  const firedRef = useRef(false)
 
   useEffect(() => {
     let raf: number
     const tick = () => {
-      setHoldProgress(p => {
-        if (holdingRef.current) {
-          const next = Math.min(1, p + 1 / 60)
-          if (next >= 1) onConfirm?.()
-          return next
-        } else {
-          return Math.max(0, p - 1 / 30)
-        }
-      })
+      // Pure updater — no side effects (firing onConfirm here would setState
+      // on the parent during render).
+      setHoldProgress(p =>
+        holdingRef.current
+          ? Math.min(1, p + 1 / 60)
+          : Math.max(0, p - 1 / 30),
+      )
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [onConfirm])
+  }, [])
+
+  // Fire the confirm callback exactly once, after the hold completes.
+  useEffect(() => {
+    if (holdProgress >= 1 && !firedRef.current) {
+      firedRef.current = true
+      onConfirm?.()
+    }
+  }, [holdProgress, onConfirm])
 
   return (
     <div className="screen scanlines" style={{

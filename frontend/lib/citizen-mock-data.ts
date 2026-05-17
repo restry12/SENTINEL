@@ -28,8 +28,8 @@ export const CITIZEN_MOCK: CitizenData = {
   riskLevel: 'critical',
   user: { lat: -36.82412, lon: -73.04985, accuracy_m: 12, heading_deg: 84 },
   fires: [
-    { id: 'F-2041', lat: -36.81870, lon: -73.05410, frp: 184, dist_km: 0.74 },
-    { id: 'F-2043', lat: -36.81620, lon: -73.06210, frp: 96,  dist_km: 1.31 },
+    { id: 'F-2041', lat: -36.82192, lon: -73.05245, frp: 184, dist_km: 0.34 },
+    { id: 'F-2043', lat: -36.82232, lon: -73.05465, frp: 96,  dist_km: 0.46 },
   ],
   weather: { wind_speed_kmh: 38, wind_dir_deg: 215, humidity_pct: 14, temp_c: 31 },
   naturalRoutes: [
@@ -37,7 +37,7 @@ export const CITIZEN_MOCK: CitizenData = {
       id: 'R-N1',
       label: 'Quebrada Norte',
       destino: 'Punto de Encuentro · Cerro Chepe',
-      distancia_km: 1.2,
+      distancia_km: 0.42,
       bearing_deg: 38,
       eta_min: 14,
       estado: 'LIBRE',
