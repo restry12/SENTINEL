@@ -56,16 +56,7 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
         return
       }
     } catch (e) {
-      console.error("Error con MiniMax, usando fallback:", e)
-    }
-
-    // Fallback nativo (si MiniMax falla o no tiene API KEY)
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(message.content)
-      utterance.lang = 'es-ES' // O 'es-CL'
-      utterance.onend = () => setIsPlaying(false)
-      window.speechSynthesis.speak(utterance)
-      setIsPlaying(true)
+      console.error("Error con MiniMax:", e)
     }
     
     setIsLoadingAudio(false)
