@@ -28,15 +28,14 @@ export function HotspotSearch() {
     [fires]
   )
 
-  const trimmedQuery = query.trim().toUpperCase()
+  const trimmedQuery = query.trim()
+  const frpThreshold = trimmedQuery !== '' ? parseFloat(trimmedQuery) : NaN
 
-  const displayFires = useMemo(
-    () =>
-      trimmedQuery
-        ? indexedFires.filter(f => f.id.includes(trimmedQuery))
-        : indexedFires.slice(0, 10),
-    [indexedFires, trimmedQuery]
-  )
+  const displayFires = useMemo(() => {
+    if (trimmedQuery === '') return indexedFires.slice(0, 10)
+    if (!isNaN(frpThreshold)) return indexedFires.filter(f => f.fire.frp >= frpThreshold)
+    return []
+  }, [indexedFires, trimmedQuery, frpThreshold])
 
   useEffect(() => {
     if (!open) return
@@ -80,7 +79,7 @@ export function HotspotSearch() {
       </button>
 
       {open && (
-        <div className="absolute top-full mt-2 right-0 w-64 bg-[#0d1117] border border-orange/30 rounded-xl p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_30px_rgba(255,126,21,0.08)] z-50">
+        <div className="absolute top-full mt-2 right-0 w-68 bg-[#0a0d14]/90 backdrop-blur-xl border border-white/10 rounded-xl p-2.5 shadow-[0_24px_60px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,126,21,0.06)] z-[200]">
           <p className="text-[8px] tracking-[0.2em] text-text-muted uppercase px-1 mb-2">
             Top Focos · Ordenado por FRP
           </p>
@@ -89,8 +88,8 @@ export function HotspotSearch() {
             autoFocus
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Buscar por ID (ej: FIRE-120)…"
-            className="w-full bg-[#080c14] border border-border rounded-lg px-3 py-1.5 text-[9px] text-foreground placeholder:text-text-muted font-mono mb-2.5 outline-none focus:border-orange/40 transition-colors"
+            placeholder="Filtrar por MW mínimo (ej: 50)…"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[9px] text-foreground placeholder:text-text-muted font-mono mb-2.5 outline-none focus:border-orange/30 focus:bg-white/8 transition-all"
           />
 
           <div className="space-y-0.5 max-h-72 overflow-y-auto scrollbar-none">
@@ -104,8 +103,8 @@ export function HotspotSearch() {
                   <button
                     key={id}
                     onClick={() => handleSelect(index)}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-colors hover:bg-white/5 ${
-                      isTop ? 'bg-red/10 border border-red/20' : ''
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all duration-150 hover:bg-white/6 ${
+                      isTop ? 'bg-red/8 border border-red/15' : ''
                     }`}
                   >
                     <div
@@ -133,8 +132,8 @@ export function HotspotSearch() {
           </div>
 
           {!trimmedQuery && indexedFires.length > 10 && (
-            <p className="text-[8px] text-text-muted text-center mt-2 pt-2 border-t border-border">
-              + {indexedFires.length - 10} focos más · busca por ID para ver más
+            <p className="text-[8px] text-text-muted text-center mt-2 pt-2 border-t border-white/8">
+              + {indexedFires.length - 10} focos más · filtra por MW para ver más
             </p>
           )}
         </div>

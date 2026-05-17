@@ -1,18 +1,17 @@
 "use client"
 
-import { Globe, RadarIcon, Shield, Activity, Search } from "lucide-react"
+import { Shield } from "lucide-react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLang } from "@/contexts/language-context"
 import { useSentinel } from "@/contexts/sentinel-context"
-import { toast } from "sonner"
 import { HotspotSearch } from "@/components/dashboard/hotspot-search"
 
 export function TopBar() {
   const pathname = usePathname()
   const { lang, toggle, tx } = useLang()
-  const { connected, status, trigger, sentinelUpdate } = useSentinel()
+  const { connected, status, sentinelUpdate } = useSentinel()
   const [time, setTime] = useState<string>("")
 
   const fireCount = sentinelUpdate?.fires.length ?? 0
@@ -44,17 +43,9 @@ export function TopBar() {
     return () => clearInterval(timer)
   }, [])
 
-  const onTrigger = () => {
-    toast.info("Activando Agente 1: Actualizando datos satelitales en tiempo real...", {
-      duration: 3000,
-      icon: <RadarIcon className="w-4 h-4 animate-spin text-orange" />
-    })
-    trigger()
-  }
-
   return (
     <div className="flex flex-col shrink-0 z-50">
-      <header className="h-[72px] px-8 border-b border-white/10 bg-[#080c14/80] backdrop-blur-2xl flex items-center justify-between gap-8 relative overflow-hidden">
+      <header className="h-[72px] px-8 border-b border-white/10 bg-[#080c14/80] backdrop-blur-2xl flex items-center justify-between gap-8 relative">
         {/* Animated Glow Line */}
         <div className={`absolute bottom-0 left-0 h-[2px] transition-all duration-1000 ease-in-out ${
           riskLevel === 'critical' ? 'bg-red shadow-[0_0_15px_rgba(255,51,51,0.8)]' : 
@@ -113,17 +104,6 @@ export function TopBar() {
           {/* New Search Component from Main */}
           <HotspotSearch />
 
-          <button
-            onClick={onTrigger}
-            disabled={isLoading || !connected}
-            className={`group relative flex items-center gap-3 px-5 py-2.5 rounded-lg border transition-all duration-300 overflow-hidden ${
-              isLoading ? 'border-orange/30 bg-orange/5' : 'border-blue/40 bg-blue/10 hover:bg-blue/20 text-blue-soft'
-            }`}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-            <RadarIcon className={`w-4 h-4 ${isLoading ? "animate-spin text-orange" : "text-blue"}`} />
-            <span className="text-[11px] font-black tracking-[0.2em] uppercase">{isLoading ? "Procesando" : "Escanear"}</span>
-          </button>
         </div>
 
         {/* Telemetry & Global Info */}

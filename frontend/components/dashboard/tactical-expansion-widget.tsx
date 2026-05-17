@@ -78,24 +78,26 @@ export function TacticalExpansionWidget({ activeExpansion, onExpansionChange }: 
           </div>
         </div>
 
-        {/* Telemetry Grid */}
-        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
-          <div className="space-y-1">
-            <span className="text-[8px] font-bold text-text-muted uppercase tracking-widest">Viento</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-sm font-black text-white num leading-none">{selectedFire.windKmh}</span>
-              <span className="text-[9px] font-bold text-text-dim uppercase">KM/H</span>
-              <span className="text-[9px] font-bold text-blue ml-auto">{selectedFire.windImpactDir}</span>
+        {/* Telemetry Grid — solo si el foco tiene datos enriquecidos (top 150) */}
+        {selectedFire.weather && (
+          <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+            <div className="space-y-1">
+              <span className="text-[8px] font-bold text-text-muted uppercase tracking-widest">Viento</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-sm font-black text-white num leading-none">{selectedFire.windKmh}</span>
+                <span className="text-[9px] font-bold text-text-dim uppercase">KM/H</span>
+                <span className="text-[9px] font-bold text-blue ml-auto">{selectedFire.windImpactDir}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[8px] font-bold text-text-muted uppercase tracking-widest">Humedad</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-sm font-black text-white num leading-none">{selectedFire.weather.humidity}</span>
+                <span className="text-[9px] font-bold text-text-dim uppercase">%</span>
+              </div>
             </div>
           </div>
-          <div className="space-y-1">
-            <span className="text-[8px] font-bold text-text-muted uppercase tracking-widest">Humedad</span>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-sm font-black text-white num leading-none">{u?.weather.humidity ?? '—'}</span>
-              <span className="text-[9px] font-bold text-text-dim uppercase">%</span>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* Footer info */}
         <div className="mt-5 flex items-center justify-between text-[9px] font-bold text-text-muted uppercase tracking-tighter opacity-50">
