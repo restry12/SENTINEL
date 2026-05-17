@@ -122,10 +122,12 @@ export async function executeAndBroadcast(
         timestamp: update.timestamp,
       }
       chan.emit('alert', alert)
-      const centLat = lat ?? DEFAULT_LAT
-      const centLon = lon ?? DEFAULT_LON
-      await triggerMakeWebhook(update as SentinelUpdate, centLat, centLon)
-      alertsSent = true
+      if (!targetSocketId) {
+        const centLat = lat ?? DEFAULT_LAT
+        const centLon = lon ?? DEFAULT_LON
+        await triggerMakeWebhook(update as SentinelUpdate, centLat, centLon)
+        alertsSent = true
+      }
     }
 
     // Save to historical record (fails silently if Supabase not configured)
