@@ -1,0 +1,74 @@
+<h2>Diseño — Arquitectura y Flujo de Datos</h2>
+<p class="subtitle">Sección 1 de 3 — Cómo se conectan los componentes</p>
+
+<div class="mockup">
+  <div class="mockup-header">Flujo de datos: HotspotSearch → Mapa</div>
+  <div class="mockup-body" style="padding:20px;font-family:ui-monospace,monospace;font-size:12px;color:#94a3b8;line-height:1.8;">
+
+    <div style="display:grid;grid-template-columns:1fr 40px 1fr 40px 1fr;gap:0;align-items:center;text-align:center;">
+
+      <!-- Box 1 -->
+      <div style="background:#0a0c10;border:1px solid rgba(251,146,60,0.4);border-radius:10px;padding:16px;">
+        <div style="font-size:10px;letter-spacing:0.15em;color:#fb923c;margin-bottom:8px;text-transform:uppercase;">HotspotSearch</div>
+        <div style="font-size:11px;color:#e2e8f0;text-align:left;line-height:1.6;">
+          • Lee <code style="color:#38bdf8;">sentinelUpdate.fires</code><br>
+          • Ordena por FRP desc<br>
+          • Top 10 + búsqueda por ID<br>
+          • Al click → llama callback
+        </div>
+        <div style="margin-top:10px;font-size:9px;color:#475569;">📁 components/dashboard/<br>hotspot-search.tsx</div>
+      </div>
+
+      <!-- Arrow 1 -->
+      <div style="font-size:22px;color:#334155;">→</div>
+
+      <!-- Box 2 -->
+      <div style="background:#0a0c10;border:1px solid rgba(56,189,248,0.4);border-radius:10px;padding:16px;">
+        <div style="font-size:10px;letter-spacing:0.15em;color:#38bdf8;margin-bottom:8px;text-transform:uppercase;">FireSelectionContext</div>
+        <div style="font-size:11px;color:#e2e8f0;text-align:left;line-height:1.6;">
+          • +<code style="color:#38bdf8;">selectFireRef</code><br>
+          <span style="color:#475569;font-size:10px;">MutableRefObject con la función</span><br>
+          • MapboxPanel la registra<br>
+          • HotspotSearch la invoca
+        </div>
+        <div style="margin-top:10px;font-size:9px;color:#475569;">📁 contexts/<br>fire-selection-context.tsx</div>
+      </div>
+
+      <!-- Arrow 2 -->
+      <div style="font-size:22px;color:#334155;">→</div>
+
+      <!-- Box 3 -->
+      <div style="background:#0a0c10;border:1px solid rgba(239,68,68,0.4);border-radius:10px;padding:16px;">
+        <div style="font-size:10px;letter-spacing:0.15em;color:#ef4444;margin-bottom:8px;text-transform:uppercase;">MapboxPanel</div>
+        <div style="font-size:11px;color:#e2e8f0;text-align:left;line-height:1.6;">
+          • Registra <code style="color:#38bdf8;">selectFireRef</code><br>
+          • flyTo(lat, lon)<br>
+          • Abre popup<br>
+          • setSelectedFire()
+        </div>
+        <div style="margin-top:10px;font-size:9px;color:#475569;">📁 components/dashboard/<br>mapbox-panel.tsx</div>
+      </div>
+
+    </div>
+
+    <div style="margin-top:20px;padding:14px;background:rgba(56,189,248,0.05);border:1px solid rgba(56,189,248,0.15);border-radius:8px;">
+      <div style="font-size:10px;color:#38bdf8;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:6px;">¿Por qué un Ref y no un estado?</div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+        <code>flyTo()</code> y <code>popup.addTo(map)</code> son acciones imperativas del mapa — no dependen del ciclo de render de React.<br>
+        Usar un Ref evita que el componente del mapa vuelva a renderizarse cada vez que el buscador cambia de estado.
+      </div>
+    </div>
+
+    <div style="margin-top:12px;padding:14px;background:rgba(251,146,60,0.05);border:1px solid rgba(251,146,60,0.15);border-radius:8px;">
+      <div style="font-size:10px;color:#fb923c;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:6px;">ID de foco — cómo se calcula</div>
+      <div style="font-size:11px;color:#94a3b8;line-height:1.7;">
+        El ID <code>FIRE-001</code> se asigna por índice en <code>sentinelUpdate.fires[]</code>.<br>
+        HotspotSearch y MapboxPanel usan la misma fórmula: <code>FIRE-${String(i+1).padStart(3,'0')}</code><br>
+        → Buscar <code>FIRE-120</code> = ir al índice 119 del array.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px;">¿Esta arquitectura tiene sentido? (responde en terminal)</p>

@@ -1,0 +1,163 @@
+<h2>¿Cómo debería abrirse el panel de búsqueda?</h2>
+<p class="subtitle">3 enfoques — elige el que mejor encaja con el flujo de trabajo</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="dropdown" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0d1117;border-radius:8px;font-family:monospace;font-size:10px;color:#94a3b8;height:220px;position:relative;overflow:hidden;">
+        <!-- Topbar -->
+        <div style="background:#080c14;border-bottom:1px solid #1e293b;height:36px;display:flex;align-items:center;padding:0 10px;gap:8px;">
+          <div style="width:50px;height:8px;background:#334155;border-radius:2px;"></div>
+          <div style="flex:1;display:flex;justify-content:center;gap:6px;">
+            <div style="width:32px;height:8px;background:#334155;border-radius:2px;"></div>
+            <div style="width:32px;height:8px;background:#334155;border-radius:2px;"></div>
+          </div>
+          <!-- Botón search -->
+          <div style="background:rgba(251,146,60,0.12);border:1px solid rgba(251,146,60,0.45);border-radius:6px;padding:4px 10px;display:flex;align-items:center;gap:5px;cursor:pointer;">
+            <span style="font-size:11px;">🔍</span>
+            <span style="font-size:9px;color:#fb923c;font-weight:700;letter-spacing:0.1em;">TOP FOCOS</span>
+          </div>
+        </div>
+        <!-- Dropdown panel -->
+        <div style="position:absolute;top:36px;right:10px;width:200px;background:rgba(13,17,23,0.97);border:1px solid #1e293b;border-radius:10px;padding:8px;box-shadow:0 16px 40px rgba(0,0,0,0.6);z-index:10;">
+          <!-- Search input -->
+          <div style="background:#0a0c10;border:1px solid #1e293b;border-radius:6px;padding:5px 8px;display:flex;align-items:center;gap:5px;margin-bottom:6px;">
+            <span style="font-size:10px;opacity:0.5;">🔍</span>
+            <span style="font-size:9px;color:#475569;">Buscar por ID (FIRE-120)…</span>
+          </div>
+          <!-- Divider -->
+          <div style="font-size:8px;letter-spacing:0.15em;color:#475569;padding:2px 4px 4px;text-transform:uppercase;">Top 10 por FRP</div>
+          <!-- Fire items -->
+          <div style="background:rgba(239,68,68,0.12);border-radius:5px;padding:5px 7px;display:flex;justify-content:space-between;margin-bottom:2px;border-left:2px solid #ef4444;">
+            <span style="color:#ef4444;font-weight:700;font-size:9px;">FIRE-001</span>
+            <span style="color:#ef4444;font-size:9px;">824 MW</span>
+          </div>
+          <div style="background:rgba(249,115,22,0.08);border-radius:5px;padding:5px 7px;display:flex;justify-content:space-between;margin-bottom:2px;">
+            <span style="color:#f97316;font-size:9px;">FIRE-047</span>
+            <span style="color:#f97316;font-size:9px;">612 MW</span>
+          </div>
+          <div style="padding:5px 7px;display:flex;justify-content:space-between;margin-bottom:2px;">
+            <span style="color:#94a3b8;font-size:9px;">FIRE-023</span>
+            <span style="color:#94a3b8;font-size:9px;">445 MW</span>
+          </div>
+          <div style="padding:5px 7px;display:flex;justify-content:space-between;">
+            <span style="color:#64748b;font-size:9px;">FIRE-089</span>
+            <span style="color:#64748b;font-size:9px;">380 MW</span>
+          </div>
+          <div style="text-align:center;font-size:8px;color:#334155;padding:4px 0 2px;">+ 6 más…</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Botón → Dropdown (Recomendado)</h3>
+      <p>Un botón "TOP FOCOS" en el topbar. Al hacer clic abre un panel dropdown con input de búsqueda arriba y lista top 10 abajo. Simple y consistente con el resto del topbar.</p>
+    </div>
+    <div class="pros-cons">
+      <div class="pros"><h4>Pros</h4><ul><li>No ocupa espacio cuando está cerrado</li><li>Familiar (patrón de dropdown estándar)</li><li>Fácil de implementar</li></ul></div>
+      <div class="cons"><h4>Cons</h4><ul><li>Un clic extra para abrir</li></ul></div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="palette" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0d1117;border-radius:8px;font-family:monospace;font-size:10px;color:#94a3b8;height:220px;position:relative;overflow:hidden;">
+        <!-- Topbar -->
+        <div style="background:#080c14;border-bottom:1px solid #1e293b;height:36px;display:flex;align-items:center;padding:0 10px;gap:8px;opacity:0.4;">
+          <div style="width:50px;height:8px;background:#334155;border-radius:2px;"></div>
+          <div style="flex:1;"></div>
+        </div>
+        <!-- Command palette overlay -->
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:flex-start;justify-content:center;padding-top:50px;">
+          <div style="width:220px;background:#0d1117;border:1px solid rgba(251,146,60,0.4);border-radius:12px;padding:10px;box-shadow:0 24px 60px rgba(0,0,0,0.8);">
+            <div style="background:#0a0c10;border:1px solid rgba(251,146,60,0.3);border-radius:8px;padding:6px 10px;display:flex;align-items:center;gap:5px;margin-bottom:8px;">
+              <span style="font-size:12px;">🔍</span>
+              <span style="font-size:9px;color:#475569;">Buscar foco por ID…</span>
+              <span style="margin-left:auto;font-size:8px;color:#334155;border:1px solid #334155;padding:1px 4px;border-radius:3px;">ESC</span>
+            </div>
+            <div style="font-size:8px;letter-spacing:0.15em;color:#475569;padding:2px 4px 5px;text-transform:uppercase;">🔥 Top Focos por Potencia</div>
+            <div style="background:rgba(239,68,68,0.15);border-radius:6px;padding:6px 8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;border:1px solid rgba(239,68,68,0.3);">
+              <div>
+                <div style="color:#ef4444;font-weight:700;font-size:9px;">FIRE-001</div>
+                <div style="color:#475569;font-size:8px;">-38.28° / -71.90°</div>
+              </div>
+              <span style="color:#ef4444;font-size:10px;font-weight:700;">824 MW</span>
+            </div>
+            <div style="padding:6px 8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">
+              <div>
+                <div style="color:#f97316;font-size:9px;">FIRE-047</div>
+                <div style="color:#475569;font-size:8px;">-38.14° / -71.55°</div>
+              </div>
+              <span style="color:#f97316;font-size:10px;font-weight:700;">612 MW</span>
+            </div>
+            <div style="padding:6px 8px;display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="color:#94a3b8;font-size:9px;">FIRE-023</div>
+                <div style="color:#475569;font-size:8px;">-37.95° / -72.11°</div>
+              </div>
+              <span style="color:#94a3b8;font-size:10px;">445 MW</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Command Palette (Modal)</h3>
+      <p>Overlay centrado tipo Spotlight/VS Code. Más espacio para mostrar coordenadas y detalles. Se cierra con ESC o clic fuera.</p>
+    </div>
+    <div class="pros-cons">
+      <div class="pros"><h4>Pros</h4><ul><li>Más espacio para info (coords, intensidad)</li><li>Fácil de buscar con teclado</li></ul></div>
+      <div class="cons"><h4>Cons</h4><ul><li>Tapa el mapa</li><li>Más complejo de implementar</li></ul></div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="sidebar" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#0d1117;border-radius:8px;font-family:monospace;font-size:10px;color:#94a3b8;height:220px;position:relative;overflow:hidden;">
+        <!-- Topbar -->
+        <div style="background:#080c14;border-bottom:1px solid #1e293b;height:36px;display:flex;align-items:center;padding:0 10px;gap:8px;">
+          <div style="width:50px;height:8px;background:#334155;border-radius:2px;"></div>
+          <div style="flex:1;display:flex;justify-content:center;gap:6px;">
+            <div style="width:32px;height:8px;background:#334155;border-radius:2px;"></div>
+          </div>
+          <!-- botón -->
+          <div style="background:rgba(251,146,60,0.12);border:1px solid rgba(251,146,60,0.45);border-radius:6px;padding:4px 8px;font-size:9px;color:#fb923c;">🔍</div>
+        </div>
+        <!-- Layout con side drawer -->
+        <div style="display:flex;height:calc(100% - 36px);">
+          <!-- Side drawer deslizado desde la derecha -->
+          <div style="flex:1;background:linear-gradient(135deg,#0f172a,#1a2744);position:relative;">
+            <div style="position:absolute;bottom:30px;left:25px;width:7px;height:7px;background:#ef4444;border-radius:50%;box-shadow:0 0 8px #ef4444;"></div>
+            <div style="position:absolute;bottom:50px;left:55px;width:5px;height:5px;background:#f97316;border-radius:50%;box-shadow:0 0 6px #f97316;"></div>
+          </div>
+          <!-- Drawer panel -->
+          <div style="width:100px;background:#0a0c10;border-left:1px solid rgba(251,146,60,0.3);padding:8px;flex-shrink:0;">
+            <div style="font-size:8px;color:#fb923c;font-weight:700;letter-spacing:0.12em;margin-bottom:6px;text-transform:uppercase;">Top Focos</div>
+            <div style="background:#0d1117;border:1px solid #1e293b;border-radius:4px;padding:3px 5px;font-size:8px;color:#475569;margin-bottom:5px;">🔍 FIRE-120…</div>
+            <div style="background:rgba(239,68,68,0.12);border-radius:4px;padding:4px 5px;margin-bottom:2px;border-left:2px solid #ef4444;">
+              <div style="color:#ef4444;font-size:8px;font-weight:700;">FIRE-001</div>
+              <div style="color:#475569;font-size:7px;">824 MW</div>
+            </div>
+            <div style="padding:4px 5px;margin-bottom:2px;">
+              <div style="color:#f97316;font-size:8px;">FIRE-047</div>
+              <div style="color:#475569;font-size:7px;">612 MW</div>
+            </div>
+            <div style="padding:4px 5px;">
+              <div style="color:#94a3b8;font-size:8px;">FIRE-023</div>
+              <div style="color:#475569;font-size:7px;">445 MW</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Side Drawer</h3>
+      <p>Un drawer que se desliza desde la derecha al activarse. La lista queda siempre visible mientras navegas el mapa sin cerrarlo.</p>
+    </div>
+    <div class="pros-cons">
+      <div class="pros"><h4>Pros</h4><ul><li>Lista siempre visible al mismo tiempo que el mapa</li></ul></div>
+      <div class="cons"><h4>Cons</h4><ul><li>Achica el mapa</li><li>Más complejo (ya hay panel derecho)</li></ul></div>
+    </div>
+  </div>
+
+</div>

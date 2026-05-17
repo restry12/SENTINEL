@@ -1,0 +1,166 @@
+<h2>Diseño — UI del Componente</h2>
+<p class="subtitle">Sección 2 de 3 — Cómo se ve y comporta HotspotSearch</p>
+
+<div class="split">
+
+  <div class="mockup">
+    <div class="mockup-header">Estado: cerrado (en el topbar)</div>
+    <div class="mockup-body" style="padding:0;">
+      <div style="background:#080c14;height:64px;display:flex;align-items:center;padding:0 24px;gap:16px;font-family:monospace;">
+        <!-- Brand -->
+        <div style="width:100px;display:flex;align-items:center;gap:8px;">
+          <div style="width:32px;height:32px;background:#0f172a;border:1px solid #1e293b;border-radius:6px;"></div>
+          <div>
+            <div style="font-size:10px;font-weight:900;color:#fff;letter-spacing:0.15em;">SENTINEL</div>
+            <div style="font-size:7px;color:#475569;">WILDFIRE AI</div>
+          </div>
+        </div>
+
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px;">
+          <!-- Nav -->
+          <div style="display:flex;gap:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:4px;">
+            <div style="padding:4px 10px;background:rgba(251,146,60,0.15);border:1px solid rgba(251,146,60,0.3);border-radius:4px;font-size:8px;color:#fb923c;font-weight:700;">DASHBOARD</div>
+            <div style="padding:4px 10px;font-size:8px;color:#475569;">AIRE</div>
+            <div style="padding:4px 10px;font-size:8px;color:#475569;">CIUDADANO</div>
+          </div>
+          <!-- Status -->
+          <div style="padding:4px 10px;border:1px solid rgba(239,68,68,0.4);border-radius:20px;font-size:8px;color:#ef4444;display:flex;align-items:center;gap:4px;">
+            <div style="width:5px;height:5px;background:#ef4444;border-radius:50%;"></div>
+            CRITICAL
+          </div>
+          <!-- Analizar -->
+          <div style="padding:4px 10px;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.4);border-radius:6px;font-size:8px;color:#fb923c;display:flex;align-items:center;gap:4px;">
+            ◉ Analizar
+          </div>
+          <!-- Fire count -->
+          <div style="padding:4px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-size:8px;color:#64748b;display:flex;align-items:center;gap:4px;">
+            FOCOS <span style="color:#fb923c;font-size:11px;font-weight:900;">4,203</span>
+          </div>
+          <!-- 🔍 BOTÓN NUEVO -->
+          <div style="padding:4px 12px;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.45);border-radius:6px;font-size:8px;color:#fb923c;font-weight:700;display:flex;align-items:center;gap:5px;letter-spacing:0.1em;">
+            🔍 TOP FOCOS
+          </div>
+        </div>
+
+        <div style="width:100px;display:flex;justify-content:flex-end;gap:6px;">
+          <div style="padding:4px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-size:8px;color:#e2e8f0;">00:00:00 UTC</div>
+          <div style="padding:4px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-size:8px;color:#e2e8f0;">ES</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Estado: abierto (dropdown desplegado)</div>
+    <div class="mockup-body" style="padding:0;position:relative;overflow:visible;">
+      <div style="background:#080c14;height:64px;display:flex;align-items:center;padding:0 24px;gap:16px;font-family:monospace;">
+        <div style="width:100px;"></div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:10px;">
+          <div style="display:flex;gap:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:4px;">
+            <div style="padding:4px 10px;background:rgba(251,146,60,0.15);border:1px solid rgba(251,146,60,0.3);border-radius:4px;font-size:8px;color:#fb923c;">DASHBOARD</div>
+            <div style="padding:4px 10px;font-size:8px;color:#475569;">AIRE</div>
+          </div>
+          <div style="padding:4px 10px;border:1px solid rgba(239,68,68,0.4);border-radius:20px;font-size:8px;color:#ef4444;display:flex;align-items:center;gap:4px;">
+            <div style="width:5px;height:5px;background:#ef4444;border-radius:50%;"></div>
+            CRITICAL
+          </div>
+          <div style="padding:4px 10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;font-size:8px;color:#64748b;display:flex;align-items:center;gap:4px;">
+            FOCOS <span style="color:#fb923c;font-size:11px;font-weight:900;">4,203</span>
+          </div>
+          <!-- Botón activo (open) -->
+          <div style="padding:4px 12px;background:rgba(251,146,60,0.2);border:1px solid rgba(251,146,60,0.7);border-radius:6px;font-size:8px;color:#fb923c;font-weight:700;display:flex;align-items:center;gap:5px;box-shadow:0 0 12px rgba(251,146,60,0.25);">
+            🔍 TOP FOCOS
+          </div>
+        </div>
+        <div style="width:100px;"></div>
+      </div>
+
+      <!-- Dropdown -->
+      <div style="position:absolute;top:64px;right:170px;width:260px;background:#0d1117;border:1px solid rgba(251,146,60,0.3);border-radius:12px;padding:10px;box-shadow:0 20px 50px rgba(0,0,0,0.7),0 0 30px rgba(251,146,60,0.08);z-index:100;font-family:monospace;">
+
+        <!-- Header label -->
+        <div style="font-size:8px;letter-spacing:0.2em;color:#475569;text-transform:uppercase;margin-bottom:8px;padding:0 2px;">Top Focos · Ordenado por FRP</div>
+
+        <!-- Search input -->
+        <div style="background:#080c14;border:1px solid #1e293b;border-radius:7px;padding:7px 10px;display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+          <span style="font-size:12px;opacity:0.4;">🔍</span>
+          <span style="font-size:9px;color:#334155;font-style:italic;">Buscar por ID (ej: FIRE-120)…</span>
+        </div>
+
+        <!-- Fire items -->
+        <!-- #1 critical -->
+        <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);border-radius:7px;padding:8px 10px;display:flex;align-items:center;gap:8px;margin-bottom:4px;cursor:pointer;">
+          <div style="width:6px;height:6px;background:#ef4444;border-radius:50%;box-shadow:0 0 8px #ef4444;flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:10px;font-weight:900;color:#ef4444;letter-spacing:0.12em;">FIRE-001</div>
+            <div style="font-size:8px;color:#475569;margin-top:1px;">-38.281° / -71.902°</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:13px;font-weight:900;color:#ef4444;">824</div>
+            <div style="font-size:7px;color:#475569;">MW</div>
+          </div>
+        </div>
+
+        <!-- #2 high -->
+        <div style="border-radius:7px;padding:8px 10px;display:flex;align-items:center;gap:8px;margin-bottom:4px;cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
+          <div style="width:6px;height:6px;background:#f97316;border-radius:50%;box-shadow:0 0 8px #f97316;flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:10px;font-weight:700;color:#f97316;letter-spacing:0.1em;">FIRE-047</div>
+            <div style="font-size:8px;color:#475569;">-38.140° / -71.550°</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:13px;font-weight:900;color:#f97316;">612</div>
+            <div style="font-size:7px;color:#475569;">MW</div>
+          </div>
+        </div>
+
+        <!-- #3 -->
+        <div style="border-radius:7px;padding:8px 10px;display:flex;align-items:center;gap:8px;margin-bottom:4px;cursor:pointer;">
+          <div style="width:6px;height:6px;background:#f97316;border-radius:50%;flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="font-size:10px;font-weight:700;color:#f97316;letter-spacing:0.1em;">FIRE-023</div>
+            <div style="font-size:8px;color:#475569;">-37.950° / -72.110°</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:13px;font-weight:700;color:#f97316;">445</div>
+            <div style="font-size:7px;color:#475569;">MW</div>
+          </div>
+        </div>
+
+        <!-- #4-#6 más dimmed -->
+        <div style="border-radius:7px;padding:7px 10px;display:flex;align-items:center;gap:8px;margin-bottom:3px;opacity:0.7;cursor:pointer;">
+          <div style="width:5px;height:5px;background:#fbbf24;border-radius:50%;flex-shrink:0;"></div>
+          <div style="flex:1;font-size:9px;color:#94a3b8;letter-spacing:0.08em;">FIRE-089</div>
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;">380 MW</div>
+        </div>
+        <div style="border-radius:7px;padding:7px 10px;display:flex;align-items:center;gap:8px;margin-bottom:3px;opacity:0.6;cursor:pointer;">
+          <div style="width:5px;height:5px;background:#fbbf24;border-radius:50%;flex-shrink:0;"></div>
+          <div style="flex:1;font-size:9px;color:#94a3b8;letter-spacing:0.08em;">FIRE-012</div>
+          <div style="font-size:11px;font-weight:700;color:#94a3b8;">315 MW</div>
+        </div>
+        <div style="border-radius:7px;padding:7px 10px;display:flex;align-items:center;gap:8px;opacity:0.5;cursor:pointer;">
+          <div style="width:5px;height:5px;background:#64748b;border-radius:50%;flex-shrink:0;"></div>
+          <div style="flex:1;font-size:9px;color:#64748b;letter-spacing:0.08em;">FIRE-156</div>
+          <div style="font-size:11px;color:#64748b;">298 MW</div>
+        </div>
+
+        <!-- Footer -->
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.05);text-align:center;font-size:8px;color:#334155;letter-spacing:0.08em;">
+          + 4 focos más • click para volar al foco
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Comportamientos clave</h3>
+  <ul style="color:#94a3b8;font-size:13px;line-height:2;">
+    <li>🔴 / 🟠 / 🟡 El color del dot refleja la intensidad del foco (≥300 MW crítico, ≥100 alto, resto moderado)</li>
+    <li>Click fuera del dropdown → cierra automáticamente</li>
+    <li>Al escribir en el input → filtra en tiempo real sobre la lista completa por ID</li>
+    <li>Click en cualquier foco → <code>flyTo(lat, lon, zoom≥11)</code> + abre popup + setSelectedFire</li>
+    <li>Si no hay datos aún → botón deshabilitado (igual que "Analizar")</li>
+  </ul>
+</div>
