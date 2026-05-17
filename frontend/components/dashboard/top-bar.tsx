@@ -39,7 +39,28 @@ export function TopBar() {
     <div className="flex flex-col shrink-0 z-50">
       <div className="h-[1.5px] bg-[linear-gradient(90deg,transparent_0%,rgba(255,126,21,0.2)_10%,rgba(255,51,51,0.8)_50%,rgba(255,126,21,0.2)_90%,transparent_100%)] shadow-[0_0_15px_rgba(255,51,51,0.3)]" />
 
-      <header className="h-[64px] px-6 border-b border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_70%)] bg-[#080c14/90] backdrop-blur-xl flex items-center justify-between gap-4">
+      {/* Mobile header */}
+      <header className="md:hidden h-12 px-4 border-b border-white/5 bg-[#080c14/90] backdrop-blur-xl flex items-center justify-between gap-3">
+        <img
+          src="/sentinel-logo.png"
+          alt="SENTINEL"
+          className="h-8 w-auto object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.25)]"
+        />
+        <div className={`px-3 py-1.5 rounded-full border border-red/40 bg-[linear-gradient(180deg,rgba(255,51,51,0.15),rgba(255,51,51,0.05))] ${statusColor} flex items-center gap-2`}>
+          <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(255,51,51,1)] ${connected ? "bg-red animate-pulse" : "bg-text-muted"}`} />
+          <span className="text-[10px] font-black tracking-[0.2em] uppercase whitespace-nowrap">{statusLabel}</span>
+        </div>
+        <button
+          onClick={toggle}
+          className="flex items-center gap-1 px-2 py-1.5 bg-surface border border-border-2 rounded-lg text-[10px] font-black tracking-widest text-foreground hover:border-blue/50 transition-all"
+        >
+          <Globe className="w-3.5 h-3.5" />
+          <span>{lang === 'es' ? 'ES' : 'EN'}</span>
+        </button>
+      </header>
+
+      {/* Desktop header */}
+      <header className="hidden md:flex h-[64px] px-6 border-b border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_70%)] bg-[#080c14/90] backdrop-blur-xl items-center justify-between gap-4">
         {/* Brand */}
         <div className="w-80 flex items-center gap-3">
           <img
