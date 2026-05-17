@@ -52,8 +52,9 @@ const AMENITY_TYPE: Record<string, CellInfrastructure['type']> = {
 }
 
 interface OverpassNode {
-  lat: number
-  lon: number
+  lat?: number
+  lon?: number
+  center?: { lat: number; lon: number }
   tags?: Record<string, string>
 }
 
@@ -66,9 +67,9 @@ export async function fetchInfrastructure(cell: FireRiskCell): Promise<CellInfra
   const centerLon = cell.lon + cell.size / 2
   const query = `[out:json][timeout:25];
 (
-  node["amenity"~"hospital|school|kindergarten|fire_station|police"](${latMin},${lonMin},${latMax},${lonMax});
+  nwr["amenity"~"^(hospital|school|kindergarten|fire_station|police)$"](${latMin},${lonMin},${latMax},${lonMax});
 );
-out body;`
+out center;`
   try {
     const res = await fetch(OVERPASS_URL, {
       method: 'POST',
@@ -80,12 +81,19 @@ out body;`
     const data = (await res.json()) as { elements?: OverpassNode[] }
     return (data.elements ?? [])
       .filter(n => n.tags?.name && n.tags?.amenity && AMENITY_TYPE[n.tags.amenity])
-      .map(n => ({
-        name: n.tags!.name,
-        type: AMENITY_TYPE[n.tags!.amenity],
-        lat: n.lat,
-        lon: n.lon,
-        distance_km: Math.round(haversineKm(centerLat, centerLon, n.lat, n.lon) * 10) / 10,
+      .map(n => {
+        const lat = n.lat ?? n.center?.lat
+        const lon = n.lon ?? n.center?.lon
+        return { node: n, lat, lon }
+      })
+      .filter((x): x is { node: OverpassNode; lat: number; lon: number } =>
+        typeof x.lat === 'number' && typeof x.lon === 'number')
+      .map(x => ({
+        name: x.node.tags!.name,
+        type: AMENITY_TYPE[x.node.tags!.amenity],
+        lat: x.lat,
+        lon: x.lon,
+        distance_km: Math.round(haversineKm(centerLat, centerLon, x.lat, x.lon) * 10) / 10,
       }))
       .sort((a, b) => a.distance_km - b.distance_km)
   } catch {

@@ -36,8 +36,10 @@ export async function callOpenRouter(
     throw new Error(`OpenRouter error ${res.status}: ${err}`)
   }
 
-  const data = await res.json() as { choices: Array<{ message: { content: string } }> }
-  return data.choices[0].message.content
+  const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> }
+  const content = data.choices?.[0]?.message?.content
+  if (typeof content !== 'string') throw new Error('OpenRouter returned no content')
+  return content
 }
 
 export function parseJSON<T>(raw: string, agentName: string): T {
