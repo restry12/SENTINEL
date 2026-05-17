@@ -213,6 +213,7 @@ export function useSocket() {
   const [sentinelUpdate, setSentinelUpdate] = useState<SentinelUpdate | null>(null)
   const [status, setStatus] = useState<SocketStatus>({ state: "idle" })
   const [connected, setConnected] = useState(false)
+  const [citizenRoutes, setCitizenRoutes] = useState<NaturalRoutes | null>(null)
   const socketRef = useRef<Socket | null>(null)
 
   const hydrate = useCallback(async (retries = 3): Promise<boolean> => {
@@ -256,6 +257,10 @@ export function useSocket() {
       cacheUpdate(data)
     })
 
+    socket.on("citizen-routes", (data: { routes: unknown[]; naturalRoutes: NaturalRoutes | null }) => {
+      if (data.naturalRoutes) setCitizenRoutes(data.naturalRoutes)
+    })
+
     socket.on("status", (s: { state: "loading" | "ok" | "error"; message?: string }) =>
       setStatus(s)
     )
@@ -274,14 +279,23 @@ export function useSocket() {
     const socketId = socketRef.current?.id ?? null
     const body: Record<string, unknown> = { lat, lon }
     if (socketId) body.socketId = socketId
+
     fetch('/api/trigger/citizen-init', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     }).catch((err) => console.error('[triggerCitizen] HTTP trigger failed:', err))
+
+    if (socketId) {
+      fetch('/api/citizen-routes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userLat: lat, userLon: lon, socketId }),
+      }).catch((err) => console.error('[triggerCitizen] citizen-routes failed:', err))
+    }
   }, [])
 
   const refresh = useCallback(() => { hydrate() }, [hydrate])
 
-  return { sentinelUpdate, status, connected, trigger, triggerCitizen, refresh }
+  return { sentinelUpdate, status, connected, trigger, triggerCitizen, refresh, citizenRoutes }
 }

@@ -236,6 +236,55 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     res.status(202).json({ ok: true, accepted: true })
   })
 
+  // POST /api/citizen-routes — calls agent-routes/analyze/citizen with user GPS + last fires.
+  // Returns 202 immediately and emits `citizen-routes` to the requesting socket.
+  app.post('/api/citizen-routes', triggerLimiter, async (req, res) => {
+    const body = req.body as { userLat?: unknown; userLon?: unknown; socketId?: unknown }
+    const userLat = typeof body.userLat === 'number' && isFinite(body.userLat) ? body.userLat : undefined
+    const userLon = typeof body.userLon === 'number' && isFinite(body.userLon) ? body.userLon : undefined
+    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
+
+    if (userLat === undefined || userLon === undefined) {
+      res.status(400).json({ ok: false, error: 'userLat and userLon required' })
+      return
+    }
+
+    res.status(202).json({ ok: true, accepted: true })
+
+    const agentRoutesUrl = process.env.AGENT_ROUTES_URL
+    if (!agentRoutesUrl) {
+      console.warn('[citizen-routes] AGENT_ROUTES_URL not set')
+      return
+    }
+
+    const last = getLastUpdate()
+    const fires = last?.fires ?? []
+    const weather = last?.weather ?? { speed: 0, deg: 0 }
+
+    try {
+      const response = await fetch(`${agentRoutesUrl}/analyze/citizen`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userLat,
+          userLon,
+          fires,
+          weather: {
+            wind_speed_kmh: Math.round((weather.speed ?? 0) * 3.6),
+            wind_dir_deg: weather.deg ?? 0,
+          },
+        }),
+      })
+      const data = await response.json() as { success: boolean; data: unknown }
+      if (data.success) {
+        const emitter = socketId ? io.to(socketId) : io
+        emitter.emit('citizen-routes', data.data)
+      }
+    } catch (err) {
+      console.error('[citizen-routes] agent-routes call failed:', err instanceof Error ? err.message : err)
+    }
+  })
+
   // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
   // Receives { runId, socketId, lat, lon, weather, pm25 }
   // runId references fires cached by /api/fires/filter; weather and pm25 at citizen's location

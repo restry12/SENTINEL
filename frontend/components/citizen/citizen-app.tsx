@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { CITIZEN_MOCK, type CitizenData, type NaturalRoute, type ScreenRisk } from '@/lib/citizen-mock-data'
-import type { SentinelUpdate } from '@/hooks/use-socket'
+import type { SentinelUpdate, NaturalRoutes } from '@/hooks/use-socket'
 import {
   ScreenLocating,
   ScreenAlert,
@@ -47,6 +47,7 @@ function compassToDeg(s: string): number {
 function buildScene(
   userLoc: { lat: number; lon: number } | null,
   u: SentinelUpdate | null,
+  citizenRoutes: NaturalRoutes | null = null,
 ): CitizenData {
   const riskLevel = (u?.riskLevel as ScreenRisk) ?? CITIZEN_MOCK.riskLevel
   const user = userLoc
@@ -76,7 +77,7 @@ function buildScene(
     : CITIZEN_MOCK.fires
 
   // Real escape routes from the routes agent
-  const backendRoutes = u.naturalRoutes?.rutas ?? []
+  const backendRoutes = citizenRoutes?.rutas ?? u?.naturalRoutes?.rutas ?? []
   const naturalRoutes: NaturalRoute[] = backendRoutes.length > 0
     ? backendRoutes.map((r, i) => ({
         id: `R-${String(i + 1).padStart(2, '0')}`,
@@ -115,8 +116,11 @@ function buildScene(
 export function CitizenApp() {
   const [screen, setScreen] = useState<ScreenState>('locating')
   const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(null)
-  const { sentinelUpdate, connected, triggerCitizen } = useSentinel()
-  const data = useMemo(() => buildScene(userLoc, sentinelUpdate), [userLoc, sentinelUpdate])
+  const { sentinelUpdate, connected, triggerCitizen, citizenRoutes } = useSentinel()
+  const data = useMemo(
+    () => buildScene(userLoc, sentinelUpdate, citizenRoutes),
+    [userLoc, sentinelUpdate, citizenRoutes],
+  )
 
   const handleLocated = useCallback((coords?: { lat: number; lon: number }) => {
     if (coords) {
