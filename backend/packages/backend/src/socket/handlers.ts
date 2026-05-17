@@ -58,25 +58,13 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
     })
 
     socket.on('trigger-citizen', (data: { lat?: number; lon?: number }) => {
-      // Per-socket rate limit (shared map with 'trigger')
       const lastTrigger = socketLastTrigger.get(socket.id) ?? 0
       const elapsed = Date.now() - lastTrigger
       if (elapsed < SOCKET_TRIGGER_COOLDOWN_MS) {
         const waitSec = Math.ceil((SOCKET_TRIGGER_COOLDOWN_MS - elapsed) / 1000)
         socket.emit('status', {
           state: 'error',
-          message: `Demasiadas peticiones. Espera ${waitSec}s antes de analizar otra zona.`,
-        } satisfies StatusPayload)
-        return
-      }
-
-      const lat = typeof data.lat === 'number' && isFinite(data.lat) ? data.lat : undefined
-      const lon = typeof data.lon === 'number' && isFinite(data.lon) ? data.lon : undefined
-
-      if (lat === undefined || lon === undefined) {
-        socket.emit('status', {
-          state: 'error',
-          message: 'Coordenadas inválidas. Se requiere lat y lon.',
+          message: `Demasiadas peticiones. Espera ${waitSec}s.`,
         } satisfies StatusPayload)
         return
       }
@@ -89,13 +77,18 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
         return
       }
 
+      const lat = typeof data.lat === 'number' && isFinite(data.lat) ? data.lat : undefined
+      const lon = typeof data.lon === 'number' && isFinite(data.lon) ? data.lon : undefined
+      if (!lat || !lon) {
+        socket.emit('status', { state: 'error', message: 'Coordenadas inválidas.' } satisfies StatusPayload)
+        return
+      }
+
       socketLastTrigger.set(socket.id, Date.now())
       socket.emit('status', { state: 'loading' } satisfies StatusPayload)
 
       const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
-
       if (citizenWebhookUrl) {
-        // Delegate to Make.com — it fetches FIRMS/Weather/AQ and calls back to /api/trigger/citizen
         const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
         const webhookSecret = process.env.MAKE_CITIZEN_WEBHOOK_SECRET
         if (webhookSecret) webhookHeaders['Authorization'] = webhookSecret
@@ -106,13 +99,9 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
           body: JSON.stringify({ lat, lon, socketId: socket.id }),
         }).catch((err) => {
           console.error('[trigger-citizen] Make.com webhook call failed:', err)
-          socket.emit('status', {
-            state: 'error',
-            message: 'No se pudo iniciar el análisis ciudadano.',
-          } satisfies StatusPayload)
+          socket.emit('status', { state: 'error', message: 'No se pudo iniciar el análisis ciudadano.' } satisfies StatusPayload)
         })
       } else {
-        // Fallback: run degraded analysis with empty data
         console.warn('[trigger-citizen] MAKE_CITIZEN_WEBHOOK_URL not set — running degraded analysis')
         executeAndBroadcast(io, lat, lon, [], undefined, undefined, socket.id).catch((err) => {
           console.error('[trigger-citizen] fallback analysis error:', err)
@@ -152,30 +141,20 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
 const DEFAULT_LAT = -38.5
 const DEFAULT_LON = -72.0
 
-export async function executeAndBroadcast(
-  io: Server,
-  lat?: number,
-  lon?: number,
-  firms?: unknown[],
-  weather?: unknown,
-  pm25?: number,
-  targetSocketId?: string,
-): Promise<void> {
+export async function executeAndBroadcast(io: Server, lat?: number, lon?: number, firms?: unknown[], weather?: unknown, pm25?: number, targetSocketId?: string): Promise<void> {
   if (!acquireLock()) {
     console.warn('[orchestrator] analysis already in progress — skipping duplicate trigger')
     return
   }
 
-  const chan: { emit: (ev: string, ...args: unknown[]) => void } =
-    targetSocketId ? io.to(targetSocketId) : io
-
-  chan.emit('status', { state: 'loading' } satisfies StatusPayload)
+  const emitter = targetSocketId ? io.to(targetSocketId) : io
+  emitter.emit('status', { state: 'loading' } satisfies StatusPayload)
 
   try {
     const update = await runAnalysis(lat, lon, firms, weather, pm25)
-    if (!targetSocketId) setLastUpdate(update)
-    chan.emit('update', update)
-    chan.emit('status', { state: 'ok' } satisfies StatusPayload)
+    setLastUpdate(update)
+    emitter.emit('update', update)
+    emitter.emit('status', { state: 'ok' } satisfies StatusPayload)
 
     let alertsSent = false
     if (update.riskLevel === 'high' || update.riskLevel === 'critical') {
@@ -184,24 +163,19 @@ export async function executeAndBroadcast(
         fires: update.fires,
         timestamp: update.timestamp,
       }
-      chan.emit('alert', alert)
-      if (!targetSocketId) {
-        const centLat = lat ?? DEFAULT_LAT
-        const centLon = lon ?? DEFAULT_LON
-        await triggerMakeWebhook(update as SentinelUpdate, centLat, centLon)
-        alertsSent = true
-      }
+      emitter.emit('alert', alert)
+      const centLat = lat ?? DEFAULT_LAT
+      const centLon = lon ?? DEFAULT_LON
+      await triggerMakeWebhook(update as SentinelUpdate, centLat, centLon)
+      alertsSent = true
     }
 
     // Save to historical record (fails silently if Supabase not configured)
-    // Only save global analyses, not citizen-specific ones (which reference civilian GPS points)
-    if (!targetSocketId) {
-      await saveIncident(update, lat ?? DEFAULT_LAT, lon ?? DEFAULT_LON, alertsSent)
-    }
+    await saveIncident(update, lat ?? DEFAULT_LAT, lon ?? DEFAULT_LON, alertsSent)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[orchestrator] error:', message)
-    chan.emit('status', { state: 'error', message } satisfies StatusPayload)
+    emitter.emit('status', { state: 'error', message } satisfies StatusPayload)
   } finally {
     releaseLock()
   }

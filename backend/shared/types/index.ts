@@ -69,6 +69,13 @@ export interface SentinelUpdate {
   prediction?: PredictionResult
 }
 
+export interface PredictionResult {
+  riskScore: number
+  riskLevel: 'low' | 'medium' | 'high' | 'critical'
+  summary?: string
+  [key: string]: unknown
+}
+
 export interface AlertPayload {
   riskLevel: 'high' | 'critical'
   fires: FireData[]
@@ -108,7 +115,6 @@ export interface ExpansionData {
   expansion_12h: ExpansionPolygon
   velocidad_propagacion_kmh: number
   direccion_principal: string
-  direccion_principal_deg?: number   // propagation direction in degrees (0-360°)
 }
 
 export interface PerFireExpansion {
@@ -176,7 +182,6 @@ export interface NaturalRoute {
   instrucciones: string
   estado: 'LIBRE' | 'CONGESTIONADA' | 'BLOQUEADA'
   prioridad: 1 | 2 | 3
-  bearing_deg?: number   // initial compass bearing (0-360°) from route origin to destination
 }
 
 export interface NaturalRoutes {
@@ -190,27 +195,44 @@ export interface RoutesResult {
   naturalRoutes: NaturalRoutes | null
 }
 
-export interface PredictionCell {
-  lat: number
-  lon: number
-  risk_score: number        // 0-1 combined (FWI × 0.6 + historical × 0.4)
-  fwi_score: number         // 0-1 weather-only component
-  historical_weight: number // 0-1 history-only component
+// ─── Agent 6 — Fire Risk by Region ───────────────────────────────────────────
+
+export type RiskCategory = 'bajo' | 'medio' | 'alto' | 'critico'
+
+export interface RiskFactors {
+  fwi: number        // 0-100 — weather (single point)
+  historial: number  // 0-100 — real fire history + live FIRMS
+  terreno: number    // 0-100 — vegetation zone proxy
 }
 
-export interface PredictionResult {
-  grid: PredictionCell[]
-  top_zones: Array<{
-    lat: number
-    lon: number
-    risk_score: number
-    zona: string    // human-readable zone name from LLM
-    razon: string   // why this zone is at risk, from LLM
-  }>
-  analisis_6h: string
-  analisis_24h: string
-  analisis_72h: string
-  confianza: 'baja' | 'media' | 'alta'
+export interface RegionGeometry {
+  type: 'Polygon' | 'MultiPolygon'
+  coordinates: number[][][] | number[][][][]
+}
+
+export interface FireRiskRegion {
+  id: number               // codregion 1-16
+  nombre: string           // region name from GeoJSON properties.Region
+  score: number            // 0-100
+  category: RiskCategory
+  factors: RiskFactors     // each 0-100
+  geometry: RegionGeometry
+}
+
+export interface FireRiskRegionMap {
+  regions: FireRiskRegion[]
+  generated_at: string
+  weather_point: { lat: number; lon: number }   // single-weather-point limitation
+}
+
+export interface RegionDetail {
+  region_id: number
+  nombre: string
+  infraestructura_total: number          // count of sensible facilities (Overpass)
+  resumen_infraestructura: string
+  explicacion: string                    // Mistral
+  recomendaciones: string[]              // Mistral
+  prioridad: 'baja' | 'media' | 'alta' | 'critica'
 }
 
 // Agent contract — POST /analyze

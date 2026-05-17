@@ -10,44 +10,27 @@ import { storeRun, getRun } from '../services/run-cache'
 import { mergeEnriched } from '../utils/mergeEnriched'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
+import { fetchRiskGrid, fetchCellDetail } from '../services/prediction-proxy'
+import type { RiskCategory, RiskFactors } from '@sentinel/types'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
 
-// Cuántos focos (top por FRP) se mandan a Make.com para enriquecer. Única
-// perilla: subir/bajar acá según cuánto aguante OpenAQ / el tiempo de corrida.
 const ENRICH_LIMIT = 150
 
-type RawCitizenBody = {
-  fires?: unknown
-  lat?: unknown
-  lon?: unknown
-  socketId?: unknown
-}
+type RawCitizenBody = { fires?: unknown; lat?: unknown; lon?: unknown; socketId?: unknown }
 
 export function parseCitizenBody(body: RawCitizenBody): {
-  firms: unknown[]
-  socketId: string
-  lat: number | undefined
-  lon: number | undefined
-  pm25: number | undefined
+  firms: unknown[]; socketId: string; lat: number | undefined; lon: number | undefined; pm25: number | undefined
 } | null {
-  const socketId = typeof body.socketId === 'string' && body.socketId.length > 0
-    ? body.socketId
-    : null
+  const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : null
   if (!socketId) return null
-
   const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : null
   if (!rawFires) return null
-
   const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
   const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
-
-  const pm25Values = rawFires
-    .map(f => f.pm25)
-    .filter((v): v is number => typeof v === 'number')
+  const pm25Values = rawFires.map(f => f.pm25).filter((v): v is number => typeof v === 'number')
   const pm25 = pm25Values.length > 0 ? Math.max(...pm25Values) : undefined
-
   return { firms: rawFires, socketId, lat, lon, pm25 }
 }
 
@@ -55,6 +38,16 @@ export function parseCitizenBody(body: RawCitizenBody): {
 const triggerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Demasiadas solicitudes. Intenta de nuevo en 15 minutos.' },
+})
+
+// Grid endpoints hit Overpass + Mistral — more generous than triggerLimiter
+// but still capped to protect the upstreams.
+const gridLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, error: 'Demasiadas solicitudes. Intenta de nuevo en 15 minutos.' },
@@ -79,6 +72,48 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       lock: getLockStatus(),
       polling: polling.getState(),
     })
+  })
+
+  // GET /api/risk-grid — Fire Risk Grid, lazy-loaded by the dashboard toggle.
+  app.get('/api/risk-grid', gridLimiter, async (_req, res) => {
+    const last = getLastUpdate()
+    const weather = last?.weather ?? { speed: 0, deg: 0, humidity: 0 }
+    const firms = last?.fires ?? []
+    try {
+      const grid = await fetchRiskGrid(weather, firms)
+      res.json({ ok: true, grid })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(502).json({ ok: false, error: message })
+    }
+  })
+
+  // POST /api/cell-detail — per-region infrastructure + AI detail.
+  app.post('/api/cell-detail', gridLimiter, async (req, res) => {
+    const body = req.body as {
+      region_id?: unknown
+      nombre?: unknown
+      score?: unknown
+      category?: unknown
+      factors?: unknown
+    }
+    if (typeof body.region_id !== 'number') {
+      res.status(400).json({ ok: false, error: 'Missing region_id' })
+      return
+    }
+    try {
+      const detail = await fetchCellDetail({
+        region_id: body.region_id,
+        nombre: typeof body.nombre === 'string' ? body.nombre : '',
+        score: typeof body.score === 'number' ? body.score : 0,
+        category: (body.category as RiskCategory) ?? 'bajo',
+        factors: (body.factors as RiskFactors) ?? { fwi: 0, historial: 0, terreno: 0 },
+      })
+      res.json({ ok: true, detail })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(502).json({ ok: false, error: message })
+    }
   })
 
   // POST /api/trigger — manual single analysis run (rate limited)
@@ -158,25 +193,40 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   })
 
   // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
-  // Receives { fires, socketId, lat, lon } — emits analysis only to the requesting citizen socket
+  // Receives { fires, socketId, lat, lon, weather, pm25 }
+  // weather and pm25 are at the citizen's location (not per-fire)
   app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
     if (isLocked()) {
       res.status(202).json({ ok: false, accepted: false, error: 'Analysis in progress — try again shortly' })
       return
     }
 
-    const parsed = parseCitizenBody(req.body as RawCitizenBody)
-    if (!parsed) {
-      res.status(400).json({ ok: false, error: 'socketId required and fires must be an array' })
+    const body = req.body as {
+      fires?: unknown
+      socketId?: unknown
+      lat?: unknown
+      lon?: unknown
+      weather?: unknown
+      pm25?: unknown
+    }
+
+    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : null
+    if (!socketId) {
+      res.status(400).json({ ok: false, error: 'socketId required' })
       return
     }
-    const { firms, socketId, lat, lon, pm25 } = parsed
 
-    const enriched = mapRawFiresToFireData(firms as Record<string, unknown>[])
+    const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
+    const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+    const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+    const pm25 = typeof body.pm25 === 'number' ? body.pm25 : undefined
+    const weather = body.weather ?? undefined
+
+    const enriched = mapRawFiresToFireData(rawFires)
 
     res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
 
-    executeAndBroadcast(io, lat, lon, enriched, undefined, pm25, socketId).catch((err) => {
+    executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId).catch((err) => {
       console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
     })
   })
