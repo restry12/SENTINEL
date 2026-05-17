@@ -259,6 +259,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const map = mapRef.current
     if (!map || !userCoords) return
     const apply = () => {
+      if (!map.getStyle()) return
       const data = {
         type: 'Feature' as const,
         properties: {},
@@ -302,6 +303,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         cancelAnimationFrame(pulseRafRef.current)
         pulseRafRef.current = null
       }
+      if (!map.getStyle()) return
       [SELECTED, POINTS, 'fires-points-halo', CLUSTER_COUNT, CLUSTERS].forEach(id => {
         if (map.getLayer(id)) map.removeLayer(id)
       })
@@ -525,7 +527,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
 
       // Pulse animation for unclustered individual fires
       const animate = () => {
-        if (!mapRef.current || !mapRef.current.getLayer('fires-points-halo')) return
+        if (!mapRef.current || !mapRef.current.getStyle() || !mapRef.current.getLayer('fires-points-halo')) return
         const t = (performance.now() / 1400) % 1
         const phase = (Math.sin(t * Math.PI * 2) + 1) / 2  // 0..1
         const radius = 8 + phase * 14
@@ -554,6 +556,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     if (!map || !sentinelUpdate) return
 
     const apply = () => {
+      if (!map.getStyle()) return
       const polyId = 'sentinel-polygon'
       if (map.getLayer(polyId + '-fill')) map.removeLayer(polyId + '-fill')
       if (map.getLayer(polyId + '-line')) map.removeLayer(polyId + '-line')
@@ -598,6 +601,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const EXP_SOURCE_IDS = ['exp-outer', 'exp-mid', 'exp-core', 'exp-arrow-src']
 
     const drawExpansion = () => {
+      if (!map.getStyle()) return
       EXP_LAYER_IDS.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) })
       EXP_SOURCE_IDS.forEach(id => { if (map.getSource(id)) map.removeSource(id) })
 
@@ -683,6 +687,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const PF_LINE = 'per-fire-exp-line'
 
     const drawPerFire = () => {
+      if (!map.getStyle()) return
       if (map.getLayer(PF_LINE)) map.removeLayer(PF_LINE)
       if (map.getLayer(PF_FILL)) map.removeLayer(PF_FILL)
       if (map.getSource(PF_SRC)) map.removeSource(PF_SRC)
@@ -740,6 +745,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const LINE = 'prediction-heatmap-line'
 
     const cleanup = () => {
+      if (!map.getStyle()) return
       if (map.getLayer(LINE)) map.removeLayer(LINE)
       if (map.getLayer(FILL)) map.removeLayer(FILL)
       if (map.getSource(SRC)) map.removeSource(SRC)
