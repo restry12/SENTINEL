@@ -360,8 +360,12 @@ export async function calculateCitizenEscapeRoute(
       userLat, userLon, nearestFireDistKm, escapeBearing, routes, weather,
     )
     if (naturalRoutes) {
+      const fallbackBearing = bearingMap.size > 0 ? bearingMap.values().next().value : undefined
       for (const ruta of naturalRoutes.rutas) {
-        const bearing = bearingMap.get(ruta.destino) ?? bearingMap.get(ruta.nombre)
+        const bearing =
+          bearingMap.get(ruta.destino) ??
+          bearingMap.get(ruta.nombre) ??
+          fallbackBearing
         if (bearing !== undefined) ruta.bearing_deg = bearing
       }
     }
