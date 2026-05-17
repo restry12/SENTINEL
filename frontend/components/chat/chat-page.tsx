@@ -1,32 +1,131 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Bot, Zap, Newspaper, Activity, User, Briefcase } from "lucide-react"
+import {
+  Bot, User, Briefcase, ShieldAlert, Flame, Wind, Gauge,
+  MapPin, Building2, Navigation, Newspaper, Activity, TrendingUp,
+} from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { TopBar } from "@/components/dashboard/top-bar"
 import { useSentinel } from "@/contexts/sentinel-context"
 import { MessageBubble, type Message } from "./message-bubble"
 import { ChatInput } from "./chat-input"
+import { cn } from "@/lib/utils"
 
 type ChatMode = 'citizen' | 'expert'
 const MODE_LS_KEY = 'sentinel_chat_mode'
 
-const CITIZEN_SUGGESTIONS = [
-  "¿Estoy en peligro ahora mismo?",
-  "¿Qué hago si veo humo cerca de mi casa?",
-  "¿Es seguro que mis hijos salgan a jugar hoy?",
-  "¿Cuándo se espera que mejore el aire?",
+interface QuickCard {
+  icon: LucideIcon
+  accent: 'orange' | 'red' | 'blue' | 'cyan'
+  title: string
+  desc: string
+  prompt: string
+}
+
+const CITIZEN_CARDS: QuickCard[] = [
+  {
+    icon: ShieldAlert,
+    accent: 'orange',
+    title: "Estoy en peligro ahora mismo",
+    desc: "Evalúa riesgo inmediato y pasos de seguridad",
+    prompt: "¿Estoy en peligro ahora mismo? ¿Qué debo hacer?",
+  },
+  {
+    icon: Flame,
+    accent: 'red',
+    title: "Veo humo o fuego",
+    desc: "Reporta señales y recibe instrucciones",
+    prompt: "Veo humo o fuego cerca de mi ubicación, ¿qué hago?",
+  },
+  {
+    icon: Gauge,
+    accent: 'blue',
+    title: "El aire se siente pesado",
+    desc: "Consulta AQI y recomendaciones de salud",
+    prompt: "El aire se siente pesado y difícil de respirar, ¿cuál es la calidad del aire?",
+  },
+  {
+    icon: Wind,
+    accent: 'cyan',
+    title: "Hay viento extremo",
+    desc: "Analiza riesgo de tormenta o tornado",
+    prompt: "Hay viento extremo en mi zona, ¿cuál es el riesgo?",
+  },
 ]
 
-const EXPERT_SUGGESTIONS = [
-  "¿Cuál es el foco con mayor FRP actualmente?",
-  "Resumen operacional: focos activos, AQI, viento",
-  "Predicción 6h y 24h de propagación",
-  "Rutas de evacuación activas y estado",
+const EXPERT_CARDS: QuickCard[] = [
+  {
+    icon: Flame,
+    accent: 'red',
+    title: "Foco con mayor FRP",
+    desc: "Identifica el incendio más intenso actualmente",
+    prompt: "¿Cuál es el foco con mayor FRP actualmente?",
+  },
+  {
+    icon: Activity,
+    accent: 'orange',
+    title: "Resumen operacional",
+    desc: "Focos activos, AQI, condiciones de viento",
+    prompt: "Resumen operacional: focos activos, AQI, viento",
+  },
+  {
+    icon: TrendingUp,
+    accent: 'cyan',
+    title: "Predicción 6h y 24h",
+    desc: "Propagación estimada y condiciones futuras",
+    prompt: "Predicción 6h y 24h de propagación",
+  },
+  {
+    icon: Navigation,
+    accent: 'blue',
+    title: "Rutas de evacuación",
+    desc: "Estado de rutas activas y puntos de encuentro",
+    prompt: "Rutas de evacuación activas y estado",
+  },
 ]
 
-// crypto.randomUUID requires a secure context (HTTPS/localhost) and is missing
-// on older mobile Safari. Fall back to a timestamp+random ID so dev on a LAN IP
-// or older browsers still work.
+const ACCENT: Record<string, { border: string; bg: string; text: string; glow: string; iconBg: string }> = {
+  orange: {
+    border: "border-orange-500/20 hover:border-orange-500/40",
+    bg: "bg-orange-500/[0.04] hover:bg-orange-500/[0.08]",
+    text: "text-orange-400",
+    glow: "hover:shadow-[0_0_20px_rgba(249,115,22,0.08)]",
+    iconBg: "bg-orange-500/10 border border-orange-500/20",
+  },
+  red: {
+    border: "border-red-500/20 hover:border-red-500/40",
+    bg: "bg-red-500/[0.04] hover:bg-red-500/[0.08]",
+    text: "text-red-400",
+    glow: "hover:shadow-[0_0_20px_rgba(239,68,68,0.08)]",
+    iconBg: "bg-red-500/10 border border-red-500/20",
+  },
+  blue: {
+    border: "border-blue-500/20 hover:border-blue-500/40",
+    bg: "bg-blue-500/[0.04] hover:bg-blue-500/[0.08]",
+    text: "text-blue-400",
+    glow: "hover:shadow-[0_0_20px_rgba(59,130,246,0.08)]",
+    iconBg: "bg-blue-500/10 border border-blue-500/20",
+  },
+  cyan: {
+    border: "border-cyan-500/20 hover:border-cyan-500/40",
+    bg: "bg-cyan-500/[0.04] hover:bg-cyan-500/[0.08]",
+    text: "text-cyan-400",
+    glow: "hover:shadow-[0_0_20px_rgba(34,211,238,0.08)]",
+    iconBg: "bg-cyan-500/10 border border-cyan-500/20",
+  },
+}
+
+const CONTEXT_CHIPS: { icon: LucideIcon; label: string }[] = [
+  { icon: MapPin,     label: "Ubicación" },
+  { icon: Flame,      label: "Incendios activos" },
+  { icon: Gauge,      label: "Calidad del aire" },
+  { icon: Wind,       label: "Viento" },
+  { icon: Newspaper,  label: "Noticias" },
+  { icon: Building2,  label: "Infraestructura crítica" },
+  { icon: Navigation, label: "Rutas de evacuación" },
+]
+
 function makeId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -42,27 +141,18 @@ export function ChatPage() {
     try {
       const stored = window.localStorage.getItem(MODE_LS_KEY)
       if (stored === 'citizen' || stored === 'expert') setMode(stored)
-    } catch {
-      /* localStorage unavailable — keep default */
-    }
+    } catch { /* localStorage unavailable */ }
   }, [])
 
   const updateMode = (next: ChatMode) => {
     setMode(next)
-    try {
-      window.localStorage.setItem(MODE_LS_KEY, next)
-    } catch {
-      /* non-critical */
-    }
+    try { window.localStorage.setItem(MODE_LS_KEY, next) } catch { /* non-critical */ }
   }
 
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [newsArticles, setNewsArticles] = useState<Array<{ title: string; snippet?: string; source: string; publishedAt: string }>>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  // Tracks the in-flight fetch so we can abort on unmount or when the user
-  // clears the conversation mid-stream — avoids "setState on unmounted"
-  // warnings and stops wasting OpenRouter tokens.
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -78,65 +168,41 @@ export function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Abort any in-flight chat stream when the component unmounts.
   useEffect(() => () => abortRef.current?.abort(), [])
 
   const sendMessage = async (content: string) => {
-    // Cancel any prior in-flight stream before starting a new one.
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
 
-    const userMsg: Message = {
-      id: makeId(),
-      role: 'user',
-      content,
-      timestamp: new Date(),
-    }
-
+    const userMsg: Message = { id: makeId(), role: 'user', content, timestamp: new Date() }
     const history = messages.map(m => ({ role: m.role, content: m.content }))
     setMessages(prev => [...prev, userMsg])
     setIsStreaming(true)
 
     const assistantId = makeId()
-    setMessages(prev => [
-      ...prev,
-      { id: assistantId, role: 'assistant', content: '', timestamp: new Date() },
-    ])
+    setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '', timestamp: new Date() }])
 
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: content,
-          history,
-          sentinelSnapshot: sentinelUpdate,
-          newsArticles,
-          mode,
-        }),
+        body: JSON.stringify({ message: content, history, sentinelSnapshot: sentinelUpdate, newsArticles, mode }),
         signal: controller.signal,
       })
 
-      if (!res.ok || !res.body) {
-        throw new Error('stream failed')
-      }
+      if (!res.ok || !res.body) throw new Error('stream failed')
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
-      // SSE buffer: TCP chunks can split a JSON line in half. We keep the
-      // trailing incomplete line in `buffer` and prepend it to the next chunk.
-      // Without this, JSON.parse fails on partial lines and tokens are lost.
       let buffer = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''   // last item may be incomplete — save for next iteration
-
+        buffer = lines.pop() ?? ''
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6).trim()
@@ -146,19 +212,13 @@ export function ChatPage() {
             const token: string = parsed.choices?.[0]?.delta?.content ?? ''
             if (token) {
               setMessages(prev =>
-                prev.map(m =>
-                  m.id === assistantId ? { ...m, content: m.content + token } : m
-                )
+                prev.map(m => m.id === assistantId ? { ...m, content: m.content + token } : m)
               )
             }
-          } catch {
-            // malformed SSE line — skip
-          }
+          } catch { /* malformed SSE line */ }
         }
       }
     } catch (err) {
-      // AbortError = intentional cancel (unmount / clear / new send). Leave
-      // any partial text in place and don't surface a fake error to the user.
       if ((err as { name?: string })?.name !== 'AbortError') {
         setMessages(prev =>
           prev.map(m =>
@@ -181,86 +241,69 @@ export function ChatPage() {
     setMessages([])
   }
 
-  const hasLiveData = !!sentinelUpdate
-  const hasNews = newsArticles.length > 0
   const lastMessageIsStreaming =
-    isStreaming &&
-    messages.length > 0 &&
-    messages[messages.length - 1].role === 'assistant'
+    isStreaming && messages.length > 0 && messages[messages.length - 1].role === 'assistant'
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       <TopBar />
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 min-h-0">
-        {/* Chat header */}
-        <div className="flex items-center gap-3 py-4 border-b border-white/10 shrink-0 flex-wrap">
-          <div className="w-10 h-10 rounded-full bg-orange-500/20 border border-orange-500/40 flex items-center justify-center">
-            <Bot className="w-5 h-5 text-orange-400" />
+
+        {/* ── Header ── */}
+        <div className="flex items-center gap-4 py-4 border-b border-white/[0.06] shrink-0">
+          <div className="relative shrink-0">
+            <div className="absolute inset-0 rounded-full bg-orange-500/15 blur-lg scale-125 animate-pulse pointer-events-none" />
+            <div className="relative w-10 h-10 rounded-full bg-[#0d1117] border border-orange-500/25 flex items-center justify-center shadow-[0_0_20px_rgba(249,115,22,0.12)]">
+              <Bot className="w-5 h-5 text-orange-400" />
+            </div>
           </div>
+
           <div>
-            <h1 className="text-white font-black tracking-widest text-sm uppercase">SENTINEL AI</h1>
-            <p className="text-white/40 text-[10px] tracking-wider">
-              {mode === 'citizen'
-                ? 'Te ayudo a entender qué pasa y qué hacer'
-                : 'Analista operacional · datos en vivo, predicción, rutas'}
+            <h1 className="text-white font-black tracking-[0.2em] text-sm uppercase">SENTINEL AI</h1>
+            <p className="text-white/35 text-[10px] tracking-wider mt-0.5">
+              Asistente operativo para emergencias ambientales
             </p>
           </div>
-          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+
+          <div className="ml-auto flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-emerald-500/20 bg-emerald-500/[0.05]">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)] animate-pulse" />
+              <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-emerald-400/70">Sistema activo</span>
+            </div>
+
             <div
-              className="flex items-center rounded-md border border-white/10 bg-white/5 p-0.5"
+              className="flex items-center rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5"
               role="radiogroup"
               aria-label="Modo de respuesta"
             >
-              <button
-                type="button"
-                role="radio"
-                aria-checked={mode === 'citizen'}
-                onClick={() => updateMode('citizen')}
-                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded font-mono transition-colors ${
-                  mode === 'citizen'
-                    ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
-                    : 'text-white/50 hover:text-white/80'
-                }`}
-              >
-                <User className="w-3 h-3" />
-                Ciudadano
-              </button>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={mode === 'expert'}
-                onClick={() => updateMode('expert')}
-                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded font-mono transition-colors ${
-                  mode === 'expert'
-                    ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
-                    : 'text-white/50 hover:text-white/80'
-                }`}
-              >
-                <Briefcase className="w-3 h-3" />
-                Experto
-              </button>
+              {(['citizen', 'expert'] as ChatMode[]).map(m => {
+                const Icon = m === 'citizen' ? User : Briefcase
+                const label = m === 'citizen' ? 'Ciudadano' : 'Experto'
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={mode === m}
+                    onClick={() => updateMode(m)}
+                    className={cn(
+                      "flex items-center gap-1.5 text-[10px] px-3 py-1.5 rounded-md font-bold uppercase tracking-widest transition-all duration-200",
+                      mode === m
+                        ? "bg-orange-500/15 text-orange-300 border border-orange-500/30 shadow-[0_0_10px_rgba(249,115,22,0.1)]"
+                        : "text-white/30 hover:text-white/60"
+                    )}
+                  >
+                    <Icon className="w-3 h-3" />
+                    {label}
+                  </button>
+                )
+              })}
             </div>
-            {hasLiveData && (
-              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-orange-500/30 text-orange-400/80 bg-orange-500/5 font-mono">
-                <Activity className="w-3 h-3" />
-                Datos en vivo
-              </span>
-            )}
-            {hasNews && (
-              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 text-blue-400/80 bg-blue-500/5 font-mono">
-                <Newspaper className="w-3 h-3" />
-                Noticias
-              </span>
-            )}
-            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-white/10 text-white/30 bg-white/5 font-mono">
-              <Zap className="w-3 h-3" />
-              Mistral Large
-            </span>
           </div>
         </div>
 
-        {/* Messages area */}
+        {/* ── Messages ── */}
         <div className="flex-1 overflow-y-auto py-6 space-y-6 min-h-0">
           {messages.length === 0 && (
             <WelcomeScreen onSuggestion={sendMessage} mode={mode} />
@@ -275,11 +318,7 @@ export function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        <ChatInput
-          onSend={sendMessage}
-          onClear={clearHistory}
-          disabled={isStreaming}
-        />
+        <ChatInput onSend={sendMessage} onClear={clearHistory} disabled={isStreaming} />
       </div>
     </div>
   )
@@ -292,31 +331,83 @@ function WelcomeScreen({
   onSuggestion: (s: string) => void
   mode: ChatMode
 }) {
-  const suggestions = mode === 'citizen' ? CITIZEN_SUGGESTIONS : EXPERT_SUGGESTIONS
-  const subtitle =
-    mode === 'citizen'
-      ? 'Pregúntame qué está pasando y qué puedes hacer'
-      : 'Datos en vivo, predicción, recursos operacionales'
+  const cards = mode === 'citizen' ? CITIZEN_CARDS : EXPERT_CARDS
+  const subtitle = mode === 'citizen'
+    ? "Describe humo, fuego, mala calidad del aire, viento extremo o una emergencia cercana."
+    : "Consulta datos operacionales, predicciones de propagación y recursos de respuesta."
 
   return (
-    <div className="flex flex-col items-center justify-center py-16 gap-6 text-center">
-      <div className="w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center">
-        <Bot className="w-8 h-8 text-orange-400" />
+    <div className="flex flex-col items-center pt-6 pb-4 gap-7">
+
+      {/* Premium icon with glow rings */}
+      <div className="relative">
+        <div className="absolute inset-0 rounded-full bg-orange-500/10 blur-2xl scale-[2.5] pointer-events-none" />
+        <div className="absolute inset-0 rounded-full bg-orange-500/15 blur-xl scale-[1.6] pointer-events-none" />
+        <div className="relative w-20 h-20 rounded-full bg-[#0d1117] border border-orange-500/20 flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.12),inset_0_0_20px_rgba(249,115,22,0.04)]">
+          <div
+            className="absolute inset-2 rounded-full border border-transparent animate-spin pointer-events-none"
+            style={{ borderTopColor: 'rgba(249,115,22,0.35)', animationDuration: '8s' }}
+          />
+          <div
+            className="absolute inset-[10px] rounded-full border border-transparent animate-spin pointer-events-none"
+            style={{ borderTopColor: 'rgba(34,211,238,0.2)', animationDuration: '12s', animationDirection: 'reverse' }}
+          />
+          <Bot className="w-9 h-9 text-orange-400 relative z-10" />
+        </div>
       </div>
-      <div>
-        <p className="text-white/70 text-sm">¿En qué puedo ayudarte hoy?</p>
-        <p className="text-white/30 text-xs mt-1">{subtitle}</p>
+
+      {/* Title */}
+      <div className="text-center space-y-2">
+        <h2 className="text-xl font-black text-white tracking-tight">¿Qué está ocurriendo cerca de ti?</h2>
+        <p className="text-white/40 text-sm max-w-md leading-relaxed">{subtitle}</p>
       </div>
-      <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
-        {suggestions.map(s => (
-          <button
-            key={s}
-            onClick={() => onSuggestion(s)}
-            className="text-left text-xs px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/90 transition-colors"
-          >
-            {s}
-          </button>
-        ))}
+
+      {/* Quick access cards */}
+      <div className="grid grid-cols-2 gap-3 w-full max-w-2xl">
+        {cards.map((card) => {
+          const a = ACCENT[card.accent]
+          const Icon = card.icon
+          return (
+            <button
+              key={card.title}
+              onClick={() => onSuggestion(card.prompt)}
+              className={cn(
+                "flex items-start gap-3 text-left p-4 rounded-xl border transition-all duration-200",
+                a.border, a.bg, a.glow
+              )}
+            >
+              <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5", a.iconBg)}>
+                <Icon className={cn("w-5 h-5", a.text)} />
+              </div>
+              <div>
+                <p className="text-white/90 text-xs font-bold leading-snug mb-1">{card.title}</p>
+                <p className="text-white/35 text-[11px] leading-relaxed">{card.desc}</p>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Context chips */}
+      <div className="w-full max-w-2xl">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex-1 h-px bg-white/[0.05]" />
+          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20">
+            Contexto que puedo analizar
+          </span>
+          <div className="flex-1 h-px bg-white/[0.05]" />
+        </div>
+        <div className="flex flex-wrap gap-1.5 justify-center">
+          {CONTEXT_CHIPS.map(({ icon: ChipIcon, label }) => (
+            <div
+              key={label}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-white/[0.07] bg-white/[0.03] text-white/25"
+            >
+              <ChipIcon className="w-3 h-3" />
+              <span className="text-[10px] font-medium">{label}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
