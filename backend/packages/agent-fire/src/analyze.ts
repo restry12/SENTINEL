@@ -1,4 +1,4 @@
-import type { FireData, WeatherData, FireAnalysis, RiskAssessment, ExpansionData, GeoJSONFeature, PerFireExpansion } from '@sentinel/types'
+import type { FireData, WeatherData, FireAnalysis, RiskAssessment, ExpansionData, GeoJSONFeature, PerFireExpansion, RegionalContext } from '@sentinel/types'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
 export function degreesToCardinal(deg: number): string {
@@ -42,6 +42,37 @@ function toClimateData(weather: WeatherData) {
     humidity_pct: weather.humidity,
     precipitation_mm: 0,
   }
+}
+
+// A_context: Regional fire behavior inference from coordinates
+async function runAContext(fire: FireData): Promise<RegionalContext> {
+  const system = `Eres un experto en comportamiento de incendios forestales en América Latina.
+Recibes las coordenadas exactas de un foco de incendio y debes inferir el contexto regional de comportamiento del fuego.
+Responde SOLO con JSON válido, sin texto adicional, sin markdown, sin bloques de código.
+El JSON debe tener exactamente esta estructura:
+{
+  "region_name": "nombre descriptivo de la región geográfica",
+  "country": "país donde se localiza el foco",
+  "vegetation_type": "tipo de vegetación predominante en la zona",
+  "terrain_type": "tipo de terreno (montañoso, planicie, costal, etc.)",
+  "spread_multiplier": número entre 0.5 y 2.0 que escala la tasa base de propagación relativa a un incendio típico,
+  "max_ros_kmh": número máximo realista de tasa de propagación en km/h para esta región y vegetación,
+  "reference_fires": ["array de 1-3 incendios reales históricos de la zona en formato 'Nombre Año: X ha en Y horas con vientos de Z km/h'"],
+  "context_summary": "resumen breve del comportamiento típico del fuego en esta región para calibrar predicciones"
+}
+CRITERIOS DE CALIBRACIÓN:
+- Estepa patagónica / pastizales secos: spread_multiplier 1.4-2.0, max_ros_kmh 15-20
+- Bosque templado húmedo (Araucanía, Valdivia): spread_multiplier 0.6-0.8, max_ros_kmh 5-8
+- Bosque mediterráneo / matorral (Chile central): spread_multiplier 1.0-1.3, max_ros_kmh 8-12
+- Amazonia / selva tropical: spread_multiplier 0.4-0.6, max_ros_kmh 2-5
+- Cerrado brasileño / sabana: spread_multiplier 1.2-1.6, max_ros_kmh 10-15
+- Chaco: spread_multiplier 1.1-1.5, max_ros_kmh 8-14`
+
+  const user = `Foco de incendio en lat ${fire.lat}, lon ${fire.lon} (FRP: ${fire.frp} MW).
+Infiere el contexto regional y devuelve el JSON de calibración.`
+
+  const raw = await callOpenRouter(MODELS.large, system, user)
+  return parseJSON<RegionalContext>(raw, 'A_context')
 }
 
 // A1: Risk Evaluator
