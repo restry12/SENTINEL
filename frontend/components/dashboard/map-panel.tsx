@@ -118,13 +118,6 @@ export function MapPanel() {
             </span>
           </div>
 
-          <div className="absolute bottom-6 right-6 px-2.5 py-1.5 bg-[#0a0b0e/75] border border-border-2 rounded-sm backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-[1px] bg-text-dim/50" />
-              <span className="text-[10px] font-mono font-medium text-text-2 tracking-widest uppercase">5.0 KM</span>
-            </div>
-          </div>
-
           {/* Central Reticle (Slightly more technical) */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-10">
             <div className="w-40 h-40 border border-white/30 rounded-full flex items-center justify-center">

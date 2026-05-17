@@ -4,11 +4,19 @@ import type { PollingController } from '../controllers/polling'
 import { rateLimit } from 'express-rate-limit'
 import { executeAndBroadcast } from '../socket/handlers'
 import { parseFirmsCSV } from '../utils/parseFirmsCSV'
+import { dedupeFires } from '../utils/dedupeFires'
+import { mapRawFiresToFireData } from '../utils/mapRawFires'
+import { storeRun, getRun } from '../services/run-cache'
+import { mergeEnriched } from '../utils/mergeEnriched'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
+
+// Cuántos focos (top por FRP) se mandan a Make.com para enriquecer. Única
+// perilla: subir/bajar acá según cuánto aguante OpenAQ / el tiempo de corrida.
+const ENRICH_LIMIT = 150
 
 // Max 10 analysis requests per IP every 15 minutes
 const triggerLimiter = rateLimit({
@@ -65,27 +73,33 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
   })
 
-  // POST /api/fires/filter — recibe CSV de NASA, devuelve los 50 focos con mayor FRP
+  // POST /api/fires/filter — recibe CSV de NASA. Deduplica, guarda la lista
+  // completa bajo un runId, y devuelve solo el top ENRICH_LIMIT por FRP.
   app.post('/api/fires/filter', (req, res) => {
     const csv = typeof req.body === 'string' ? req.body : ''
     const all = csv ? parseFirmsCSV(csv) : []
 
-    const fires = [...all]
-      .sort((a, b) => b.frp - a.frp)
-      .slice(0, 50)
+    const deduped = dedupeFires(all)
+    const runId = storeRun(deduped)
 
-    res.json({ fires, total: all.length, dangerous: fires.length })
+    res.json({
+      runId,
+      fires: deduped.slice(0, ENRICH_LIMIT),
+      total: all.length,
+      dangerous: deduped.length,
+    })
   })
 
   // POST /api/trigger/full — recibe fires[] de Make.com (rate limited)
   // Cada fire trae: { lat, lon, frp, brightness, speed, deg, humidity, date, pm25 }
   app.post('/api/trigger/full', triggerLimiter, async (req, res) => {
-    const body = req.body as { fires?: unknown[] }
+    const body = req.body as { fires?: unknown[]; runId?: unknown }
     const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
 
-    const firms = rawFires.map(f => ({
-      lat: f.lat, lon: f.lon, frp: f.frp, brightness: f.brightness, timestamp: f.date ?? f.timestamp,
-    }))
+    const enriched = mapRawFiresToFireData(rawFires)
+    const runId = typeof body.runId === 'string' ? body.runId : undefined
+    const full = runId ? (getRun(runId) ?? []) : []
+    const firms = mergeEnriched(full, enriched)
 
     const first = rawFires[0]
     const weather = first
