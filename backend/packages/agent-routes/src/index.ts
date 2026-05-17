@@ -4,7 +4,7 @@ import type { AgentRequest, AgentResponse, NaturalRoutes } from '@sentinel/types
 import { calculateEvacuationRoutes } from './analyze'
 
 const app = express()
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
 
 app.post('/analyze', async (req, res) => {
   const body = req.body as AgentRequest
