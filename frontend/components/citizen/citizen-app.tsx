@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { CITIZEN_MOCK, type CitizenData, type ScreenRisk } from '@/lib/citizen-mock-data'
 import type { SentinelUpdate } from '@/hooks/use-socket'
@@ -42,6 +42,14 @@ export function CitizenApp() {
   const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(null)
   const { sentinelUpdate, triggerCitizen } = useSentinel()
   const data = useMemo(() => buildScene(userLoc, sentinelUpdate), [userLoc, sentinelUpdate])
+
+  const handleLocated = useCallback((coords?: { lat: number; lon: number }) => {
+    if (coords) {
+      setUserLoc(coords)
+      triggerCitizen(coords.lat, coords.lon)
+    }
+    setScreen('alert')
+  }, [triggerCitizen])
   const route = data.naturalRoutes[0] ?? CITIZEN_MOCK.naturalRoutes[0]
 
   return (
@@ -49,13 +57,7 @@ export function CitizenApp() {
       {screen === 'locating' && (
         <ScreenLocating
           riskLevel={data.riskLevel}
-          onLocated={(coords) => {
-            if (coords) {
-              setUserLoc(coords)
-              triggerCitizen(coords.lat, coords.lon)
-            }
-            setScreen('alert')
-          }}
+          onLocated={handleLocated}
         />
       )}
       {screen === 'alert' && (

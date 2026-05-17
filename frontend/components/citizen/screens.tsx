@@ -124,11 +124,20 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
 
     // Request the real device GPS location
     if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
+      const doGps = () => navigator.geolocation.getCurrentPosition(
         (pos) => finish({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-        () => finish(), // permission denied / unavailable → fall back to demo scene
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+        () => finish(),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
       )
+      // Check permission state first — if already denied, go to fallback immediately
+      if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+          if (result.state === 'denied') finish()
+          else doGps()
+        }).catch(() => doGps())
+      } else {
+        doGps()
+      }
     } else {
       timers.push(setTimeout(() => finish(), 2200))
     }
