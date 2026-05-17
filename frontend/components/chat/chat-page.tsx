@@ -194,16 +194,53 @@ export function ChatPage() {
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 min-h-0">
         {/* Chat header */}
-        <div className="flex items-center gap-3 py-4 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-3 py-4 border-b border-white/10 shrink-0 flex-wrap">
           <div className="w-10 h-10 rounded-full bg-orange-500/20 border border-orange-500/40 flex items-center justify-center">
             <Bot className="w-5 h-5 text-orange-400" />
           </div>
           <div>
             <h1 className="text-white font-black tracking-widest text-sm uppercase">SENTINEL AI</h1>
-            <p className="text-white/40 text-[10px] tracking-wider uppercase">Analista Operacional de Emergencias</p>
+            <p className="text-white/40 text-[10px] tracking-wider uppercase">
+              {mode === 'citizen'
+                ? 'Te ayudo a entender qué pasa y qué hacer'
+                : 'Analista operacional · datos en vivo, predicción, rutas'}
+            </p>
           </div>
-          {/* Context chips */}
           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+            <div
+              className="flex items-center rounded-md border border-white/10 bg-white/5 p-0.5"
+              role="tablist"
+              aria-label="Modo de respuesta"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'citizen'}
+                onClick={() => updateMode('citizen')}
+                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded font-mono transition-colors ${
+                  mode === 'citizen'
+                    ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
+                    : 'text-white/50 hover:text-white/80'
+                }`}
+              >
+                <User className="w-3 h-3" />
+                Ciudadano
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'expert'}
+                onClick={() => updateMode('expert')}
+                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded font-mono transition-colors ${
+                  mode === 'expert'
+                    ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
+                    : 'text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Briefcase className="w-3 h-3" />
+                Experto
+              </button>
+            </div>
             {hasLiveData && (
               <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-orange-500/30 text-orange-400/80 bg-orange-500/5 font-mono">
                 <Activity className="w-3 h-3" />
@@ -213,7 +250,7 @@ export function ChatPage() {
             {hasNews && (
               <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 text-blue-400/80 bg-blue-500/5 font-mono">
                 <Newspaper className="w-3 h-3" />
-                Noticias Chile
+                Noticias
               </span>
             )}
             <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-white/10 text-white/30 bg-white/5 font-mono">
