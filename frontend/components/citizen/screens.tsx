@@ -533,6 +533,100 @@ export function ScreenTrappedConfirm({ onCancel, onConfirm }: ScreenTrappedConfi
   )
 }
 
+// ── Screen Safe: No Nearby Fire ───────────────────────────────────────────
+
+interface ScreenSafeProps {
+  nearestKm: number | null
+  weather: { wind_speed_kmh: number; wind_dir_deg: number; humidity_pct: number; temp_c: number }
+  onRefresh?: () => void
+}
+
+export function ScreenSafe({ nearestKm, weather, onRefresh }: ScreenSafeProps) {
+  return (
+    <div className="screen scanlines" style={{
+      width: '100%', height: '100%',
+      background: 'radial-gradient(ellipse 90% 60% at 50% 40%, rgba(34,197,94,0.08) 0%, var(--background) 65%)',
+      display: 'flex', flexDirection: 'column', position: 'relative',
+    }}>
+      <SentinelStatusStrip riskLevel="low" />
+      <div style={{ height: 86 }} />
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 28 }}>
+        {/* Shield icon */}
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+          <path d="M 40 8 L 68 18 L 68 42 C 68 58 55 70 40 74 C 25 70 12 58 12 42 L 12 18 Z"
+            fill="rgba(34,197,94,0.12)" stroke="rgba(34,197,94,0.6)" strokeWidth="2" />
+          <path d="M 26 40 L 36 50 L 54 32" stroke="var(--safe)" strokeWidth="3"
+            strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+
+        <div style={{ textAlign: 'center', maxWidth: 300 }}>
+          <div className="font-mono" style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--safe)', marginBottom: 10, textTransform: 'uppercase' }}>
+            ÁREA MONITOREADA
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.15, marginBottom: 12 }}>
+            Sin amenaza activa
+          </div>
+          {nearestKm !== null && isFinite(nearestKm) && (
+            <div style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.45 }}>
+              El foco más cercano está a{' '}
+              <span style={{ color: 'var(--foreground)', fontWeight: 600 }}>
+                {nearestKm.toFixed(1)} km
+              </span>{' '}
+              de tu posición.
+            </div>
+          )}
+        </div>
+
+        {/* Weather strip */}
+        <div style={{
+          width: '100%', maxWidth: 320, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
+        }}>
+          {[
+            { label: 'VIENTO',    value: `${weather.wind_speed_kmh} km/h` },
+            { label: 'HUMEDAD',   value: `${weather.humidity_pct}%` },
+            { label: 'TEMP',      value: `${weather.temp_c}°C` },
+          ].map(({ label, value }) => (
+            <div key={label} style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '8px 10px', textAlign: 'center',
+            }}>
+              <div className="font-mono" style={{ fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{label}</div>
+              <div className="font-mono" style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: '14px 22px 36px' }}>
+        <div className="font-mono" style={{
+          fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em',
+          textAlign: 'center', marginBottom: 14, textTransform: 'uppercase',
+        }}>
+          SENTINEL MONITOREA EN TIEMPO REAL
+        </div>
+        <button
+          onClick={onRefresh}
+          style={{
+            width: '100%', minHeight: 56, borderRadius: 14,
+            background: 'transparent', color: 'var(--foreground)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            fontSize: 15, fontWeight: 500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            cursor: 'pointer',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path d="M 2 8 A 6 6 0 1 1 8 14 M 8 14 L 5 11 M 8 14 L 11 11"
+              stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </svg>
+          Actualizar mi ubicación
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Screen 04b: Trapped Live ───────────────────────────────────────────────
 
 type ResponderState = 'dispatched' | 'enroute' | 'ack'

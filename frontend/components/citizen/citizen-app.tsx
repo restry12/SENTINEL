@@ -9,10 +9,11 @@ import {
   ScreenAlert,
   ScreenTrappedConfirm,
   ScreenTrappedLive,
+  ScreenSafe,
 } from './screens'
 import { SentinelCompass } from './sentinel-compass'
 
-type ScreenState = 'locating' | 'alert' | 'compass' | 'trapped_confirm' | 'trapped_live'
+type ScreenState = 'locating' | 'alert' | 'compass' | 'trapped_confirm' | 'trapped_live' | 'safe'
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371
@@ -21,6 +22,16 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
+
+function nearestFireKm(
+  userLoc: { lat: number; lon: number },
+  fires: { lat: number; lon: number }[],
+): number {
+  if (fires.length === 0) return Infinity
+  return Math.min(...fires.map((f) => haversineKm(userLoc.lat, userLoc.lon, f.lat, f.lon)))
+}
+
+const CITIZEN_ALERT_RADIUS_KM = 0.8
 
 function compassToDeg(s: string): number {
   const map: Record<string, number> = {
@@ -72,7 +83,7 @@ function buildScene(
         label: r.nombre,
         destino: r.destino,
         distancia_km: r.distancia_km,
-        bearing_deg: u.weather?.deg ?? 0,
+        bearing_deg: r.bearing_deg ?? u.weather?.deg ?? 0,
         eta_min: r.tiempo_estimado_min,
         estado: r.estado,
         instrucciones: r.instrucciones ? [r.instrucciones] : undefined,
@@ -114,9 +125,16 @@ export function CitizenApp() {
       if (!connected) {
         console.warn('[CitizenApp] socket not connected — trigger-citizen not sent')
       }
+      if (sentinelUpdate && sentinelUpdate.fires.length > 0) {
+        const nearest = nearestFireKm(coords, sentinelUpdate.fires)
+        setScreen(nearest <= CITIZEN_ALERT_RADIUS_KM ? 'alert' : 'safe')
+      } else {
+        setScreen('alert')
+      }
+    } else {
+      setScreen('alert')
     }
-    setScreen('alert')
-  }, [triggerCitizen, connected])
+  }, [triggerCitizen, connected, sentinelUpdate])
 
   const route = data.naturalRoutes[0] ?? CITIZEN_MOCK.naturalRoutes[0]
 
@@ -155,6 +173,15 @@ export function CitizenApp() {
       {screen === 'trapped_live' && (
         <ScreenTrappedLive
           onRecall={() => setScreen('alert')}
+        />
+      )}
+      {screen === 'safe' && (
+        <ScreenSafe
+          nearestKm={userLoc && data.fires.length > 0
+            ? nearestFireKm(userLoc, data.fires)
+            : null}
+          weather={data.weather}
+          onRefresh={() => setScreen('locating')}
         />
       )}
     </div>
