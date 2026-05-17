@@ -1,6 +1,7 @@
 "use client"
 
-import { Bot, User } from "lucide-react"
+import { User } from "lucide-react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 export interface Message {
@@ -23,14 +24,14 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
       {/* Label row */}
       <div className={cn("flex items-center gap-1.5 px-1", isUser && "flex-row-reverse")}>
         <div className={cn(
-          "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+          "w-5 h-5 rounded-full flex items-center justify-center shrink-0 overflow-hidden",
           isUser
             ? "bg-orange-500/15 border border-orange-500/30"
-            : "bg-cyan-500/10 border border-cyan-500/20"
+            : "border border-cyan-500/25 shadow-[0_0_8px_rgba(34,211,238,0.15)]"
         )}>
           {isUser
             ? <User className="w-2.5 h-2.5 text-orange-400" />
-            : <Bot className="w-2.5 h-2.5 text-cyan-400" />
+            : <Image src="/condor.png" alt="SENTINEL AI" width={20} height={20} className="object-cover object-top w-full h-full" />
           }
         </div>
         <span className={cn(

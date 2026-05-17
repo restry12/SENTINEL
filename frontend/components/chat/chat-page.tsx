@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from "react"
 import {
-  Bot, User, Briefcase, ShieldAlert, Flame, Wind, Gauge,
+  User, Briefcase, ShieldAlert, Flame, Wind, Gauge,
   MapPin, Building2, Navigation, Newspaper, Activity, TrendingUp,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import Image from "next/image"
 import { TopBar } from "@/components/dashboard/top-bar"
 import { useSentinel } from "@/contexts/sentinel-context"
 import { MessageBubble, type Message } from "./message-bubble"
@@ -253,9 +254,9 @@ export function ChatPage() {
         {/* ── Header ── */}
         <div className="flex items-center gap-4 py-4 border-b border-white/[0.06] shrink-0">
           <div className="relative shrink-0">
-            <div className="absolute inset-0 rounded-full bg-orange-500/15 blur-lg scale-125 animate-pulse pointer-events-none" />
-            <div className="relative w-10 h-10 rounded-full bg-[#0d1117] border border-orange-500/25 flex items-center justify-center shadow-[0_0_20px_rgba(249,115,22,0.12)]">
-              <Bot className="w-5 h-5 text-orange-400" />
+            <div className="absolute inset-0 rounded-full bg-cyan-500/15 blur-lg scale-125 animate-pulse pointer-events-none" />
+            <div className="relative w-10 h-10 rounded-full overflow-hidden border border-cyan-500/25 shadow-[0_0_20px_rgba(34,211,238,0.12)]">
+              <Image src="/condor.png" alt="SENTINEL AI" fill className="object-cover object-top" />
             </div>
           </div>
 
@@ -339,20 +340,20 @@ function WelcomeScreen({
   return (
     <div className="flex flex-col items-center pt-6 pb-4 gap-7">
 
-      {/* Premium icon with glow rings */}
+      {/* Premium condor avatar with glow rings */}
       <div className="relative">
-        <div className="absolute inset-0 rounded-full bg-orange-500/10 blur-2xl scale-[2.5] pointer-events-none" />
-        <div className="absolute inset-0 rounded-full bg-orange-500/15 blur-xl scale-[1.6] pointer-events-none" />
-        <div className="relative w-20 h-20 rounded-full bg-[#0d1117] border border-orange-500/20 flex items-center justify-center shadow-[0_0_40px_rgba(249,115,22,0.12),inset_0_0_20px_rgba(249,115,22,0.04)]">
+        <div className="absolute inset-0 rounded-full bg-cyan-500/10 blur-2xl scale-[2.5] pointer-events-none" />
+        <div className="absolute inset-0 rounded-full bg-cyan-500/12 blur-xl scale-[1.6] pointer-events-none" />
+        <div className="relative w-24 h-24 rounded-full overflow-hidden border border-cyan-500/25 shadow-[0_0_50px_rgba(34,211,238,0.15),inset_0_0_20px_rgba(34,211,238,0.04)]">
           <div
-            className="absolute inset-2 rounded-full border border-transparent animate-spin pointer-events-none"
-            style={{ borderTopColor: 'rgba(249,115,22,0.35)', animationDuration: '8s' }}
+            className="absolute inset-0 rounded-full border-2 border-transparent animate-spin pointer-events-none z-10"
+            style={{ borderTopColor: 'rgba(249,115,22,0.4)', animationDuration: '8s' }}
           />
           <div
-            className="absolute inset-[10px] rounded-full border border-transparent animate-spin pointer-events-none"
-            style={{ borderTopColor: 'rgba(34,211,238,0.2)', animationDuration: '12s', animationDirection: 'reverse' }}
+            className="absolute inset-1 rounded-full border border-transparent animate-spin pointer-events-none z-10"
+            style={{ borderTopColor: 'rgba(34,211,238,0.3)', animationDuration: '12s', animationDirection: 'reverse' }}
           />
-          <Bot className="w-9 h-9 text-orange-400 relative z-10" />
+          <Image src="/condor.png" alt="SENTINEL AI" fill className="object-cover object-top relative z-0" />
         </div>
       </div>
 
