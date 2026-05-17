@@ -36,24 +36,31 @@ const TOKEN =
 
 type ExpansionKey = '2h' | '6h' | '12h'
 
-// Elliptical fire spread model (simplified Rothermel).
+// Elliptical fire spread model — shape from wind, size from LLM area (km²).
 function makeFireSpreadPolygon(
   lat: number, lon: number,
   windDegFrom: number, windSpeedMs: number,
-  hours: number
+  expansionKm2: number
 ) {
   const windKmh = windSpeedMs * 3.6
   const spreadRad = ((windDegFrom + 180) % 360) * (Math.PI / 180)
   const sinS = Math.sin(spreadRad)
   const cosS = Math.cos(spreadRad)
 
-  const ros_forward = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
+  // Shape ratios from wind (Rothermel simplified)
+  const ros_forward = Math.max(0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002, 0.5)
   const ros_backing = 0.3
   const ros_flank = Math.sqrt(ros_forward * ros_backing)
 
-  const d_forward = ros_forward * hours
-  const d_backing = ros_backing * hours
-  const d_flank = Math.max(ros_flank * hours, 0.3)
+  // Scale the ellipse so its area matches expansionKm2: area = π * a * b
+  // a = k*(ros_forward+ros_backing)/2, b = k*ros_flank
+  // → k = sqrt(expansionKm2 / (π * (ros_forward+ros_backing)/2 * ros_flank))
+  const shapeArea = Math.PI * ((ros_forward + ros_backing) / 2) * ros_flank
+  const k = Math.sqrt(Math.max(expansionKm2, 0.01) / shapeArea)
+
+  const d_forward = k * ros_forward
+  const d_backing = k * ros_backing
+  const d_flank = Math.max(k * ros_flank, 0.05)
 
   const a = (d_forward + d_backing) / 2
   const b = d_flank
@@ -507,11 +514,15 @@ export function MapboxPanel({
       if (!selectedFire || !activeExpansion) return
 
       const config = EXP_CONFIG[activeExpansion]
+      const expansionKm2 =
+        activeExpansion === '2h'  ? (selectedFire.expansion2h?.km2  ?? config.hours * 5) :
+        activeExpansion === '6h'  ? (selectedFire.expansion6h?.km2  ?? config.hours * 5) :
+                                    (selectedFire.expansion12h?.km2 ?? config.hours * 5)
       const poly = makeFireSpreadPolygon(
         selectedFire.lat, selectedFire.lon,
         selectedFire.weather?.deg ?? 0,
         selectedFire.weather?.speed ?? 0,
-        config.hours
+        expansionKm2
       )
 
       map.addSource(expId, { type: 'geojson', data: poly as any })
