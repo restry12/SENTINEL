@@ -41,7 +41,9 @@ export function combineScores(cells: PredictionCell[]): PredictionCell[] {
       ...c,
       risk_score: Math.min(c.fwi_score * 0.6 + c.historical_weight * 0.4, 1),
     }))
-    .filter(c => c.risk_score > 0.2)
+    // Only show cells with real spatial variation: historical hotspot OR extreme FWI.
+    // Without this, the grid renders as a uniform color across the entire region.
+    .filter(c => c.historical_weight > 0 || c.fwi_score > 0.75)
 }
 
 function snapToGrid(v: number): number {
