@@ -46,6 +46,14 @@ export interface Glacier {
   ai?: GlacierAI
 }
 
+export interface ScoreInputs {
+  areaNow: number
+  areaRef: number
+  tempAnomaly: number
+  elevation: number
+  cuencaFactor: number
+}
+
 // Shape de respuesta cruda de GLIMS WFS
 export interface GlimsFeature {
   properties: {

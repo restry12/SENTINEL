@@ -13,9 +13,9 @@ const TEMP_BASELINE: Record<string, number[]> = {
 }
 
 export function getZone(lat: number): 'norte' | 'centro' | 'sur' | 'patagonia' {
-  if (lat > -30) return 'norte'
-  if (lat > -40) return 'centro'
-  if (lat > -50) return 'sur'
+  if (lat > -27) return 'norte'
+  if (lat > -38) return 'centro'
+  if (lat > -46) return 'sur'
   return 'patagonia'
 }
 
@@ -42,8 +42,9 @@ export function getCuenca(lat: number, lon: number): string {
   if (lat > -35 && lat < -33.5) return 'Río Rapel · Cuenca Rapel'
   if (lat > -36 && lat < -35) return 'Río Tinguiririca · Cuenca Rapel'
   if (lat > -40 && lat < -36) return 'Río Biobío · Cuenca Biobío'
+  if (lat > -42 && lat < -40) return 'Río Petrohué · Cuenca Los Lagos'
   if (lat > -45 && lat < -40) return 'Cuenca Palena-Puelo'
-  if (lat > -48 && lat < -45) return 'Campo de Hielo Norte · Aysén'
+  if (lat > -48 && lat < -45) return 'Campo de Hielo Norte · Aysén / Cochrane'
   return 'Campo de Hielo Sur · Magallanes'
 }
 

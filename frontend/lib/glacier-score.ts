@@ -1,12 +1,4 @@
-import type { RiskCat } from './glacier-types'
-
-export interface ScoreInputs {
-  areaNow: number         // km² actual
-  areaRef: number         // km² en época de referencia (o estimado)
-  tempAnomaly: number     // °C sobre baseline
-  elevation: number       // m.s.n.m.
-  cuencaFactor: number    // 0–100, importancia hídrica
-}
+import type { RiskCat, ScoreInputs } from '@/lib/glacier-types'
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
@@ -61,19 +53,21 @@ export function getCat(riesgo: number): RiskCat {
   return 'Estable'
 }
 
-export function getTrend(massHistory: number[]): string {
-  if (massHistory.length < 4) return 'Sin datos suficientes'
+export function getTrend(massHistory: number[]): 'Retroceso acelerado' | 'Retroceso lento' | 'Estable' {
+  if (massHistory.length < 4) return 'Estable'
   const last = massHistory.slice(-4)
   const slope = (last[3] - last[0]) / 3
   if (slope < -0.05) return 'Retroceso acelerado'
   if (slope < -0.01) return 'Retroceso lento'
-  if (slope > 0.01) return 'Leve recuperación'
   return 'Estable'
 }
 
 export function getMasaVar(massHistory: number[]): string {
+  if (massHistory.length === 0) return '−0.00 m EH/año'
   const last = massHistory.at(-1) ?? 0
-  return `${last.toFixed(2)} m EH/año`
+  const formatted = last.toFixed(2)
+  const display = formatted.startsWith('-') ? '−' + formatted.slice(1) : formatted
+  return `${display} m EH/año`
 }
 
 // Derivar riskHistory (12 puntos) a partir de los arrays históricos
