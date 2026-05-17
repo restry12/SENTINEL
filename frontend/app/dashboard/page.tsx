@@ -8,10 +8,12 @@ import { MetricCards } from "@/components/dashboard/metric-cards"
 import { SafeRoute } from "@/components/dashboard/safe-route"
 import { InfoSections } from "@/components/dashboard/info-sections"
 import { AuthGuard } from "@/components/auth-guard"
+import { FireSelectionProvider } from "@/contexts/fire-selection-context"
 
 export default function Dashboard() {
   return (
     <AuthGuard>
+    <FireSelectionProvider>
     <div className="h-screen flex flex-col bg-background overflow-hidden relative selection:bg-orange/30">
       <TopBar />
 
@@ -34,6 +36,7 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+    </FireSelectionProvider>
     </AuthGuard>
   )
 }

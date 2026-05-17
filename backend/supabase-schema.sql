@@ -129,3 +129,21 @@ CREATE POLICY "last_snapshot_read_all" ON last_snapshot
 CREATE POLICY "last_snapshot_write_service" ON last_snapshot
   FOR ALL USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
+
+-- ============================================================
+-- Historial de hotspots FIRMS (para A6 — predicción de ignición)
+-- Acumulado por el orchestrator en cada run de Make.com.
+-- A6 lee los últimos 30 días para calcular pesos históricos por celda 0.25°.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS fire_hotspot_history (
+  id          bigserial PRIMARY KEY,
+  lat         double precision NOT NULL,
+  lon         double precision NOT NULL,
+  frp         double precision,
+  brightness  double precision,
+  timestamp   timestamptz NOT NULL,
+  created_at  timestamptz DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS fire_hotspot_history_timestamp_idx ON fire_hotspot_history (timestamp);
+CREATE INDEX IF NOT EXISTS fire_hotspot_history_lat_lon_idx ON fire_hotspot_history (lat, lon);

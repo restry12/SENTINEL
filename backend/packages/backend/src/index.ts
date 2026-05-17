@@ -20,6 +20,7 @@ for (const name of REQUIRED_ENV) {
 }
 
 const app = express()
+app.set('trust proxy', 1)
 app.use(express.json({ limit: '10mb' }))
 app.use(express.text({ type: 'text/plain', limit: '10mb' }))
 

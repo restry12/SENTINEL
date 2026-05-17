@@ -10,7 +10,9 @@ import type {
   AirAlerts,
   AuthorityReport,
   RoutesResult,
+  PredictionResult,
 } from '@sentinel/types'
+import { appendFireHistory } from './fire-history'
 
 const DEFAULT_LAT = -38.5
 const DEFAULT_LON = -72.0
@@ -84,8 +86,9 @@ function parseOpenWeatherResponse(v: unknown): WeatherData | null {
   const speed = typeof wind.speed === 'number' ? wind.speed : null
   const deg = typeof wind.deg === 'number' ? wind.deg : 0
   const humidity = typeof main.humidity === 'number' ? main.humidity : 0
+  const temp = typeof main.temp === 'number' ? main.temp : undefined
   if (speed === null) return null
-  return { speed, deg, humidity, gust: typeof wind.gust === 'number' ? wind.gust : undefined }
+  return { speed, deg, humidity, temp, gust: typeof wind.gust === 'number' ? wind.gust : undefined }
 }
 
 function pm25ToAqi(pm25: number): number {
@@ -116,6 +119,8 @@ export async function runAnalysis(
 ): Promise<SentinelUpdate> {
   // All data comes from Make.com — no external API fetches
   const fires = externalFirms ? (externalFirms as FireData[]) : []
+  // Accumulate hotspots for A6 historical dataset (fire-and-forget)
+  void appendFireHistory(fires)
   // Acepta WeatherData interno o respuesta cruda de OpenWeather API
   const weather = isWeatherData(externalWeather)
     ? externalWeather
@@ -135,19 +140,24 @@ export async function runAnalysis(
   const weatherUrl = requireEnv('AGENT_WEATHER_URL')
   const airUrl = requireEnv('AGENT_AIR_URL')
   const routesUrl = requireEnv('AGENT_ROUTES_URL')
-  const reportUrl = process.env.AGENT_REPORT_URL  // optional — skip silently if not set
+  const reportUrl = process.env.AGENT_REPORT_URL      // optional — skip silently if not set
+  const predictionUrl = process.env.AGENT_PREDICTION_URL  // optional — skip silently if not set
 
-  const [fireSettled, weatherAgentSettled, airAgentSettled, routesSettled] = await Promise.allSettled([
+  const [fireSettled, weatherAgentSettled, airAgentSettled, routesSettled, predictionSettled] = await Promise.allSettled([
     callAgent<FireAnalysis>(fireUrl, { firms: fires, weather }),
     callAgent<unknown>(weatherUrl, { weather, firms: fires }),
     callAgent<AirAlerts>(airUrl, { openaq: airQuality, firms: fires }),
     callAgent<RoutesResult>(routesUrl, { firms: fires }),
+    predictionUrl
+      ? callAgent<PredictionResult>(predictionUrl, { weather, firms: fires })
+      : Promise.reject(new Error('AGENT_PREDICTION_URL not set')),
   ])
 
   if (fireSettled.status === 'rejected') console.warn('[orchestrator] agent-fire failed:', fireSettled.reason)
   if (weatherAgentSettled.status === 'rejected') console.warn('[orchestrator] agent-weather failed:', weatherAgentSettled.reason)
   if (airAgentSettled.status === 'rejected') console.warn('[orchestrator] agent-air failed:', airAgentSettled.reason)
   if (routesSettled.status === 'rejected') console.warn('[orchestrator] agent-routes failed:', routesSettled.reason)
+  if (predictionSettled.status === 'rejected') console.warn('[orchestrator] agent-prediction failed:', predictionSettled.reason)
 
   // Extract LLM outputs
   const fireAnalysis =
@@ -163,6 +173,11 @@ export async function runAnalysis(
   const routesResult =
     routesSettled.status === 'fulfilled' && routesSettled.value.success
       ? routesSettled.value.data
+      : null
+
+  const predictionResult =
+    predictionSettled.status === 'fulfilled' && predictionSettled.value.success
+      ? predictionSettled.value.data
       : null
 
   // Step 3: agent-report (A4) — needs A1+A2+A3 output, runs after step 2
@@ -201,5 +216,6 @@ export async function runAnalysis(
     airAlerts: airAlerts ?? undefined,
     report,
     naturalRoutes: routesResult?.naturalRoutes ?? undefined,
+    prediction: predictionResult ?? undefined,
   }
 }

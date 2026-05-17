@@ -24,4 +24,4 @@ dist/
 *.tsbuildinfo
 
 # Duplicate test files (use zavu/ folder)
-test-zavu.js
+test-zavu.js.mcp.json
