@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from "react"
 import type { Map as MapboxMap, LngLatBoundsLike } from "mapbox-gl"
+import { RISK_PRIORITY, COUNTRY_BBOX, ISO_NAME, aggregatePointsByCountry } from "@/lib/tornado-utils"
 
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
@@ -43,177 +44,64 @@ const RISK_COLOR: Record<string, string> = {
   LOW:      "#22c55e",
 }
 
-const RISK_PRIORITY: Record<string, number> = {
-  LOW: 1, MODERATE: 2, HIGH: 3, CRITICAL: 4,
-}
-
-// ─── Country bounding boxes [west, south, east, north] ──────────────────────
-
-const COUNTRY_BBOX: Record<string, [number, number, number, number]> = {
-  USA:[-125,24,-66,50],CAN:[-141,42,-52,72],MEX:[-118,14,-86,33],
-  BRA:[-74,-34,-34,6],ARG:[-74,-56,-53,-21],CHL:[-76,-56,-66,-17],
-  COL:[-80,-5,-66,13],VEN:[-73,0,-59,12],PER:[-82,-19,-68,0],
-  ECU:[-81,-5,-75,2],BOL:[-70,-23,-57,-9],PRY:[-63,-28,-54,-19],
-  URY:[-59,-35,-53,-30],GUY:[-62,1,-56,9],SUR:[-58,1,-53,6],
-  CUB:[-85,19,-74,24],DOM:[-72,17,-68,20],HTI:[-75,18,-71,20],
-  JAM:[-79,17,-76,19],TTO:[-62,10,-60,11],
-  GTM:[-92,13,-88,18],BLZ:[-89,15,-87,19],HND:[-90,13,-83,16],
-  SLV:[-91,13,-87,15],NIC:[-88,10,-83,15],CRI:[-86,8,-82,11],PAN:[-83,7,-77,10],
-  GBR:[-9,49,2,61],FRA:[-5,42,9,51],ESP:[-10,36,4,44],PRT:[-10,37,-6,42],
-  DEU:[5,47,15,55],ITA:[6,36,19,47],NLD:[3,50,8,54],BEL:[2,49,7,52],
-  CHE:[5,45,11,48],AUT:[9,46,17,49],IRL:[-11,51,-5,56],
-  NOR:[4,57,31,72],SWE:[10,55,25,70],FIN:[19,59,32,70],DNK:[8,54,13,58],
-  POL:[14,49,25,55],UKR:[22,44,41,53],ROU:[20,43,30,48],
-  HUN:[16,45,23,49],CZE:[12,48,19,52],BGR:[22,41,29,44],
-  SRB:[18,42,23,47],HRV:[13,42,20,47],GRC:[19,34,30,42],
-  TUR:[25,35,45,42],ALB:[19,39,22,43],
-  RUS:[27,41,180,72],KAZ:[46,40,88,56],UZB:[56,37,74,46],TKM:[52,35,67,43],
-  KGZ:[69,39,81,44],TJK:[67,36,75,41],
-  IND:[68,6,98,36],PAK:[60,23,78,37],BGD:[88,20,93,27],
-  NPL:[80,26,89,31],LKA:[79,5,82,10],MMR:[92,9,102,29],
-  AFG:[60,29,75,39],IRN:[44,25,64,40],IRQ:[38,29,49,38],
-  SYR:[35,32,42,38],JOR:[34,29,40,34],ISR:[34,29,36,34],
-  SAU:[34,16,56,33],ARE:[51,22,57,27],OMN:[51,16,60,27],
-  YEM:[42,12,54,19],KWT:[46,28,49,30],QAT:[50,24,52,27],
-  LBN:[35,33,37,35],
-  THA:[97,5,106,21],VNM:[102,8,110,24],KHM:[102,10,108,15],
-  LAO:[100,13,108,23],MYS:[99,0,120,8],IDN:[95,-11,141,6],
-  PHL:[116,4,127,21],SGP:[103,1,104,2],
-  CHN:[73,18,135,54],JPN:[128,30,146,46],KOR:[124,33,132,39],MNG:[87,41,120,52],
-  AUS:[112,-44,154,-10],NZL:[165,-48,179,-33],
-  NGA:[-0,4,15,14],GHA:[-4,4,2,12],CIV:[-9,4,-2,11],
-  SEN:[-18,12,-11,17],MLI:[-12,10,5,25],BFA:[-6,9,3,15],
-  NER:[0,11,16,24],CMR:[8,1,17,13],TCD:[13,7,24,24],
-  ETH:[33,3,48,15],KEN:[33,-5,42,5],TZA:[29,-12,41,0],
-  UGA:[29,-2,35,5],RWA:[28,-3,31,0],SOM:[40,-2,52,12],
-  SDN:[21,8,39,23],SSD:[24,3,36,13],
-  ZAF:[16,-35,33,-22],BWA:[19,-27,30,-17],NAM:[11,-29,26,-17],
-  ZMB:[21,-18,34,-8],ZWE:[25,-23,34,-15],MOZ:[30,-27,41,-10],
-  MWI:[32,-17,36,-9],MDG:[43,-26,51,-11],AGO:[11,-18,24,-4],
-  COD:[12,-14,32,6],COG:[11,-5,19,4],
-  EGY:[24,22,37,32],LBY:[9,19,26,34],TUN:[7,30,12,38],
-  MAR:[-13,27,-1,36],DZA:[-9,18,12,38],
-}
-
-// ISO alpha-3 → display name
-const ISO_NAME: Record<string, string> = {
-  USA:"United States",CAN:"Canada",MEX:"Mexico",BRA:"Brazil",ARG:"Argentina",
-  CHL:"Chile",COL:"Colombia",VEN:"Venezuela",PER:"Peru",ECU:"Ecuador",
-  BOL:"Bolivia",PRY:"Paraguay",URY:"Uruguay",GUY:"Guyana",SUR:"Suriname",
-  CUB:"Cuba",DOM:"Dominican Rep.",HTI:"Haiti",JAM:"Jamaica",TTO:"Trinidad",
-  GTM:"Guatemala",BLZ:"Belize",HND:"Honduras",SLV:"El Salvador",
-  NIC:"Nicaragua",CRI:"Costa Rica",PAN:"Panama",
-  GBR:"United Kingdom",FRA:"France",ESP:"Spain",PRT:"Portugal",
-  DEU:"Germany",ITA:"Italy",NLD:"Netherlands",BEL:"Belgium",
-  CHE:"Switzerland",AUT:"Austria",IRL:"Ireland",NOR:"Norway",SWE:"Sweden",
-  FIN:"Finland",DNK:"Denmark",POL:"Poland",UKR:"Ukraine",ROU:"Romania",
-  HUN:"Hungary",CZE:"Czechia",BGR:"Bulgaria",SRB:"Serbia",HRV:"Croatia",
-  GRC:"Greece",TUR:"Turkey",ALB:"Albania",
-  RUS:"Russia",KAZ:"Kazakhstan",UZB:"Uzbekistan",TKM:"Turkmenistan",
-  KGZ:"Kyrgyzstan",TJK:"Tajikistan",
-  IND:"India",PAK:"Pakistan",BGD:"Bangladesh",NPL:"Nepal",LKA:"Sri Lanka",
-  MMR:"Myanmar",AFG:"Afghanistan",IRN:"Iran",IRQ:"Iraq",SYR:"Syria",
-  JOR:"Jordan",ISR:"Israel",SAU:"Saudi Arabia",ARE:"UAE",OMN:"Oman",
-  YEM:"Yemen",KWT:"Kuwait",QAT:"Qatar",LBN:"Lebanon",
-  THA:"Thailand",VNM:"Vietnam",KHM:"Cambodia",LAO:"Laos",MYS:"Malaysia",
-  IDN:"Indonesia",PHL:"Philippines",SGP:"Singapore",
-  CHN:"China",JPN:"Japan",KOR:"South Korea",MNG:"Mongolia",
-  AUS:"Australia",NZL:"New Zealand",
-  NGA:"Nigeria",GHA:"Ghana",CIV:"Ivory Coast",SEN:"Senegal",MLI:"Mali",
-  BFA:"Burkina Faso",NER:"Niger",CMR:"Cameroon",TCD:"Chad",
-  ETH:"Ethiopia",KEN:"Kenya",TZA:"Tanzania",UGA:"Uganda",RWA:"Rwanda",
-  SOM:"Somalia",SDN:"Sudan",SSD:"South Sudan",
-  ZAF:"South Africa",BWA:"Botswana",NAM:"Namibia",ZMB:"Zambia",
-  ZWE:"Zimbabwe",MOZ:"Mozambique",MWI:"Malawi",MDG:"Madagascar",
-  AGO:"Angola",COD:"DR Congo",COG:"Congo",
-  EGY:"Egypt",LBY:"Libya",TUN:"Tunisia",MAR:"Morocco",DZA:"Algeria",
-}
-
-// ─── Map point → country (bbox lookup, instant, no async) ───────────────────
-
-function findCountryForPoint(lat: number, lon: number): string | null {
-  // Check smaller/more specific countries first (priority order)
-  const prioritized = ["SGP","QAT","KWT","LBN","JOR","ISR","BLZ","SLV","JAM","TTO","RWA",
-    "HRV","SVN","CHE","AUT","BEL","NLD","DNK","ALB","BGR","SRB","HUN","CZE",
-    "DOM","HTI","CUB","CRI","PAN","NIC","HND","GTM","SUR","GUY","URY","PRY","ECU","BOL",
-    "KOR","JPN","NPL","BGD","LKA","KHM","LAO","VNM","THA","PHL","MYS",
-    "NZL","GBR","IRL","PRT","ESP","FRA","DEU","ITA","NOR","SWE","FIN","POL",
-    "UKR","ROU","GRC","TUR","IRQ","SYR","AFG","PAK","IRN","SAU","ARE","OMN","YEM",
-    "EGY","LBY","TUN","MAR","DZA","SEN","MLI","GHA","NGA","CMR","NER","BFA","CIV",
-    "TCD","ETH","KEN","TZA","UGA","SOM","SDN","SSD",
-    "ZAF","BWA","NAM","ZMB","ZWE","MOZ","MWI","MDG","AGO","COD","COG",
-    "MEX","COL","VEN","PER","CHL","ARG","BRA",
-    "IND","CHN","MNG","IDN","AUS","KAZ","UZB","TKM","KGZ","TJK","RUS",
-    "USA","CAN","MMR","LBN"]
-
-  for (const iso of prioritized) {
-    const bbox = COUNTRY_BBOX[iso]
-    if (!bbox) continue
-    const [w, s, e, n] = bbox
-    if (lat >= s && lat <= n && lon >= w && lon <= e) return iso
-  }
-  return null
-}
-
-function aggregatePointsByCountry(points: GridPoint[]): Record<string, { risk: string; points: GridPoint[] }> {
-  const result: Record<string, { risk: string; points: GridPoint[] }> = {}
-  for (const p of points) {
-    const iso = findCountryForPoint(p.lat, p.lon)
-    if (!iso) continue
-    if (!result[iso]) result[iso] = { risk: p.risk_level, points: [] }
-    result[iso].points.push(p)
-    if (RISK_PRIORITY[p.risk_level] > RISK_PRIORITY[result[iso].risk]) {
-      result[iso].risk = p.risk_level
-    }
-  }
-  return result
-}
-
 // ─── Geometry helpers for point detail ──────────────────────────────────────
 
-function makeEllipse(cx: number, cy: number, rx: number, ry: number, n = 64): number[][] {
+function makeEllipse(cx: number, cy: number, lengthDeg: number, widthDeg: number, bearingDeg = 0, n = 64): number[][] {
   const pts: number[][] = []
+  const rad = (bearingDeg * Math.PI) / 180
+  const sinB = Math.sin(rad)
+  const cosB = Math.cos(rad)
+  
   for (let i = 0; i <= n; i++) {
     const a = (i / n) * 2 * Math.PI
-    pts.push([cx + rx * Math.cos(a), cy + ry * Math.sin(a)])
+    const x = lengthDeg * Math.cos(a) 
+    const y = widthDeg * Math.sin(a)
+    
+    // Rotate so local X aligns with bearing, local Y is orthogonal
+    const rotX = x * sinB + y * cosB
+    const rotY = x * cosB - y * sinB
+    
+    pts.push([cx + rotX, cy + rotY])
   }
   return pts
 }
 
-function generateRiskZones(point: GridPoint) {
+function generateRiskZones(point: GridPoint, bearingDeg = 0) {
   const { lon, lat, risk_level } = point
   const zones = []
   if (risk_level === "CRITICAL" || risk_level === "HIGH") {
-    zones.push({ id: "low", coords: makeEllipse(lon, lat, 2.0, 1.3), color: "#22c55e", opacity: 0.08, outlineOpacity: 0.30 })
-    zones.push({ id: "moderate", coords: makeEllipse(lon, lat, 1.3, 0.8), color: "#eab308", opacity: 0.12, outlineOpacity: 0.40 })
-    zones.push({ id: "high", coords: makeEllipse(lon, lat, 0.7, 0.45), color: "#f97316", opacity: 0.16, outlineOpacity: 0.55 })
+    zones.push({ id: "low", coords: makeEllipse(lon, lat, 2.0, 1.3, bearingDeg), color: "#22c55e", opacity: 0.08, outlineOpacity: 0.30 })
+    zones.push({ id: "moderate", coords: makeEllipse(lon, lat, 1.3, 0.8, bearingDeg), color: "#eab308", opacity: 0.12, outlineOpacity: 0.40 })
+    zones.push({ id: "high", coords: makeEllipse(lon, lat, 0.7, 0.45, bearingDeg), color: "#f97316", opacity: 0.16, outlineOpacity: 0.55 })
   }
   if (risk_level === "CRITICAL") {
-    zones.push({ id: "critical", coords: makeEllipse(lon, lat, 0.35, 0.22), color: "#ef4444", opacity: 0.22, outlineOpacity: 0.70 })
+    zones.push({ id: "critical", coords: makeEllipse(lon, lat, 0.35, 0.22, bearingDeg), color: "#ef4444", opacity: 0.22, outlineOpacity: 0.70 })
   }
   return zones
 }
 
-function generateWindFlows(point: GridPoint): number[][][] {
-  const { lon, lat } = point
-  const offsets = [
-    [[-3.5, 1.8], [-2.3, 1.2], [-1.1, 0.6], [-0.3, 0.15]],
-    [[-3.8, 0.3], [-2.5, 0.2], [-1.4, 0.1], [-0.5, 0.05]],
-    [[-3, -1.1], [-2, -0.7], [-1, -0.35], [-0.3, -0.1]],
-    [[2, 1.5], [1.3, 1], [0.7, 0.5], [0.2, 0.15]],
-    [[2.5, -0.7], [1.7, -0.5], [1, -0.3], [0.3, -0.1]],
-    [[1.2, -1.8], [0.8, -1.2], [0.4, -0.7], [0.1, -0.2]],
-  ]
-  return offsets.map(line => [...line.map(([dx, dy]) => [lon + dx, lat + dy]), [lon, lat]])
-}
-
-function generateForecastCone(point: GridPoint, bearingDeg: number = 45): { polygon: number[][]; centerPath: number[][] } {
+function generateForecastCone(point: GridPoint, bearingDeg: number = 45, detail?: SevereWeatherDetail | null): { polygon: number[][]; centerPath: number[][] } {
   const { lon, lat } = point
   const rad = (bearingDeg * Math.PI) / 180
   const cosB = Math.cos(rad), sinB = Math.sin(rad)
   const cosP = Math.cos(rad + Math.PI / 2), sinP = Math.sin(rad + Math.PI / 2)
-  const steps = [0.6, 1.2, 1.8, 2.4]
-  const spreads = [0.15, 0.3, 0.5, 0.7]
+  
+  let dist1 = 50, dist3 = 150, dist6 = 300 // default km
+  if (detail?.forecast_risk?.[0]?.impact_corridor) {
+    const ic = detail.forecast_risk[0].impact_corridor
+    dist1 = ic.estimated_distance_km_1h || 50
+    dist3 = ic.estimated_distance_km_3h || 150
+    dist6 = ic.estimated_distance_km_6h || 300
+  } else if (point.wind_gusts_10m) {
+    dist1 = point.wind_gusts_10m * 1
+    dist3 = point.wind_gusts_10m * 3
+    dist6 = point.wind_gusts_10m * 6
+  }
+
+  // Convert km to degrees (roughly 111km per degree of latitude, approx locally for viz)
+  const steps = [dist1 / 111, dist3 / 111, dist6 / 111, (dist6 * 1.3) / 111]
+  const spreads = [steps[0] * 0.25, steps[1] * 0.25, steps[2] * 0.25, steps[3] * 0.3]
+
   const left: number[][] = [], right: number[][] = [], center: number[][] = [[lon, lat]]
   for (let i = 0; i < steps.length; i++) {
     const cx = lon + sinB * steps[i], cy = lat + cosB * steps[i]
@@ -243,16 +131,19 @@ interface SevereWeatherDetail {
 
 interface Props {
   gridData: GridScanResult | null
+  selectedCountryIso?: string | null
   selectedPoint: GridPoint | null
+  onCountrySelect?: (iso: string) => void
   onPointSelect: (point: GridPoint) => void
   onBack: () => void
   loading: boolean
   detail?: SevereWeatherDetail | null
 }
 
-export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack, loading, detail }: Props) {
+export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, onCountrySelect, onPointSelect, onBack, loading, detail }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapboxMap | null>(null)
+  const onCountryRef = useRef(onCountrySelect)
   const onPointRef = useRef(onPointSelect)
   const onBackRef = useRef(onBack)
   const markersRef = useRef<{ remove: () => void }[]>([])
@@ -260,12 +151,13 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
   const tooltipRef = useRef<HTMLDivElement | null>(null)
 
   const [mapReady, setMapReady] = useState(false)
-  const [viewMode, setViewMode] = useState<"world" | "country" | "point">("world")
-  const [activeCountryIso, setActiveCountryIso] = useState<string | null>(null)
-  const viewModeRef = useRef<"world" | "country" | "point">("world")
   const countryDataRef = useRef<Record<string, { risk: string; points: GridPoint[] }>>({})
   const prevSelectedPointRef = useRef<GridPoint | null>(null)
+  
+  const viewMode = selectedPoint ? "point" : (selectedCountryIso ? "country" : "world")
+  const viewModeRef = useRef<"world" | "country" | "point">(viewMode)
 
+  useEffect(() => { onCountryRef.current = onCountrySelect }, [onCountrySelect])
   useEffect(() => { onPointRef.current = onPointSelect }, [onPointSelect])
   useEffect(() => { onBackRef.current = onBack }, [onBack])
   useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
@@ -354,15 +246,22 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
           url: "mapbox://mapbox.country-boundaries-v1",
         })
 
-        // Base country fill (choropleth) — starts transparent, colored once data arrives
+        // Base country fill (choropleth) — starts green, colored with risk data once grid arrives
+        const initialColorMatch: unknown[] = ["match", ["get", "iso_3166_1_alpha_3"]]
+        for (const iso of Object.keys(ISO_NAME)) {
+          initialColorMatch.push(iso, "#22c55e")
+        }
+        initialColorMatch.push("#22c55e") // fallback
+
         map.addLayer({
           id: "country-fills",
           type: "fill",
           source: "countries",
           "source-layer": "country_boundaries",
           paint: {
-            "fill-color": "#1a1f2e",
-            "fill-opacity": 0.6,
+            "fill-color": initialColorMatch as never,
+            "fill-opacity": 0.75,
+            "fill-antialias": false,
           },
         })
 
@@ -385,7 +284,7 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
           source: "countries",
           "source-layer": "country_boundaries",
           filter: ["==", ["get", "iso_3166_1_alpha_3"], "___"],
-          paint: { "fill-color": "#ffffff", "fill-opacity": 0.85 },
+          paint: { "fill-color": "#ffffff", "fill-opacity": 0.85, "fill-antialias": false },
         })
 
         // Selected country glow
@@ -395,7 +294,7 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
           source: "countries",
           "source-layer": "country_boundaries",
           filter: ["==", ["get", "iso_3166_1_alpha_3"], "___"],
-          paint: { "fill-color": "#ffffff", "fill-opacity": 0.10 },
+          paint: { "fill-color": "#ffffff", "fill-opacity": 0.10, "fill-antialias": false },
         })
 
         // Selected country border
@@ -460,15 +359,12 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
         map.addLayer({ id: "risk-outline", type: "line", source: "risk-zones",
           paint: { "line-color": ["get", "color"], "line-opacity": ["get", "outlineOpacity"], "line-width": 1.2, "line-dasharray": [4, 4] } })
 
-        map.addSource("forecast-cone", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[]] } } as never })
+        map.addSource("forecast-cone", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
         map.addLayer({ id: "cone-fill", type: "fill", source: "forecast-cone", paint: { "fill-color": "#a855f7", "fill-opacity": 0.12 } })
         map.addLayer({ id: "cone-outline", type: "line", source: "forecast-cone", paint: { "line-color": "#a855f7", "line-opacity": 0.6, "line-width": 1.2, "line-dasharray": [5, 4] } })
 
-        map.addSource("cone-path", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } } as never })
+        map.addSource("cone-path", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
         map.addLayer({ id: "cone-center", type: "line", source: "cone-path", paint: { "line-color": "#e9d5ff", "line-opacity": 0.7, "line-width": 1.4, "line-dasharray": [6, 4] } })
-
-        map.addSource("wind-flows", { type: "geojson", data: { type: "FeatureCollection", features: [] } })
-        map.addLayer({ id: "wind-lines", type: "line", source: "wind-flows", paint: { "line-color": "#67e8f9", "line-opacity": 0.5, "line-width": 1.3, "line-dasharray": [2, 3] } })
 
         // ─── Pulsing glow animation ───
         let pulse = 0
@@ -483,6 +379,13 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
         }
         rafRef.current = requestAnimationFrame(animateGlow)
 
+        // ─── Zoom listener for auto-dismiss ───
+        map.on("zoomend", () => {
+          if (viewModeRef.current === "point" && map.getZoom() < 5) {
+            onBackRef.current()
+          }
+        })
+
         // ─── Hover tooltip on countries ───
         map.on("mousemove", "country-fills", (e) => {
           if (viewModeRef.current !== "world") return
@@ -490,15 +393,18 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
           const iso = e.features[0].properties?.iso_3166_1_alpha_3 as string
           const info = countryDataRef.current[iso]
           const tEl = tooltipRef.current!
-          if (info && ISO_NAME[iso]) {
-            const color = RISK_COLOR[info.risk] || "#22c55e"
+          if (ISO_NAME[iso]) {
+            const color = info ? (RISK_COLOR[info.risk] || "#22c55e") : "#22c55e"
             const labels: Record<string, string> = { LOW: "Bajo", MODERATE: "Moderado", HIGH: "Alto", CRITICAL: "Crítico" }
+            const riskLabel = info ? (labels[info.risk] ?? "—") : "Bajo"
+            const ptsLen = info ? info.points.length : 0
+            
             tEl.innerHTML = `
               <div style="font-weight:800;font-size:13px;color:#f8fafc;margin-bottom:4px">${ISO_NAME[iso]}</div>
               <div style="display:flex;align-items:center;gap:7px">
                 <div style="width:9px;height:9px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color}"></div>
-                <span style="color:${color};font-weight:700;font-size:11px">${labels[info.risk] ?? "—"}</span>
-                <span style="color:#94a3b8;font-size:10px">· ${info.points.length} foco${info.points.length !== 1 ? "s" : ""}</span>
+                <span style="color:${color};font-weight:700;font-size:11px">${riskLabel}</span>
+                <span style="color:#94a3b8;font-size:10px">· ${ptsLen} foco${ptsLen !== 1 ? "s" : ""}</span>
               </div>
               <div style="color:#64748b;font-size:9px;margin-top:5px">▸ Clic para explorar</div>
             `
@@ -521,12 +427,11 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
           if (!e.features?.length) return
           e.originalEvent.stopPropagation()
           const iso = e.features[0].properties?.iso_3166_1_alpha_3 as string
-          if (!iso || !countryDataRef.current[iso]) return
+          if (!iso || !ISO_NAME[iso]) return
           if (tooltipRef.current) tooltipRef.current.style.display = "none"
-          // If in point mode, clear point first
-          if (viewModeRef.current === "point") onBackRef.current()
-          setActiveCountryIso(iso)
-          setViewMode("country")
+          if (onCountryRef.current) {
+            onCountryRef.current(iso)
+          }
         })
 
         // ─── Click point → select ───
@@ -541,7 +446,6 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
             wind_gusts_10m: feat.properties.wind_gusts_10m ?? null,
             weather_code: feat.properties.weather_code ?? null,
           }
-          setViewMode("point")
           onPointRef.current(p)
         })
 
@@ -549,8 +453,6 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
         map.on("click", (e) => {
           const hits = map.queryRenderedFeatures(e.point, { layers: ["points-circle", "country-fills"] })
           if (hits.length === 0 && viewModeRef.current !== "world") {
-            setActiveCountryIso(null)
-            setViewMode("world")
             onBackRef.current()
           }
         })
@@ -583,21 +485,28 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
 
     // Build Mapbox match expression for fill-color
     const expr: unknown[] = ["match", ["get", "iso_3166_1_alpha_3"]]
-    for (const [iso, info] of Object.entries(countryAgg)) {
-      expr.push(iso, RISK_COLOR[info.risk] ?? "#1a1f2e")
+    // Ensure ALL known countries from ISO_NAME are explicitly listed with a fallback color
+    for (const iso of Object.keys(ISO_NAME)) {
+      const riskColor = countryAgg[iso] ? RISK_COLOR[countryAgg[iso].risk] : "#22c55e"
+      expr.push(iso, riskColor ?? "#22c55e")
     }
-    expr.push("#1a1f2e") // fallback for countries without data
+    expr.push("#22c55e") // final fallback for unknown countries
 
     // Apply once the style is ready
     const apply = () => {
+      if (!map.getLayer("country-fills")) {
+        // If layer isn't mounted yet, retry shortly
+        setTimeout(apply, 100)
+        return
+      }
       try {
         map.setPaintProperty("country-fills", "fill-color", expr as never)
-        map.setPaintProperty("country-fills", "fill-opacity", 0.75)
-      } catch {}
+      } catch (err) {
+        console.error("Mapbox paint error on country-fills:", err)
+      }
     }
 
-    if (map.isStyleLoaded()) apply()
-    else map.once("idle", apply)
+    apply()
   }, [gridData, mapReady])
 
   // ── View mode transitions ──
@@ -621,18 +530,22 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
       src?.setData?.({ type: "FeatureCollection", features: [] })
 
       clearAllOverlays()
-      map.flyTo({ center: [-20, 20], zoom: 2, duration: 1200 })
+      
+      // If we came from country/point mode, fly back to center
+      if (prevSelectedPointRef.current || selectedCountryIso === null) {
+        map.flyTo({ center: [-20, 20], zoom: 2, duration: 1200 })
+      }
 
-    } else if (viewMode === "country" && activeCountryIso) {
-      const info = countryDataRef.current[activeCountryIso]
-      const color = info ? (RISK_COLOR[info.risk] ?? "#1a1f2e") : "#1a1f2e"
-      const filter: unknown[] = ["==", ["get", "iso_3166_1_alpha_3"], activeCountryIso]
+    } else if (viewMode === "country" && selectedCountryIso) {
+      const info = countryDataRef.current[selectedCountryIso]
+      const color = info ? (RISK_COLOR[info.risk] ?? "#22c55e") : "#22c55e"
+      const filter: unknown[] = ["==", ["get", "iso_3166_1_alpha_3"], selectedCountryIso]
 
       // Dim others, highlight selected
-      map.setPaintProperty("country-fills", "fill-opacity", 0.2)
-      map.setPaintProperty("country-borders", "line-opacity", 0.25)
+      map.setPaintProperty("country-fills", "fill-opacity", 0.28)
+      map.setPaintProperty("country-borders", "line-opacity", 0.3)
       map.setPaintProperty("country-highlight", "fill-color", color)
-      map.setPaintProperty("country-highlight", "fill-opacity", 0.55)
+      map.setPaintProperty("country-highlight", "fill-opacity", 1.0)
       map.setFilter("country-highlight", filter as never)
       map.setFilter("country-glow", filter as never)
       map.setFilter("country-highlight-border", filter as never)
@@ -655,19 +568,21 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
 
       clearAllOverlays()
 
-      // Zoom to country
-      const bbox = COUNTRY_BBOX[activeCountryIso]
-      if (bbox) {
-        const [w, s, e, n] = bbox
-        const padLng = Math.max((e - w) * 0.15, 2)
-        const padLat = Math.max((n - s) * 0.15, 1)
-        map.fitBounds(
-          [[w - padLng, s - padLat], [e + padLng, n + padLat]] as LngLatBoundsLike,
-          { duration: 1200, padding: { top: 80, bottom: 80, left: 380, right: 380 } }
-        )
+      // Zoom to country if coming from world view
+      if (!selectedPoint) {
+        const bbox = COUNTRY_BBOX[selectedCountryIso]
+        if (bbox) {
+          const [w, s, e, n] = bbox
+          const padLng = Math.max((e - w) * 0.15, 2)
+          const padLat = Math.max((n - s) * 0.15, 1)
+          map.fitBounds(
+            [[w - padLng, s - padLat], [e + padLng, n + padLat]] as LngLatBoundsLike,
+            { duration: 1200, padding: { top: 80, bottom: 80, left: 380, right: 380 } }
+          )
+        }
       }
     }
-  }, [viewMode, activeCountryIso, mapReady])
+  }, [viewMode, selectedCountryIso, mapReady])
 
   // ── Selected point (from props) ──
   useEffect(() => {
@@ -682,11 +597,6 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
       showPointOverlays(selectedPoint)
     } else if (prev && !selectedPoint) {
       clearAllOverlays()
-      if (activeCountryIso) {
-        setViewMode("country")
-      } else {
-        setViewMode("world")
-      }
     }
   }, [selectedPoint, mapReady])
 
@@ -701,8 +611,10 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
     const map = mapRef.current
     if (!map || !map.isStyleLoaded()) return
 
+    const bearing = detail?.forecast_risk?.[0]?.impact_corridor?.bearing_degrees ?? 45
+
     // Risk zones
-    const zones = generateRiskZones(point)
+    const zones = generateRiskZones(point, bearing)
     const zSrc = map.getSource("risk-zones") as { setData?: (d: unknown) => void } | undefined
     zSrc?.setData?.({
       type: "FeatureCollection",
@@ -712,21 +624,18 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
       })),
     })
 
-    // Wind flows
-    const flows = generateWindFlows(point)
-    const wSrc = map.getSource("wind-flows") as { setData?: (d: unknown) => void } | undefined
-    wSrc?.setData?.({
-      type: "FeatureCollection",
-      features: flows.map(c => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: c } })),
-    })
-
-    // Forecast cone
-    const bearing = detail?.forecast_risk?.[0]?.impact_corridor?.bearing_degrees ?? 45
-    const { polygon, centerPath } = generateForecastCone(point, bearing)
+    // Forecast cone - ONLY SHOW IF DETAIL IS LOADED (don't show fallback)
     const cSrc = map.getSource("forecast-cone") as { setData?: (d: unknown) => void } | undefined
-    cSrc?.setData?.({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [polygon] } })
     const pSrc = map.getSource("cone-path") as { setData?: (d: unknown) => void } | undefined
-    pSrc?.setData?.({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: centerPath } })
+    
+    if (!detail) {
+      cSrc?.setData?.({ type: "FeatureCollection", features: [] })
+      pSrc?.setData?.({ type: "FeatureCollection", features: [] })
+    } else {
+      const { polygon, centerPath } = generateForecastCone(point, bearing, detail)
+      cSrc?.setData?.({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [polygon] } })
+      pSrc?.setData?.({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: centerPath } })
+    }
 
     // Small wave marker
     clearMarkers()
@@ -761,16 +670,14 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
     if (!map || !map.isStyleLoaded()) return
     clearMarkers()
     const empty = { type: "FeatureCollection", features: [] }
-    const eLine = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [] } }
-    const ePoly = { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[]] } }
-    ;(["risk-zones", "wind-flows"] as const).forEach(id => {
+    ;(["risk-zones"] as const).forEach(id => {
       (map.getSource(id) as { setData?: (d: unknown) => void } | undefined)?.setData?.(empty)
     })
     ;(["forecast-cone"] as const).forEach(id => {
-      (map.getSource(id) as { setData?: (d: unknown) => void } | undefined)?.setData?.(ePoly)
+      (map.getSource(id) as { setData?: (d: unknown) => void } | undefined)?.setData?.(empty)
     })
     ;(["cone-path"] as const).forEach(id => {
-      (map.getSource(id) as { setData?: (d: unknown) => void } | undefined)?.setData?.(eLine)
+      (map.getSource(id) as { setData?: (d: unknown) => void } | undefined)?.setData?.(empty)
     })
   }, [clearMarkers])
 
@@ -790,13 +697,7 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
       {viewMode !== "world" && (
         <button
           onClick={() => {
-            if (viewMode === "point") {
-              onBackRef.current()
-            } else {
-              setActiveCountryIso(null)
-              setViewMode("world")
-              onBackRef.current()
-            }
+            onBackRef.current()
           }}
           className="absolute top-4 left-4 z-50 flex items-center gap-2 bg-[#0a0b0e]/85 backdrop-blur-md border border-white/15 rounded-full px-4 py-2 hover:bg-[#0a0b0e]/95 hover:border-white/30 transition-all cursor-pointer shadow-lg"
         >
@@ -804,8 +705,8 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
             <path d="M9 2L4 7L9 12" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span className="text-[11px] font-bold uppercase tracking-wider text-white/80">
-            {viewMode === "point" && activeCountryIso
-              ? `← ${ISO_NAME[activeCountryIso] ?? "País"}`
+            {viewMode === "point" && selectedCountryIso
+              ? `← ${ISO_NAME[selectedCountryIso] ?? "País"}`
               : "← Vista Global"
             }
           </span>
@@ -813,20 +714,20 @@ export function WorldTornadoMap({ gridData, selectedPoint, onPointSelect, onBack
       )}
 
       {/* Country info badge (country mode) */}
-      {viewMode === "country" && activeCountryIso && countryDataRef.current[activeCountryIso] && (
+      {viewMode === "country" && selectedCountryIso && countryDataRef.current[selectedCountryIso] && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-[#0a0b0e]/85 backdrop-blur-md border border-white/10 rounded-full px-5 py-2 shadow-lg">
           <div
             className="w-2.5 h-2.5 rounded-full"
             style={{
-              backgroundColor: RISK_COLOR[countryDataRef.current[activeCountryIso]!.risk] || "#22c55e",
-              boxShadow: `0 0 8px ${RISK_COLOR[countryDataRef.current[activeCountryIso]!.risk] || "#22c55e"}`,
+              backgroundColor: RISK_COLOR[countryDataRef.current[selectedCountryIso]!.risk] || "#22c55e",
+              boxShadow: `0 0 8px ${RISK_COLOR[countryDataRef.current[selectedCountryIso]!.risk] || "#22c55e"}`,
             }}
           />
           <span className="text-[12px] font-bold text-white">
-            {ISO_NAME[activeCountryIso] ?? activeCountryIso}
+            {ISO_NAME[selectedCountryIso] ?? selectedCountryIso}
           </span>
           <span className="text-[10px] text-white/50">
-            {countryDataRef.current[activeCountryIso]!.points.length} foco{countryDataRef.current[activeCountryIso]!.points.length !== 1 ? "s" : ""} detectado{countryDataRef.current[activeCountryIso]!.points.length !== 1 ? "s" : ""}
+            {countryDataRef.current[selectedCountryIso]!.points.length} foco{countryDataRef.current[selectedCountryIso]!.points.length !== 1 ? "s" : ""} detectado{countryDataRef.current[selectedCountryIso]!.points.length !== 1 ? "s" : ""}
           </span>
         </div>
       )}

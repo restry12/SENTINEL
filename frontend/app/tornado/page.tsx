@@ -86,9 +86,11 @@ export default function TornadoPage() {
 function TornadoPageInner() {
   const [gridData, setGridData] = useState<GridScanResult | null>(null)
   const [gridLoading, setGridLoading] = useState(true)
+  const [selectedCountryIso, setSelectedCountryIso] = useState<string | null>(null)
   const [selectedPoint, setSelectedPoint] = useState<GridPoint | null>(null)
   const [detail, setDetail] = useState<SevereWeatherDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const detailCacheRef = useRef<Record<string, SevereWeatherDetail>>({})
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -144,12 +146,19 @@ function TornadoPageInner() {
 
   // Fetch detail when a point is selected
   async function fetchDetail(point: GridPoint) {
+    const cacheKey = `${point.lat},${point.lon}`
+    if (detailCacheRef.current[cacheKey]) {
+      setDetail(detailCacheRef.current[cacheKey])
+      return
+    }
+
     setDetailLoading(true)
     setDetail(null)
     try {
       const res = await fetch(`/api/severe-weather?lat=${point.lat}&lon=${point.lon}`)
       if (res.ok) {
         const data = await res.json()
+        detailCacheRef.current[cacheKey] = data
         setDetail(data)
       }
     } catch (err) {
@@ -159,15 +168,25 @@ function TornadoPageInner() {
     }
   }
 
+  const handleCountrySelect = useCallback((iso: string) => {
+    setSelectedCountryIso(iso)
+    setSelectedPoint(null)
+    setDetail(null)
+  }, [])
+
   const handlePointSelect = useCallback((point: GridPoint) => {
     setSelectedPoint(point)
     fetchDetail(point)
   }, [])
 
   const handleBack = useCallback(() => {
-    setSelectedPoint(null)
-    setDetail(null)
-  }, [])
+    if (selectedPoint) {
+      setSelectedPoint(null)
+      setDetail(null)
+    } else if (selectedCountryIso) {
+      setSelectedCountryIso(null)
+    }
+  }, [selectedPoint, selectedCountryIso])
 
   return (
     <div className="h-screen w-screen flex flex-col bg-background overflow-hidden">
@@ -177,7 +196,9 @@ function TornadoPageInner() {
         {/* Map */}
         <WorldTornadoMap
           gridData={gridData}
+          selectedCountryIso={selectedCountryIso}
           selectedPoint={selectedPoint}
+          onCountrySelect={handleCountrySelect}
           onPointSelect={handlePointSelect}
           onBack={handleBack}
           loading={gridLoading}
@@ -187,6 +208,7 @@ function TornadoPageInner() {
         {/* Left panel */}
         <TornadoLeftPanel
           gridData={gridData}
+          selectedCountryIso={selectedCountryIso}
           selectedPoint={selectedPoint}
           detail={detail}
           detailLoading={detailLoading}
@@ -195,7 +217,7 @@ function TornadoPageInner() {
         />
 
         {/* Right panel */}
-        <TornadoRightPanel selectedPoint={selectedPoint} detail={detail} />
+        <TornadoRightPanel selectedPoint={selectedPoint} detail={detail} detailLoading={detailLoading} />
 
         {/* Risk Scale Legend */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none">

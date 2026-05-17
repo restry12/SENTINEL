@@ -45,17 +45,33 @@ interface SevereWeatherDetail {
 interface Props {
   selectedPoint: GridPoint | null
   detail: SevereWeatherDetail | null
+  detailLoading: boolean
 }
 
-export function TornadoRightPanel({ selectedPoint, detail }: Props) {
+export function TornadoRightPanel({ selectedPoint, detail, detailLoading }: Props) {
+  if (!selectedPoint) return null
+
   return (
     <div className="absolute top-6 right-6 z-40 w-72 pointer-events-none h-[calc(100vh-160px)]">
       <div className="h-full overflow-y-auto pl-1 scrollbar-none pointer-events-auto flex flex-col gap-3 pb-12">
-        <SummaryCard selectedPoint={selectedPoint} detail={detail} />
-        {detail && <MistralCard detail={detail} />}
-        {detail && detail.mistral_analysis.recommended_actions.length > 0 && <ActionsCard detail={detail} />}
-        {detail && <DriversCard detail={detail} />}
-        <DisclaimerCard detail={detail} />
+        {detailLoading || !detail ? (
+          <div className="bg-[#0a0d14]/90 backdrop-blur-xl border border-cyan-500/20 rounded-lg p-6 flex flex-col items-center justify-center gap-4 shadow-2xl text-center">
+            <div className="w-5 h-5 rounded-full bg-cyan-400/20 flex items-center justify-center">
+              <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_12px_rgba(34,211,238,0.8)]" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400/80 leading-relaxed">
+              Cargando proyecciones<br/>e información oficial...
+            </span>
+          </div>
+        ) : (
+          <>
+            <SummaryCard selectedPoint={selectedPoint} detail={detail} />
+            <MistralCard detail={detail} />
+            {detail.mistral_analysis.recommended_actions.length > 0 && <ActionsCard detail={detail} />}
+            <DriversCard detail={detail} />
+            <DisclaimerCard detail={detail} />
+          </>
+        )}
       </div>
     </div>
   )
