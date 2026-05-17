@@ -151,7 +151,7 @@ function AirPageInner() {
       </header>
 
       {/* ── Main ── */}
-      <main className="flex-1 relative overflow-hidden">
+      <main className="flex-1 relative overflow-hidden pb-16 md:pb-0">
         <AirMap wind={liveEnv.wind} fires={liveFires} infrastructure={liveInfra} />
         <SmokeAlert wind={liveEnv.wind} sourceCount={liveFires.length} />
 
