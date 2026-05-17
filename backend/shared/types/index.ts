@@ -66,7 +66,6 @@ export interface SentinelUpdate {
   airAlerts?: AirAlerts
   report?: AuthorityReport
   naturalRoutes?: NaturalRoutes
-  prediction?: PredictionResult
 }
 
 export interface AlertPayload {
@@ -176,27 +175,55 @@ export interface RoutesResult {
   naturalRoutes: NaturalRoutes | null
 }
 
-export interface PredictionCell {
-  lat: number
-  lon: number
-  risk_score: number        // 0-1 combined (FWI × 0.6 + historical × 0.4)
-  fwi_score: number         // 0-1 weather-only component
-  historical_weight: number // 0-1 history-only component
+// ─── Agent 6 — Fire Risk Grid ────────────────────────────────────────────────
+
+export type RiskCategory = 'bajo' | 'medio' | 'alto' | 'critico'
+
+export interface RiskFactors {
+  fwi: number        // 0-100 — weather (single point)
+  historial: number  // 0-100 — real fire history + live FIRMS
+  terreno: number    // 0-100 — vegetation zone proxy
 }
 
-export interface PredictionResult {
-  grid: PredictionCell[]
-  top_zones: Array<{
-    lat: number
-    lon: number
-    risk_score: number
-    zona: string    // human-readable zone name from LLM
-    razon: string   // why this zone is at risk, from LLM
-  }>
-  analisis_6h: string
-  analisis_24h: string
-  analisis_72h: string
-  confianza: 'baja' | 'media' | 'alta'
+export interface FireRiskCell {
+  id: string                 // e.g. "M-17"
+  lat: number                // SW corner
+  lon: number                // SW corner
+  size: number               // cell size in degrees (0.25)
+  score: number              // 0-100
+  category: RiskCategory
+  factors: RiskFactors
+  zona: string               // vegetation band name
+}
+
+export interface FireRiskGrid {
+  cells: FireRiskCell[]
+  generated_at: string
+  weather_point: { lat: number; lon: number }   // limitation: single weather point
+  bbox: { latMin: number; latMax: number; lonMin: number; lonMax: number }
+}
+
+export interface CellInfrastructure {
+  name: string
+  type: 'hospital' | 'school' | 'kindergarten' | 'fire_station' | 'police'
+  lat: number
+  lon: number
+  distance_km: number
+}
+
+export interface CellSocialImpact {
+  score: number              // 0-100
+  poblacion_estimada?: number
+  resumen: string
+}
+
+export interface CellDetail {
+  cell_id: string
+  infrastructure: CellInfrastructure[]
+  social_impact: CellSocialImpact
+  explicacion: string                                // Mistral
+  recomendaciones: string[]                          // Mistral
+  prioridad: 'baja' | 'media' | 'alta' | 'critica'   // Mistral, score-fallback
 }
 
 // Agent contract — POST /analyze
