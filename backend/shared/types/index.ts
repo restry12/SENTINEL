@@ -62,6 +62,7 @@ export interface SentinelUpdate {
   // LLM enrichment — optional, degrade gracefully if agents fail
   riskAssessment?: RiskAssessment
   expansion?: ExpansionData
+  perFireExpansions?: PerFireExpansion[]  // per-fire expansion data
   airAlerts?: AirAlerts
   report?: AuthorityReport
   naturalRoutes?: NaturalRoutes
@@ -109,11 +110,23 @@ export interface ExpansionData {
   direccion_principal: string
 }
 
+export interface PerFireExpansion {
+  lat: number
+  lon: number
+  frp: number
+  expansion_2h_km2: number
+  expansion_6h_km2: number
+  expansion_12h_km2: number
+  velocidad_kmh: number
+  direccion: string
+}
+
 // Combined output of agent-fire (A1 + A2)
 export interface FireAnalysis {
   polygon: GeoJSONFeature        // expansion_2h wrapped as GeoJSONFeature for map display
   riskAssessment: RiskAssessment
   expansion: ExpansionData
+  perFireExpansions: PerFireExpansion[]
 }
 
 export interface AirAlert {

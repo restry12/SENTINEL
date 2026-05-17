@@ -639,6 +639,61 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     else map.once('style.load', drawExpansion)
   }, [selectedFire, activeExpansion, sentinelUpdate])
 
+  // Per-fire expansion ellipses — shows individual spread zones for top 150 fires
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    const PF_SRC = 'per-fire-expansions'
+    const PF_FILL = 'per-fire-exp-fill'
+    const PF_LINE = 'per-fire-exp-line'
+
+    const drawPerFire = () => {
+      if (map.getLayer(PF_LINE)) map.removeLayer(PF_LINE)
+      if (map.getLayer(PF_FILL)) map.removeLayer(PF_FILL)
+      if (map.getSource(PF_SRC)) map.removeSource(PF_SRC)
+
+      if (!activeExpansion) return
+      const expansions = sentinelUpdate?.perFireExpansions ?? []
+      if (expansions.length === 0) return
+
+      const windDeg = sentinelUpdate?.weather?.deg ?? 315
+      const windSpeedMs = sentinelUpdate?.weather?.speed ?? 6.7
+      const hours = EXP_CONFIG[activeExpansion].hours
+
+      // Generate ellipse polygon for each fire using its FRP-adjusted spread
+      const features = expansions.map(pf => {
+        const frpFactor = 1 + (pf.frp / 500) * 0.3
+        return makeFireSpreadPolygon(pf.lat, pf.lon, windDeg, windSpeedMs * frpFactor, hours)
+      })
+
+      map.addSource(PF_SRC, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features } as any,
+      })
+
+      map.addLayer({
+        id: PF_FILL, type: 'fill', source: PF_SRC,
+        paint: {
+          'fill-color': EXP_CONFIG[activeExpansion].colorOuter,
+          'fill-opacity': 0.12,
+        },
+      })
+      map.addLayer({
+        id: PF_LINE, type: 'line', source: PF_SRC,
+        paint: {
+          'line-color': EXP_CONFIG[activeExpansion].colorMid,
+          'line-width': 1,
+          'line-opacity': 0.4,
+          'line-dasharray': [3, 2],
+        },
+      })
+    }
+
+    if (map.isStyleLoaded()) drawPerFire()
+    else map.once('style.load', drawPerFire)
+  }, [activeExpansion, sentinelUpdate])
+
   // A6 prediction heatmap — toggled by clicking Critical Fire legend
   useEffect(() => {
     const map = mapRef.current
