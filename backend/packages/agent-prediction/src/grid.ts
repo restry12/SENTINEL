@@ -29,3 +29,37 @@ export function categoryFor(score: number): RiskCategory {
   if (score >= 40) return 'medio'
   return 'bajo'
 }
+
+import { CELL_DEG } from './zones'
+
+export interface Hotspot {
+  lat: number
+  lon: number
+}
+
+// Proximity kernel: each hotspot adds weight 1.0 to its own cell and a
+// linear falloff to cells within a 2-cell radius. Result keyed "row,col"
+// (integer grid indices), normalized so the hottest cell is 100.
+export function computeHistorial(hotspots: Hotspot[]): Map<string, number> {
+  const raw = new Map<string, number>()
+  for (const h of hotspots) {
+    const hRow = Math.floor(h.lat / CELL_DEG)
+    const hCol = Math.floor(h.lon / CELL_DEG)
+    for (let dr = -2; dr <= 2; dr++) {
+      for (let dc = -2; dc <= 2; dc++) {
+        const dist = Math.sqrt(dr * dr + dc * dc)
+        const w = Math.max(0, 1 - dist / 3)
+        if (w <= 0) continue
+        const k = `${hRow + dr},${hCol + dc}`
+        raw.set(k, (raw.get(k) ?? 0) + w)
+      }
+    }
+  }
+  const result = new Map<string, number>()
+  if (raw.size === 0) return result
+  const max = Math.max(...raw.values())
+  for (const [k, v] of raw) {
+    result.set(k, Math.round((v / max) * 100))
+  }
+  return result
+}

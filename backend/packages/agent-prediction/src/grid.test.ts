@@ -39,3 +39,27 @@ describe('categoryFor', () => {
     expect(categoryFor(90)).toBe('critico')
   })
 })
+
+import { computeHistorial } from './grid'
+
+describe('computeHistorial', () => {
+  it('returns an empty map when there are no hotspots', () => {
+    expect(computeHistorial([]).size).toBe(0)
+  })
+
+  it('the hottest cell normalizes to 100', () => {
+    const map = computeHistorial([{ lat: -38.4, lon: -72.1 }])
+    const max = Math.max(...map.values())
+    expect(max).toBe(100)
+  })
+
+  it('neighbouring cells receive a falloff weight below the centre', () => {
+    const map = computeHistorial([{ lat: -38.4, lon: -72.1 }])
+    const row = Math.floor(-38.4 / 0.25)
+    const col = Math.floor(-72.1 / 0.25)
+    const centre = map.get(`${row},${col}`) ?? 0
+    const neighbour = map.get(`${row + 1},${col}`) ?? 0
+    expect(neighbour).toBeGreaterThan(0)
+    expect(neighbour).toBeLessThan(centre)
+  })
+})
