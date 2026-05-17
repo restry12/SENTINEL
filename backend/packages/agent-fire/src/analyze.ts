@@ -8,6 +8,13 @@ export function degreesToCardinal(deg: number): string {
   return dirs[Math.round(deg / 45) % 8]
 }
 
+export function cardinalToDeg(dir: string): number {
+  const map: Record<string, number> = {
+    N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315,
+  }
+  return map[dir.toUpperCase()] ?? 0
+}
+
 export function centroid(fires: { lat: number; lon: number }[]): { lat: number; lon: number } {
   const lat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
   const lon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
@@ -170,7 +177,9 @@ IMPORTANTE: Los polígonos deben estar centrados en las coordenadas reales del i
   const user = `Centroide real del incendio: lat ${center.lat}, lon ${center.lon}\n\nEvaluación de riesgo (Agent 1):\n${JSON.stringify(a1, null, 2)}\n\nDatos climáticos:\n${JSON.stringify(climateData, null, 2)}\n\nPredice la expansión a 2h, 6h y 12h con polígonos GeoJSON centrados en las coordenadas reales.`
 
   const raw = await callOpenRouter(MODELS.large, system, user)
-  return parseJSON<ExpansionData>(raw, 'Agent 2 (Expansion)')
+  const a2 = parseJSON<ExpansionData>(raw, 'Agent 2 (Expansion)')
+  a2.direccion_principal_deg = cardinalToDeg(a2.direccion_principal)
+  return a2
 }
 
 function expansionToGeoJSON(expansion: ExpansionData): GeoJSONFeature {
@@ -203,6 +212,7 @@ const EMPTY: FireAnalysis = {
     expansion_12h: { type: 'Polygon', coordinates: [], area_km2: 0 },
     velocidad_propagacion_kmh: 0,
     direccion_principal: 'N',
+    direccion_principal_deg: 0,
   },
   perFireExpansions: [],
 }

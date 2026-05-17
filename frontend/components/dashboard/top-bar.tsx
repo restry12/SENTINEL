@@ -45,7 +45,7 @@ export function TopBar() {
 
   return (
     <div className="flex flex-col shrink-0 z-50">
-      <header className="h-[72px] px-8 border-b border-white/10 bg-[#080c14/80] backdrop-blur-2xl flex items-center justify-between gap-8 relative">
+      <header className="h-[72px] px-8 border-b border-white/10 bg-[#0f172a] backdrop-blur-2xl flex items-center justify-between gap-8 relative">
         {/* Animated Glow Line */}
         <div className={`absolute bottom-0 left-0 h-[2px] transition-all duration-1000 ease-in-out ${
           riskLevel === 'critical' ? 'bg-red shadow-[0_0_15px_rgba(255,51,51,0.8)]' : 
@@ -80,11 +80,12 @@ export function TopBar() {
             </div>
             
             <nav className="flex items-center gap-1">
-              {([
+              {[
                 { href: '/dashboard', label: tx.navDashboard },
                 { href: '/air',       label: tx.navAir },
+                { href: '/tornado',   label: tx.navTornado },
                 { href: '/news',      label: tx.navNews ?? 'Noticias' },
-              ] as const).map(({ href, label }) => (
+              ].map(({ href, label }) => (
                 <Link
                   key={href}
                   href={href}

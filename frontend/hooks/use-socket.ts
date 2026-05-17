@@ -107,6 +107,44 @@ export interface InfrastructurePoint {
   type: "hospital" | "school" | "emergency"
 }
 
+export type RiskCategory = 'bajo' | 'medio' | 'alto' | 'critico'
+
+export interface RiskFactors {
+  fwi: number
+  historial: number
+  terreno: number
+}
+
+export interface RegionGeometry {
+  type: 'Polygon' | 'MultiPolygon'
+  coordinates: number[][][] | number[][][][]
+}
+
+export interface FireRiskRegion {
+  id: number
+  nombre: string
+  score: number
+  category: RiskCategory
+  factors: RiskFactors
+  geometry: RegionGeometry
+}
+
+export interface FireRiskRegionMap {
+  regions: FireRiskRegion[]
+  generated_at: string
+  weather_point: { lat: number; lon: number }
+}
+
+export interface RegionDetail {
+  region_id: number
+  nombre: string
+  infraestructura_total: number
+  resumen_infraestructura: string
+  explicacion: string
+  recomendaciones: string[]
+  prioridad: 'baja' | 'media' | 'alta' | 'critica'
+}
+
 export interface PerFireExpansion {
   lat: number
   lon: number
@@ -142,26 +180,8 @@ export interface SentinelUpdate {
   airAlerts?: AirAlerts
   report?: AuthorityReport
   naturalRoutes?: NaturalRoutes
-  prediction?: PredictionResult
   // Optional — populated once Make.com / backend start sending infrastructure
   infrastructure?: InfrastructurePoint[]
-}
-
-export interface PredictionCell {
-  lat: number
-  lon: number
-  risk_score: number
-  fwi_score: number
-  historical_weight: number
-}
-
-export interface PredictionResult {
-  grid: PredictionCell[]
-  top_zones: Array<{ lat: number; lon: number; risk_score: number; zona: string; razon: string }>
-  analisis_6h: string
-  analisis_24h: string
-  analisis_72h: string
-  confianza: 'baja' | 'media' | 'alta'
 }
 
 export interface SocketStatus {
@@ -194,6 +214,7 @@ export function useSocket() {
   const [status, setStatus] = useState<SocketStatus>({ state: "idle" })
   const [connected, setConnected] = useState(false)
   const socketRef = useRef<Socket | null>(null)
+  const pendingCitizenTrigger = useRef<{ lat: number; lon: number } | null>(null)
 
   useEffect(() => {
     // 1. Instant paint from the browser's own cache of the last analysis.
@@ -204,24 +225,43 @@ export function useSocket() {
     }
 
     // 2. Hydrate from the backend's last snapshot (covers a fresh browser).
-    fetch("/api/last")
-      .then((r) => r.json())
-      .then((d) => {
+    const hydrate = async (retries = 3) => {
+      try {
+        const r = await fetch("/api/last")
+        const d = await r.json()
         if (d?.ok && d.update) {
           setSentinelUpdate(d.update as SentinelUpdate)
           cacheUpdate(d.update as SentinelUpdate)
           setStatus({ state: "ok" })
+          return true
         }
-      })
-      .catch(() => {
-        /* backend unreachable — socket replay still covers it */
-      })
+      } catch (e) {
+        if (retries > 0) {
+          setTimeout(() => hydrate(retries - 1), 2000)
+        }
+      }
+      return false
+    }
+
+    hydrate()
 
     const url = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000"
     const socket: Socket = io(url, { transports: ["websocket"] })
     socketRef.current = socket
 
-    socket.on("connect", () => setConnected(true))
+    socket.on("connect", () => {
+      setConnected(true)
+      // Fire any queued citizen trigger now that we have a valid socket.id
+      if (pendingCitizenTrigger.current) {
+        const { lat, lon } = pendingCitizenTrigger.current
+        pendingCitizenTrigger.current = null
+        fetch('/api/trigger/citizen-init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lon, socketId: socket.id }),
+        }).catch((err) => console.error('[triggerCitizen] queued trigger failed:', err))
+      }
+    })
     socket.on("disconnect", () => setConnected(false))
 
     socket.on("update", (data: SentinelUpdate) => {
@@ -243,5 +283,21 @@ export function useSocket() {
     socketRef.current?.emit("trigger", { lat, lon })
   }, [])
 
-  return { sentinelUpdate, status, connected, trigger }
+  const triggerCitizen = useCallback((lat: number, lon: number) => {
+    const socket = socketRef.current
+    const socketId = socket?.connected ? socket.id : null
+    if (socketId) {
+      // Socket already connected — fire immediately with the real socketId
+      fetch('/api/trigger/citizen-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lon, socketId }),
+      }).catch((err) => console.error('[triggerCitizen] HTTP trigger failed:', err))
+    } else {
+      // Socket not connected yet — queue it; connect handler fires it with socket.id
+      pendingCitizenTrigger.current = { lat, lon }
+    }
+  }, [])
+
+  return { sentinelUpdate, status, connected, trigger, triggerCitizen }
 }

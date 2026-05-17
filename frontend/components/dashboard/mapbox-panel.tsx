@@ -6,6 +6,7 @@ import { useSentinel } from '@/contexts/sentinel-context'
 import { useFireSelection, type FireIntensity } from '@/contexts/fire-selection-context'
 import { degToCompass } from '@/lib/utils'
 import { useGeolocation } from '@/hooks/use-geolocation'
+import type { FireRiskRegionMap, FireRiskRegion } from '@/hooks/use-socket'
 
 function directionToDeg(dir: string): number | null {
   const map: Record<string, number> = {
@@ -101,12 +102,14 @@ const EXP_CONFIG: Record<ExpansionKey, {
 }
 
 
-export function MapboxPanel({ 
-  showHeatmap = false,
+export function MapboxPanel({
+  riskMap,
+  onRegionClick,
   activeExpansion,
   setActiveExpansion
-}: { 
-  showHeatmap?: boolean,
+}: {
+  riskMap: FireRiskRegionMap | null,
+  onRegionClick: (region: FireRiskRegion) => void,
   activeExpansion: ExpansionKey | null,
   setActiveExpansion: (k: ExpansionKey | null) => void
 }) {
@@ -114,9 +117,16 @@ export function MapboxPanel({
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const pulseRafRef = useRef<number | null>(null)
+  const lastUpdateRef = useRef<string>('')
   const { sentinelUpdate } = useSentinel()
   const { selectedFire, setSelectedFire, selectFireRef } = useFireSelection()
   const userCoords = useGeolocation()
+  const onRegionClickRef = useRef(onRegionClick)
+  onRegionClickRef.current = onRegionClick
+  // Holds the latest regions so the click handler can recover full geometry
+  // from a clicked feature's id (geometry is not carried in feature props).
+  const regionsRef = useRef<FireRiskRegion[]>([])
+  regionsRef.current = riskMap?.regions ?? []
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -213,8 +223,15 @@ export function MapboxPanel({
     }
 
     const apply = () => {
-      cleanup()
       const fires = sentinelUpdate?.fires ?? []
+      
+      // Skip if data is identical to avoid flickering
+      const currentDataStr = JSON.stringify(fires)
+      if (currentDataStr === lastUpdateRef.current) return
+      lastUpdateRef.current = currentDataStr
+
+      cleanup()
+      if (fires.length === 0) return
 
       function openFire(
         lat: number, lon: number,
@@ -249,7 +266,7 @@ export function MapboxPanel({
           expansion2h: fireA2, expansion6h: fireA6, expansion12h: fireA12,
           weather,
         })
-        setActiveExpansion('2h')
+        setActiveExpansion(perFire ? '2h' : null)
 
         const sel = m.getSource('fires-selected-src') as mapboxgl.GeoJSONSource
         sel?.setData({
@@ -449,55 +466,91 @@ export function MapboxPanel({
     else map.once('style.load', apply)
   }, [sentinelUpdate])
 
+  // Region source + fill/line layers — rebuilt whenever the risk map changes.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapLoaded) return
 
     const apply = () => {
       if (!map.getStyle()) return
-      const heatId = 'prediction-heatmap'
-      const gridId = 'prediction-grid'
-      if (map.getLayer(heatId)) map.removeLayer(heatId)
-      if (map.getLayer(gridId)) map.removeLayer(gridId)
-      if (map.getSource(gridId)) map.removeSource(gridId)
+      const fillId = 'risk-grid-fill'
+      const lineId = 'risk-grid-line'
+      const srcId = 'risk-grid-src'
+      if (map.getLayer(fillId)) map.removeLayer(fillId)
+      if (map.getLayer(lineId)) map.removeLayer(lineId)
+      if (map.getSource(srcId)) map.removeSource(srcId)
 
-      const pred = sentinelUpdate?.prediction
-      if (!pred || !showHeatmap) return
+      if (!riskMap) return
 
-      const features = pred.grid.map(c => ({
-        type: 'Feature',
-        properties: { risk: c.risk_score },
-        geometry: { type: 'Point', coordinates: [c.lon, c.lat] },
+      const features = riskMap.regions.map(r => ({
+        type: 'Feature' as const,
+        id: r.id,
+        properties: {
+          id: r.id,
+          nombre: r.nombre,
+          category: r.category,
+          score: r.score,
+          fwi: r.factors.fwi,
+          historial: r.factors.historial,
+          terreno: r.factors.terreno,
+        },
+        geometry: r.geometry,
       }))
 
-      map.addSource(gridId, { type: 'geojson', data: { type: 'FeatureCollection', features } as any })
-
+      map.addSource(srcId, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features } as any,
+      })
       map.addLayer({
-        id: heatId,
-        type: 'heatmap',
-        source: gridId,
-        maxzoom: 12,
+        id: fillId, type: 'fill', source: srcId,
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'risk'], 0, 0, 1, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 3],
-          'heatmap-color': [
-            'interpolate', ['linear'], ['heatmap-density'],
-            0, 'rgba(0,0,0,0)',
-            0.2, 'rgba(34,197,94,0.3)',
-            0.4, 'rgba(234,179,8,0.4)',
-            0.6, 'rgba(249,115,22,0.5)',
-            0.8, 'rgba(239,68,68,0.6)',
-            1, 'rgba(220,38,38,0.7)',
+          'fill-color': [
+            'match', ['get', 'category'],
+            'bajo', '#22c55e',
+            'medio', '#eab308',
+            'alto', '#f97316',
+            'critico', '#ef4444',
+            '#22c55e',
           ],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 12, 20],
-          'heatmap-opacity': 0.6,
+          'fill-opacity': 0.35,
         },
+      })
+      map.addLayer({
+        id: lineId, type: 'line', source: srcId,
+        paint: { 'line-color': 'rgba(255,255,255,0.25)', 'line-width': 1 },
       })
     }
 
     if (map.isStyleLoaded()) apply()
     else map.once('style.load', apply)
-  }, [sentinelUpdate, showHeatmap, mapLoaded])
+  }, [riskMap, mapLoaded])
+
+  // Region interactivity — registered once for the fixed layer id.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapLoaded) return
+
+    const fillId = 'risk-grid-fill'
+    const onClick = (e: mapboxgl.MapLayerMouseEvent) => {
+      const f = e.features?.[0]
+      if (!f) return
+      const p = f.properties as any
+      const region = regionsRef.current.find(r => r.id === p.id)
+      if (region) onRegionClickRef.current(region)
+    }
+    const onEnter = () => { map.getCanvas().style.cursor = 'pointer' }
+    const onLeave = () => { map.getCanvas().style.cursor = '' }
+
+    map.on('click', fillId, onClick)
+    map.on('mouseenter', fillId, onEnter)
+    map.on('mouseleave', fillId, onLeave)
+
+    return () => {
+      map.off('click', fillId, onClick)
+      map.off('mouseenter', fillId, onEnter)
+      map.off('mouseleave', fillId, onLeave)
+    }
+  }, [mapLoaded])
 
   useEffect(() => {
     const map = mapRef.current
@@ -511,13 +564,14 @@ export function MapboxPanel({
       if (map.getLayer(expLineId)) map.removeLayer(expLineId)
       if (map.getSource(expId)) map.removeSource(expId)
 
-      if (!selectedFire || !activeExpansion) return
+      if (!selectedFire || !activeExpansion || !selectedFire.weather) return
 
       const config = EXP_CONFIG[activeExpansion]
       const expansionKm2 =
-        activeExpansion === '2h'  ? (selectedFire.expansion2h?.km2  ?? config.hours * 5) :
-        activeExpansion === '6h'  ? (selectedFire.expansion6h?.km2  ?? config.hours * 5) :
-                                    (selectedFire.expansion12h?.km2 ?? config.hours * 5)
+        activeExpansion === '2h'  ? selectedFire.expansion2h?.km2 :
+        activeExpansion === '6h'  ? selectedFire.expansion6h?.km2 :
+                                    selectedFire.expansion12h?.km2
+      if (expansionKm2 == null) return
       const poly = makeFireSpreadPolygon(
         selectedFire.lat, selectedFire.lon,
         selectedFire.weather?.deg ?? 0,

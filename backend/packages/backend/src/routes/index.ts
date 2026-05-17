@@ -10,18 +10,44 @@ import { storeRun, getRun } from '../services/run-cache'
 import { mergeEnriched } from '../utils/mergeEnriched'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
+import { fetchRiskGrid, fetchCellDetail } from '../services/prediction-proxy'
+import type { RiskCategory, RiskFactors } from '@sentinel/types'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
 
-// Cuántos focos (top por FRP) se mandan a Make.com para enriquecer. Única
-// perilla: subir/bajar acá según cuánto aguante OpenAQ / el tiempo de corrida.
 const ENRICH_LIMIT = 150
+
+type RawCitizenBody = { fires?: unknown; lat?: unknown; lon?: unknown; socketId?: unknown }
+
+export function parseCitizenBody(body: RawCitizenBody): {
+  firms: unknown[]; socketId: string; lat: number | undefined; lon: number | undefined; pm25: number | undefined
+} | null {
+  const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : null
+  if (!socketId) return null
+  const rawFires = Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : null
+  if (!rawFires) return null
+  const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+  const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+  const pm25Values = rawFires.map(f => f.pm25).filter((v): v is number => typeof v === 'number')
+  const pm25 = pm25Values.length > 0 ? Math.max(...pm25Values) : undefined
+  return { firms: rawFires, socketId, lat, lon, pm25 }
+}
 
 // Max 10 analysis requests per IP every 15 minutes
 const triggerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Demasiadas solicitudes. Intenta de nuevo en 15 minutos.' },
+})
+
+// Grid endpoints hit Overpass + Mistral — more generous than triggerLimiter
+// but still capped to protect the upstreams.
+const gridLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, error: 'Demasiadas solicitudes. Intenta de nuevo en 15 minutos.' },
@@ -46,6 +72,49 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       lock: getLockStatus(),
       polling: polling.getState(),
     })
+  })
+
+  // GET /api/risk-grid — Fire Risk Grid, lazy-loaded by the dashboard toggle.
+  // Weather + live fires come from the last analysis already in memory.
+  app.get('/api/risk-grid', gridLimiter, async (_req, res) => {
+    const last = getLastUpdate()
+    const weather = last?.weather ?? { speed: 0, deg: 0, humidity: 0 }
+    const firms = last?.fires ?? []
+    try {
+      const grid = await fetchRiskGrid(weather, firms)
+      res.json({ ok: true, grid })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(502).json({ ok: false, error: message })
+    }
+  })
+
+  // POST /api/cell-detail — per-region infrastructure + AI detail.
+  app.post('/api/cell-detail', gridLimiter, async (req, res) => {
+    const body = req.body as {
+      region_id?: unknown
+      nombre?: unknown
+      score?: unknown
+      category?: unknown
+      factors?: unknown
+    }
+    if (typeof body.region_id !== 'number') {
+      res.status(400).json({ ok: false, error: 'Missing region_id' })
+      return
+    }
+    try {
+      const detail = await fetchCellDetail({
+        region_id: body.region_id,
+        nombre: typeof body.nombre === 'string' ? body.nombre : '',
+        score: typeof body.score === 'number' ? body.score : 0,
+        category: (body.category as RiskCategory) ?? 'bajo',
+        factors: (body.factors as RiskFactors) ?? { fwi: 0, historial: 0, terreno: 0 },
+      })
+      res.json({ ok: true, detail })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      res.status(502).json({ ok: false, error: message })
+    }
   })
 
   // POST /api/trigger — manual single analysis run (rate limited)
@@ -121,6 +190,94 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
 
     executeAndBroadcast(io, lat, lon, firms, undefined, pm25).catch((err) => {
       console.error('[trigger/full] background analysis error:', err instanceof Error ? err.message : err)
+    })
+  })
+
+  // POST /api/trigger/citizen-init — called by the frontend to kick off the citizen flow.
+  // Accepts { lat, lon, socketId? } and fires the Make.com citizen webhook.
+  // Uses the same webhook + bbox logic as the trigger-citizen socket handler.
+  app.post('/api/trigger/citizen-init', triggerLimiter, (req, res) => {
+    if (isLocked()) {
+      res.status(429).json({ ok: false, error: 'Analysis in progress — try again shortly' })
+      return
+    }
+    const body = req.body as { lat?: unknown; lon?: unknown; socketId?: unknown }
+    const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+    const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
+
+    if (lat === undefined || lon === undefined) {
+      res.status(400).json({ ok: false, error: 'lat and lon required' })
+      return
+    }
+
+    const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
+    if (citizenWebhookUrl) {
+      const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+      const secret = process.env.MAKE_CITIZEN_WEBHOOK_SECRET
+      if (secret) webhookHeaders['x-make-apikey'] = secret
+      fetch(citizenWebhookUrl, {
+        method: 'POST',
+        headers: webhookHeaders,
+        body: JSON.stringify({
+          lat, lon,
+          ...(socketId ? { socketId } : {}),
+          west:  Math.round((lon - 3) * 10) / 10,
+          south: Math.round((lat - 3) * 10) / 10,
+          east:  Math.round((lon + 3) * 10) / 10,
+          north: Math.round((lat + 3) * 10) / 10,
+        }),
+      }).catch((err) => console.error('[citizen-init] webhook error:', err instanceof Error ? err.message : err))
+    } else {
+      console.warn('[citizen-init] MAKE_CITIZEN_WEBHOOK_URL not set — running degraded analysis')
+      executeAndBroadcast(io, lat, lon, [], undefined, undefined, socketId).catch(console.error)
+    }
+
+    res.status(202).json({ ok: true, accepted: true })
+  })
+
+  // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
+  // Receives { runId, socketId, lat, lon, weather, pm25 }
+  // runId references fires cached by /api/fires/filter; weather and pm25 at citizen's location
+  app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
+    if (isLocked()) {
+      res.status(202).json({ ok: false, accepted: false, error: 'Analysis in progress — try again shortly' })
+      return
+    }
+
+    const body = req.body as {
+      runId?: unknown
+      fires?: unknown
+      socketId?: unknown
+      lat?: unknown
+      lon?: unknown
+      weather?: unknown
+      pm25?: unknown
+    }
+
+    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : null
+    if (!socketId) {
+      res.status(400).json({ ok: false, error: 'socketId required' })
+      return
+    }
+
+    const runId = typeof body.runId === 'string' ? body.runId : undefined
+    const cachedFires = runId ? (getRun(runId) ?? []) : []
+    const rawFires = cachedFires.length > 0
+      ? cachedFires
+      : Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
+
+    const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+    const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+    const pm25 = typeof body.pm25 === 'number' ? body.pm25 : undefined
+    const weather = body.weather ?? undefined
+
+    const enriched = mapRawFiresToFireData(rawFires as Record<string, unknown>[])
+
+    res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
+
+    executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId).catch((err) => {
+      console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
     })
   })
 
