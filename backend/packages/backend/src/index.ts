@@ -54,12 +54,20 @@ const polling = new PollingController(async () => {
 registerRoutes(app, io, polling)
 registerSocketHandlers(io, polling)
 
-const PORT = process.env.PORT ?? 3000
-httpServer.listen(PORT, () => {
-  console.log(`[backend] running on port ${PORT}`)
+async function start() {
   // Restore page-memory snapshot so a freshly booted instance already has
   // the last analysis (Render free tier loses RAM on cold start).
-  void loadLastUpdateFromDb()
+  await loadLastUpdateFromDb()
+
+  const PORT = process.env.PORT ?? 3000
+  httpServer.listen(PORT, () => {
+    console.log(`[backend] running on port ${PORT}`)
+  })
+}
+
+start().catch(err => {
+  console.error('[startup] failed to start server:', err)
+  process.exit(1)
 })
 
 export { io }

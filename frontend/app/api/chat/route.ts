@@ -36,6 +36,7 @@ interface PerFireExpansion {
 interface SentinelSnapshot {
   timestamp: string
   fires: FireData[]
+  weather?: { speed: number; deg: number; humidity: number; temp?: number }
   airQuality: { pm25: number; aqi: number; category: string }
   riskLevel: string
   riskAssessment?: { zona_afectada: string; resumen: string }
@@ -85,6 +86,7 @@ function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[
 - Si el usuario pregunta por un foco, región o métrica que no está en el contexto: responde "No tengo ese dato en vivo en este momento" y NO inventes nombres ni números.
 - Si la lista de FOCOS ACTIVOS está vacía o ausente: di explícitamente que no hay focos en los datos en vivo y ofrece información general sin valores específicos.
 - Está estrictamente prohibido inventar nombres de comunas, estados, ciudades o agencias que no estén en el contexto.
+- **CLIMA:** Los datos de viento, humedad y temperatura que aparecen en DATOS EN VIVO o CLIMA pertenecen ÚNICAMENTE a la zona de análisis (punto donde se disparó el sistema). NO corresponden a focos de otros países o regiones. Nunca atribuyas ese clima a un foco de otro país.
 
 ## ÁMBITO
 SENTINEL cubre incendios en América. Agencias por país (cita la del país donde está el foco que el usuario pregunta; si no estás seguro del país, no inventes):
@@ -166,8 +168,19 @@ R: [valor numérico exacto] — [categoría]. Riesgo respiratorio [bajo/medio/al
     prompt += `- Nivel de riesgo: ${snapshot.riskLevel.toUpperCase()}\n`
 
     if (snapshot.riskAssessment) {
-      prompt += `- Zona afectada: ${snapshot.riskAssessment.zona_afectada}\n`
-      prompt += `- Evaluación: ${snapshot.riskAssessment.resumen}\n`
+      const zona = snapshot.riskAssessment.zona_afectada
+      prompt += `- Zona de análisis (punto donde se disparó el sistema): ${zona}\n`
+      prompt += `- Evaluación de riesgo (específica para ${zona}): ${snapshot.riskAssessment.resumen}\n`
+    }
+
+    if (snapshot.weather) {
+      const zona = snapshot.riskAssessment?.zona_afectada ?? 'zona de análisis'
+      const windKmh = (snapshot.weather.speed * 3.6).toFixed(1)
+      prompt += `\n## CLIMA EN ZONA DE ANÁLISIS (${zona})\n`
+      prompt += `⚠️ Estos datos climáticos son EXCLUSIVOS de ${zona}. NO aplican a focos en otros países o regiones.\n`
+      prompt += `- Viento: ${windKmh} km/h\n`
+      prompt += `- Humedad: ${snapshot.weather.humidity}%\n`
+      if (snapshot.weather.temp != null) prompt += `- Temperatura: ${snapshot.weather.temp}°C\n`
     }
 
     if (snapshot.report) {

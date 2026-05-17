@@ -224,18 +224,25 @@ export function useSocket() {
     }
 
     // 2. Hydrate from the backend's last snapshot (covers a fresh browser).
-    fetch("/api/last")
-      .then((r) => r.json())
-      .then((d) => {
+    const hydrate = async (retries = 3) => {
+      try {
+        const r = await fetch("/api/last")
+        const d = await r.json()
         if (d?.ok && d.update) {
           setSentinelUpdate(d.update as SentinelUpdate)
           cacheUpdate(d.update as SentinelUpdate)
           setStatus({ state: "ok" })
+          return true
         }
-      })
-      .catch(() => {
-        /* backend unreachable — socket replay still covers it */
-      })
+      } catch (e) {
+        if (retries > 0) {
+          setTimeout(() => hydrate(retries - 1), 2000)
+        }
+      }
+      return false
+    }
+
+    hydrate()
 
     const url = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000"
     const socket: Socket = io(url, { transports: ["websocket"] })
