@@ -19,7 +19,8 @@ export function calcRiesgo(inputs: ScoreInputs): number {
   const tempScore = normalize(tempAnomaly, 0, 3)
 
   // Factor 3: elevación (15%) — glaciares más bajos son más vulnerables
-  const elevScore = normalize(5000 - Math.max(0, elevation), 4000, 5000)
+  // elevation 0m → elevScore 100 (most vulnerable), 5500m → elevScore 0
+  const elevScore = normalize(5500 - Math.max(0, elevation), 0, 5500)
 
   // Factor 4: tamaño (20%) — glaciares pequeños retroceden más rápido
   const areaScore = areaNow < 1

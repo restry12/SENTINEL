@@ -33,7 +33,7 @@ export interface Glacier {
 
   riesgo: number          // 0–100
   cat: RiskCat
-  trend: string
+  trend: 'Retroceso acelerado' | 'Retroceso lento' | 'Estable'
   deltaShort: string
   deltaYear: string
   masaVar: string

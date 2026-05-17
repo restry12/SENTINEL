@@ -1,7 +1,7 @@
 import infraData from '@/data/glacier-infra.json'
 import type { InfraItem } from './glacier-types'
 
-const INFRA = infraData as Record<string, InfraItem[]>
+const INFRA = infraData as Record<string, InfraItem[] | undefined>
 
 // Baseline de temperatura mensual (°C) a altitud glaciar por macrozona
 // Fuente: ERA5 climatología 1981-2010, ajustada por gradiente altitudinal
@@ -66,12 +66,14 @@ export function getCuencaFactor(lat: number): number {
   return 30                                  // Patagonia: bajo uso hídrico
 }
 
+// Zones without dedicated infra data (Biobío, Los Lagos, Palena) fall to 'default'.
+// Add zone keys to glacier-infra.json when infra data becomes available.
 export function getInfra(lat: number, lon: number): InfraItem[] {
-  if (lat > -33.5 && lat < -32.5 && lon > -70.5) return INFRA.rm_maipo
-  if (lat > -33.5 && lat < -32) return INFRA.valpo_aconcagua
-  if (lat > -36 && lat < -33.5) return INFRA.ohiggins_rapel
-  if (lat > -47 && lat < -45) return INFRA.aysen_norte
-  if (lat > -49 && lat < -47) return INFRA.aysen_sur
-  if (lat < -49) return INFRA.magallanes
-  return INFRA.default
+  if (lat > -33.5 && lat < -32.5 && lon > -70.5) return (INFRA.rm_maipo ?? INFRA['default'] ?? []) as InfraItem[]
+  if (lat > -33.5 && lat < -32) return (INFRA.valpo_aconcagua ?? INFRA['default'] ?? []) as InfraItem[]
+  if (lat > -36 && lat < -33.5) return (INFRA.ohiggins_rapel ?? INFRA['default'] ?? []) as InfraItem[]
+  if (lat > -47 && lat < -45) return (INFRA.aysen_norte ?? INFRA['default'] ?? []) as InfraItem[]
+  if (lat > -49 && lat < -47) return (INFRA.aysen_sur ?? INFRA['default'] ?? []) as InfraItem[]
+  if (lat < -49) return (INFRA.magallanes ?? INFRA['default'] ?? []) as InfraItem[]
+  return (INFRA['default'] ?? []) as InfraItem[]
 }
