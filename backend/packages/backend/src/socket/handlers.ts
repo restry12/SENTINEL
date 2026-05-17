@@ -190,7 +190,10 @@ export async function executeAndBroadcast(
     }
 
     // Save to historical record (fails silently if Supabase not configured)
-    await saveIncident(update, lat ?? DEFAULT_LAT, lon ?? DEFAULT_LON, alertsSent)
+    // Only save global analyses, not citizen-specific ones (which reference civilian GPS points)
+    if (!targetSocketId) {
+      await saveIncident(update, lat ?? DEFAULT_LAT, lon ?? DEFAULT_LON, alertsSent)
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[orchestrator] error:', message)

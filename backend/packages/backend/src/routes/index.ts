@@ -160,6 +160,11 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
   // Receives { fires, socketId, lat, lon } — emits analysis only to the requesting citizen socket
   app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
+    if (isLocked()) {
+      res.status(202).json({ ok: false, accepted: false, error: 'Analysis in progress — try again shortly' })
+      return
+    }
+
     const parsed = parseCitizenBody(req.body as RawCitizenBody)
     if (!parsed) {
       res.status(400).json({ ok: false, error: 'socketId required and fires must be an array' })
@@ -167,9 +172,11 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
     const { firms, socketId, lat, lon, pm25 } = parsed
 
-    res.status(202).json({ ok: true, accepted: true, fires: firms.length })
+    const enriched = mapRawFiresToFireData(firms as Record<string, unknown>[])
 
-    executeAndBroadcast(io, lat, lon, firms, undefined, pm25, socketId).catch((err) => {
+    res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
+
+    executeAndBroadcast(io, lat, lon, enriched, undefined, pm25, socketId).catch((err) => {
       console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
     })
   })
