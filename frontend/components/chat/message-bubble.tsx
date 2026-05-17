@@ -4,6 +4,8 @@ import { User } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 
+import { CondorGuideAvatar } from "./condor-avatar"
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -31,14 +33,16 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
         )}>
           {isUser
             ? <User className="w-2.5 h-2.5 text-orange-400" />
-            : <Image src="/condor.png" alt="SENTINEL AI" width={20} height={20} className="object-cover object-top w-full h-full" />
+            : <div className="w-full h-full scale-125">
+                <CondorGuideAvatar state="idle" />
+              </div>
           }
         </div>
         <span className={cn(
           "text-[9px] font-bold uppercase tracking-[0.15em]",
           isUser ? "text-orange-400/50" : "text-cyan-400/50"
         )}>
-          {isUser ? "Tú" : "SENTINEL AI"}
+          {isUser ? "Tú" : "NEWEN AI"}
         </span>
       </div>
 
