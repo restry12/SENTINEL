@@ -2,6 +2,34 @@
 
 import React, { useState, useEffect } from 'react'
 import { Radar } from './radar'
+import { GeoCoords } from '@/hooks/use-geolocation'
+import { SentinelRadarMap } from './sentinel-radar-map'
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const phi1 = (lat1 * Math.PI) / 180
+  const phi2 = (lat2 * Math.PI) / 180
+  const lambda1 = (lon1 * Math.PI) / 180
+  const lambda2 = (lon2 * Math.PI) / 180
+  const y = Math.sin(lambda2 - lambda1) * Math.cos(phi2)
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(lambda2 - lambda1)
+  const theta = Math.atan2(y, x)
+  return ((theta * 180) / Math.PI + 360) % 360
+}
+
+function getCompassDir(bearing: number): string {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO']
+  const arrows = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
+  const idx = Math.round(bearing / 45) % 8
+  return `${dirs[idx]} ${arrows[idx]}`
+}
 
 const A = {
   bg: '#03070B', panel: 'rgba(11, 22, 38, 0.66)', line: 'rgba(120, 180, 255, 0.12)',
@@ -30,7 +58,7 @@ function Label({ children, color }: { children: React.ReactNode; color?: string 
 
 function Header() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px 10px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <svg width="20" height="20" viewBox="0 0 24 24">
           <path d="M12 1.5 L22 6 V13 C22 18 17.5 21.5 12 22.5 C6.5 21.5 2 18 2 13 V6 Z" fill="none" stroke="#5CDAFF" strokeWidth="1.4"/>
@@ -47,16 +75,25 @@ function Header() {
   )
 }
 
-export function ScreenLocating({ setState }: { setState: (s: string) => void }) {
+export function ScreenLocating({ setState, coords }: { setState: (s: string) => void, coords?: GeoCoords }) {
   useEffect(() => {
     const t = setTimeout(() => setState('alert'), 2800)
     return () => clearTimeout(t)
   }, [setState])
+
+  const user = coords ?? { lat: 19.4326, lon: -99.1332 }
+  const tornado = { lat: user.lat + 0.015, lon: user.lon + 0.012, bearing_deg: 45, intensity: 'EF4', speed_kmh: 85 }
+  const shelter = { lat: user.lat - 0.005, lon: user.lon - 0.004, name: 'Sótano Reforzado' }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <Header/>
       <div style={{ padding: '0 14px' }}>
-        <GlassPanel glow="cyan" style={{ padding: 12 }}><Radar variant="locating" height={290}/></GlassPanel>
+        <GlassPanel glow="cyan" style={{ padding: 12 }}>
+          <div style={{ height: 290, borderRadius: 12, overflow: 'hidden' }}>
+            <SentinelRadarMap user={user} tornado={tornado} shelter={shelter} />
+          </div>
+        </GlassPanel>
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '24px 28px 32px', textAlign: 'center' }}>
         <div style={{ width: 44, height: 44, borderRadius: 999, border: '1.5px solid rgba(92,218,255,0.4)', borderTopColor: A.cyan, animation: 'sentinel-sweep 1.1s linear infinite', marginBottom: 18 }}/>
@@ -68,7 +105,11 @@ export function ScreenLocating({ setState }: { setState: (s: string) => void }) 
   )
 }
 
-function RiskCard() {
+function RiskCard({ coords, tornado }: { coords: GeoCoords, tornado: any }) {
+  const dist = haversineKm(coords.lat, coords.lon, tornado.lat, tornado.lon)
+  const bearing = calculateBearing(coords.lat, coords.lon, tornado.lat, tornado.lon)
+  const compass = getCompassDir(bearing)
+
   return (
     <GlassPanel glow="danger" style={{ padding: 14, marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -98,7 +139,7 @@ function RiskCard() {
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px 14px' }}>
-        {[['DISTANCIA','4.8','KM',A.orange],['DIRECCIÓN','NE','↗',A.cyan],['VIENTO MÁX.','142','KM/H',A.orange],['PROB. TORNADO','78','%',A.purple]].map(([l,v,u,c])=>(
+        {[['DISTANCIA',dist.toFixed(1),'KM',A.orange],['DIRECCIÓN',compass.split(' ')[0],compass.split(' ')[1],A.cyan],['VIENTO MÁX.','142','KM/H',A.orange],['PROB. TORNADO','78','%',A.purple]].map(([l,v,u,c])=>(
           <div key={l as string} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <Label>{l}</Label>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
@@ -157,7 +198,11 @@ function Timeline({ items }: { items: { time: string; label: string; done?: bool
   )
 }
 
-export function ScreenAlert({ setState }: { setState: (s: string) => void }) {
+export function ScreenAlert({ setState, coords }: { setState: (s: string) => void, coords?: GeoCoords }) {
+  const user = coords ?? { lat: 19.4326, lon: -99.1332 }
+  const tornado = { lat: user.lat + 0.015, lon: user.lon + 0.012, bearing_deg: 45, intensity: 'EF4', speed_kmh: 85 }
+  const shelter = { lat: user.lat - 0.005, lon: user.lon - 0.004, name: 'Sótano Reforzado' }
+
   const timeline = [
     { time: '17:35', label: 'Rotación detectada', done: true },
     { time: '17:42', label: 'Riesgo elevado a EXTREMO', now: true },
@@ -179,8 +224,12 @@ export function ScreenAlert({ setState }: { setState: (s: string) => void }) {
           </div>
         </div>
       </div>
-      <GlassPanel glow="purple" style={{ padding: 8, marginBottom: 12 }}><Radar variant="alert" height={280}/></GlassPanel>
-      <RiskCard/>
+      <GlassPanel glow="purple" style={{ padding: 8, marginBottom: 12 }}>
+        <div style={{ height: 280, borderRadius: 12, overflow: 'hidden' }}>
+          <SentinelRadarMap user={user} tornado={tornado} shelter={shelter} />
+        </div>
+      </GlassPanel>
+      <RiskCard coords={user} tornado={tornado} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
         <PrimaryButton onClick={() => setState('shelter')} variant="danger" sub="Activa la guía paso a paso">BUSCAR REFUGIO AHORA</PrimaryButton>
         <SecondaryHelpButton onClick={() => setState('help')}/>
@@ -203,7 +252,7 @@ const SHELTER_OPTIONS = [
   { id: 'table', label: 'Bajo una mesa resistente', rank: 'ÚLTIMO', tone: 'orange' as const },
 ]
 
-export function ScreenShelter({ setState, completed, setCompleted, picked, setPicked }: { setState: (s: string) => void; completed: Set<number>; setCompleted: (s: Set<number>) => void; picked: string; setPicked: (s: string) => void }) {
+export function ScreenShelter({ setState, completed, setCompleted, picked, setPicked, coords }: { setState: (s: string) => void; completed: Set<number>; setCompleted: (s: Set<number>) => void; picked: string; setPicked: (s: string) => void; coords?: GeoCoords }) {
   const toggleStep = (i: number) => {
     const next = new Set(completed)
     next.has(i) ? next.delete(i) : next.add(i)
@@ -256,7 +305,7 @@ export function ScreenShelter({ setState, completed, setCompleted, picked, setPi
   )
 }
 
-export function ScreenInShelter({ setState }: { setState: (s: string) => void }) {
+export function ScreenInShelter({ setState, coords }: { setState: (s: string) => void, coords?: GeoCoords }) {
   const [secs, setSecs] = useState(8 * 60)
   const [lastUpdate, setLastUpdate] = useState(20)
   useEffect(() => {
@@ -265,6 +314,11 @@ export function ScreenInShelter({ setState }: { setState: (s: string) => void })
   }, [])
   const mm = String(Math.floor(secs / 60)).padStart(2, '0')
   const ss = String(secs % 60).padStart(2, '0')
+
+  const user = coords ?? { lat: 19.4326, lon: -99.1332 }
+  const tornado = { lat: user.lat + 0.015, lon: user.lon + 0.012, bearing_deg: 45, intensity: 'EF4', speed_kmh: 85 }
+  const shelter = { lat: user.lat - 0.005, lon: user.lon - 0.004, name: 'Sótano Reforzado' }
+
   return (
     <div style={{ padding: '0 14px 24px' }}>
       <Header/>
@@ -292,7 +346,11 @@ export function ScreenInShelter({ setState }: { setState: (s: string) => void })
           </div>
         </div>
       </GlassPanel>
-      <GlassPanel style={{ padding: 8, marginBottom: 12 }}><Radar variant="in-shelter" height={210}/></GlassPanel>
+      <GlassPanel style={{ padding: 8, marginBottom: 12 }}>
+        <div style={{ height: 210, borderRadius: 12, overflow: 'hidden' }}>
+          <SentinelRadarMap user={user} tornado={tornado} shelter={shelter} />
+        </div>
+      </GlassPanel>
       <GlassPanel style={{ padding: '12px 14px', marginBottom: 14 }}>
         <Label>MIENTRAS ESPERAS</Label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
@@ -310,12 +368,17 @@ export function ScreenInShelter({ setState }: { setState: (s: string) => void })
   )
 }
 
-export function ScreenHelp({ setState }: { setState: (s: string) => void }) {
+export function ScreenHelp({ setState, coords }: { setState: (s: string) => void, coords?: GeoCoords }) {
   const [pulse, setPulse] = useState(0)
   useEffect(() => {
     const t = setInterval(() => setPulse(p => p + 1), 1000)
     return () => clearInterval(t)
   }, [])
+
+  const user = coords ?? { lat: 19.4326, lon: -99.1332 }
+  const tornado = { lat: user.lat + 0.015, lon: user.lon + 0.012, bearing_deg: 45, intensity: 'EF4', speed_kmh: 85 }
+  const shelter = { lat: user.lat - 0.005, lon: user.lon - 0.004, name: 'Sótano Reforzado' }
+
   return (
     <div style={{ padding: '0 14px 24px' }}>
       <Header/>
@@ -341,7 +404,9 @@ export function ScreenHelp({ setState }: { setState: (s: string) => void }) {
               <circle cx="18" cy="15" r="4" fill={A.orange}/>
             </svg>
           </div>
-          <div style={{ marginTop: 10, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: A.text, letterSpacing: 0.5 }}>19.4326° N · 99.1332° W</div>
+          <div style={{ marginTop: 10, fontFamily: 'JetBrains Mono, monospace', fontSize: 13, fontWeight: 600, color: A.text, letterSpacing: 0.5 }}>
+            {Math.abs(user.lat).toFixed(4)}° {user.lat >= 0 ? 'N' : 'S'} · {Math.abs(user.lon).toFixed(4)}° {user.lon >= 0 ? 'E' : 'W'}
+          </div>
           <div style={{ marginTop: 2, fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: A.faint, letterSpacing: 1.2 }}>± 8m · ACTUALIZADO HACE {pulse % 5}s</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,122,61,0.18)' }}>
@@ -353,7 +418,11 @@ export function ScreenHelp({ setState }: { setState: (s: string) => void }) {
           ))}
         </div>
       </GlassPanel>
-      <GlassPanel style={{ padding: 8, marginBottom: 14 }}><Radar variant="help" height={210}/></GlassPanel>
+      <GlassPanel style={{ padding: 8, marginBottom: 14 }}>
+        <div style={{ height: 210, borderRadius: 12, overflow: 'hidden' }}>
+          <SentinelRadarMap user={user} tornado={tornado} shelter={shelter} />
+        </div>
+      </GlassPanel>
       <GlassPanel style={{ padding: '12px 14px', marginBottom: 14 }}>
         <Label>MIENTRAS LLEGA AYUDA</Label>
         <div style={{ fontSize: 13.5, color: 'rgba(232,241,255,0.82)', lineHeight: 1.5, marginTop: 8 }}>Permanece en tu refugio. Si estás herido, no te muevas. Mantén el celular contigo.</div>
