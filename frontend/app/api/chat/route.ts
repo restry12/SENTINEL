@@ -20,6 +20,19 @@ interface FireData {
   timestamp: string
 }
 
+interface PerFireRegionalContext {
+  region_name: string
+  country: string
+  vegetation_type?: string
+}
+
+interface PerFireExpansion {
+  lat: number
+  lon: number
+  frp: number
+  regional_context?: PerFireRegionalContext
+}
+
 interface SentinelSnapshot {
   timestamp: string
   fires: FireData[]
@@ -43,6 +56,7 @@ interface SentinelSnapshot {
     analisis_72h: string
     confianza: string
   }
+  perFireExpansions?: PerFireExpansion[]
 }
 
 interface NewsArticle {
@@ -52,50 +66,97 @@ interface NewsArticle {
   publishedAt: string
 }
 
+type ChatMode = 'citizen' | 'expert'
+
 interface ChatRequest {
   message: string
   history: ChatMessage[]
   sentinelSnapshot: SentinelSnapshot | null
   newsArticles: NewsArticle[]
+  mode?: ChatMode
 }
 
-function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[]): string {
-  let prompt = `Eres SENTINEL AI, asistente del sistema SENTINEL de monitoreo de incendios forestales en CHILE. Respondes exclusivamente en español.
+function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[], mode: ChatMode): string {
+  let prompt = `Eres SENTINEL AI, asistente del sistema SENTINEL de monitoreo de incendios forestales en AMÉRICA (Norte, Centro y Sur). Respondes exclusivamente en español.
 
 ## REGLA ANTI-INVENCIÓN (CRÍTICA)
-Solo puedes citar datos específicos (coordenadas, FRP en MW, hectáreas, nombres de focos, AQI numérico, comunas afectadas, viento en km/h) si aparecen LITERALMENTE en la sección "DATOS EN VIVO" más abajo. Si esa sección dice que no hay datos, o si el dato específico no está listado:
-- NO inventes números, ubicaciones ni nombres de agencias.
-- NO menciones lugares fuera de Chile (México, CONAFOR, Sierra de Coalcomán, etc. están prohibidos).
-- Responde: "No tengo datos en vivo de ese foco/métrica en este momento." y ofrece información general útil (qué hacer, protocolos, cómo interpretar AQI/FRP en general) SIN inventar valores concretos.
-- Si el usuario pide ranking o "el más peligroso" y no hay focos en la lista, dilo explícitamente.
+- Solo puedes nombrar ubicaciones, países, regiones o ciudades de focos que aparecen LITERALMENTE en la sección "FOCOS ACTIVOS" más abajo.
+- Solo puedes citar números (FRP en MW, AQI, PM2.5, hectáreas, viento km/h, conteos) que aparecen LITERALMENTE en las secciones de DATOS EN VIVO.
+- Si el usuario pregunta por un foco, región o métrica que no está en el contexto: responde "No tengo ese dato en vivo en este momento" y NO inventes nombres ni números.
+- Si la lista de FOCOS ACTIVOS está vacía o ausente: di explícitamente que no hay focos en los datos en vivo y ofrece información general sin valores específicos.
+- Está estrictamente prohibido inventar nombres de comunas, estados, ciudades o agencias que no estén en el contexto.
 
 ## ÁMBITO
-Solo Chile. Agencias: CONAF, ONEMI, SENAPRED, Bomberos (132). Nunca menciones CONAFOR ni agencias de otros países.
+SENTINEL cubre incendios en América. Agencias por país (cita la del país donde está el foco que el usuario pregunta; si no estás seguro del país, no inventes):
+- Chile: CONAF, ONEMI, SENAPRED, Bomberos (132)
+- Argentina: SNMF, Defensa Civil
+- Brasil: IBAMA, Defesa Civil
+- México: CONAFOR, Protección Civil
+- Colombia: UNGRD
+- Perú: SERFOR, INDECI
+- EEUU: CAL FIRE / USFS, 911
+- Canadá: CIFFC, 911
+Para otros países de América, usa "autoridades locales de emergencia" si no conoces la agencia oficial.`
 
-## TONO — REGLA DE ADAPTACIÓN
-Lees el nivel técnico de la pregunta y respondes en el mismo nivel:
-- Si la pregunta usa términos técnicos (FRP, AQI, PM2.5, MW, hectáreas), responde técnico y conciso, como oficial de emergencias.
-- Si la pregunta es coloquial ("¿corro peligro?", "¿qué hago?", "¿es grave?"), responde simple, cálido y empático, como vecino informado. Traduce siglas a lenguaje cotidiano: AQI → "calidad del aire", PM2.5 → "partículas en el aire", FRP → "intensidad del fuego".
-- Frases cortas siempre. Sin saludos innecesarios. Sin rodeos. Usa listas solo cuando ayudan.
+  if (mode === 'citizen') {
+    prompt += `\n\n## TONO ACTUAL: CIUDADANO (modo por defecto)
+Hablas como vecino informado que ayuda a su comunidad. Reglas:
+- Frases cortas y cálidas. Empatía primero, datos después.
+- Nunca uses siglas técnicas sin traducirlas: AQI → "calidad del aire", PM2.5 → "partículas en el aire", FRP → "intensidad del fuego", MW/km² → omitir o traducir.
+- Si tienes que dar un número, acompáñalo de una analogía cotidiana (ej. "calidad del aire mala — parecido a estar al lado de un fumador").
+- Foco práctico: ¿qué hace la persona ahora? Cierra ventanas, mascarilla, evacuar, llamar a emergencias.
+- Tres viñetas máximo por respuesta cuando enumeres acciones.
+- Nada de jerga operacional ("nivel 2", "perímetro", "FRP máximo"). Si el usuario la pide explícita, ofrece traducir.
 
-## EJEMPLOS DE ADAPTACIÓN
+EJEMPLOS:
+P: ¿Corro peligro?
+R: Hay un foco grande cerca de tu zona. No es emergencia inmediata, pero si ves humo, cierra ventanas y ten mascarilla a mano. Si tienes niños chicos o alguien con asma, mejor quédense adentro hoy.
 
-P: ¿Cuál es el FRP máximo actual?
-R: 142.3 MW en el foco de Quilpué. Tres focos sobre 80 MW. Propagación esperada hacia el norte por viento de 18 km/h.
+P: ¿Qué tan grave es la calidad del aire?
+R: Está mala. Es como estar al lado de alguien fumando todo el rato. Si haces deporte hoy, déjalo para mañana. Si tienes asma, no salgas a menos que sea necesario.`
+  } else {
+    prompt += `\n\n## TONO ACTUAL: EXPERTO
+Hablas como oficial de emergencias en briefing operacional. Reglas:
+- Conciso, técnico, sin rodeos.
+- Usa siglas y unidades directas: FRP (MW), AQI, PM2.5 (µg/m³), viento (km/h), hectáreas.
+- Cita ubicaciones por nombre + país desde FOCOS ACTIVOS.
+- Listas operacionales si ayudan (recursos, acciones, prioridades).
+- Sin pleonasmos, sin saludos.
 
-P: ¿Hay peligro en mi zona?
-R: Hay tres focos activos cerca de Valparaíso. Si el viento se mantiene, el humo puede llegar en 2-3 horas. No es emergencia inmediata, pero conviene cerrar ventanas y tener mascarillas a mano, sobre todo si hay niños chicos o alguien con asma.
+EJEMPLOS:
+P: ¿Foco más peligroso?
+R: [Foco con mayor FRP de la lista FOCOS ACTIVOS] — propagación esperada según viento del contexto. Recursos recomendados: [del reporte si existe].
 
-P: ¿Qué tan grave es un AQI de 145?
-R: Calidad del aire mala. Es parecido a estar al lado de alguien fumando, todo el rato. Si eres sano, sentirás molestia en la garganta. Si tienes asma o eres adulto mayor, mejor quédate adentro y evita hacer deporte hoy.
-
-P: ¿Qué hago si veo humo cerca?
-R: Tres cosas: 1) Cierra puertas y ventanas. 2) Si tienes mascarilla N95 o KN95, úsala. 3) No salgas a menos que sea necesario. Si el humo es denso o ves fuego cercano, llama al 132 (Bomberos) y prepárate para evacuar.`
+P: AQI actual.
+R: [valor numérico exacto] — [categoría]. Riesgo respiratorio [bajo/medio/alto].`
+  }
 
   if (snapshot) {
     const frpMax = snapshot.fires.length > 0
       ? Math.max(...snapshot.fires.map(f => f.frp)).toFixed(1)
       : '0'
+
+    const perFire = snapshot.perFireExpansions ?? []
+    const TOP_FIRES = 8
+    if (perFire.length > 0) {
+      const topByFrp = [...perFire]
+        .sort((a, b) => b.frp - a.frp)
+        .slice(0, TOP_FIRES)
+      prompt += `\n\n## FOCOS ACTIVOS (con ubicación verificada)\n`
+      topByFrp.forEach((f, i) => {
+        const ctx = f.regional_context
+        const coords = `lat ${f.lat.toFixed(2)}, lon ${f.lon.toFixed(2)}`
+        const line = ctx
+          ? `${i + 1}. ${ctx.region_name}, ${ctx.country} — ${f.frp.toFixed(1)} MW (${coords})`
+          : `${i + 1}. ${coords} (ubicación sin confirmar) — ${f.frp.toFixed(1)} MW`
+        prompt += `${line}\n`
+      })
+      if (perFire.length > TOP_FIRES) {
+        prompt += `(... y ${perFire.length - TOP_FIRES} focos más de menor intensidad, no listados)\n`
+      }
+    } else {
+      prompt += `\n\n## FOCOS ACTIVOS\nNo hay focos con ubicación verificada en este snapshot. Si el usuario pregunta por un foco específico, di que no tienes ese dato.\n`
+    }
 
     prompt += `\n\n## DATOS EN VIVO [${snapshot.timestamp}]\n`
     prompt += `- Focos activos: ${snapshot.fires.length}\n`
@@ -142,12 +203,12 @@ R: Tres cosas: 1) Cierra puertas y ventanas. 2) Si tienes mascarilla N95 o KN95,
 
 Reglas para esta situación:
 - Si el usuario pregunta por focos específicos, AQI actual, ubicaciones, FRP o cualquier métrica concreta: di literalmente "No tengo datos en vivo en este momento" y NO inventes números, coordenadas ni nombres.
-- Sí puedes responder preguntas generales: protocolos de evacuación, cómo interpretar AQI, qué hacer ante humo, números de emergencia chilenos (132 Bomberos, 133 Carabineros, 134 PDI), buenas prácticas.
+- Sí puedes responder preguntas generales: protocolos de evacuación, cómo interpretar AQI, qué hacer ante humo, buenas prácticas. Si el usuario menciona un país, puedes usar los números de emergencia oficiales de ese país (911 en EEUU/Canadá, 132 Bomberos en Chile, 911 en Argentina, 911 en México, 193 Bomberos en Brasil, 123 en Colombia). Si no menciona país, di "marca el número de emergencias local de tu país" en vez de inventar.
 - Sugiere recargar la página o esperar próxima actualización del backend si el usuario insiste en datos en vivo.`
   }
 
   if (news.length > 0) {
-    prompt += `\n\n## NOTICIAS RECIENTES (Chile)\n`
+    prompt += `\n\n## NOTICIAS RECIENTES\n`
     news.slice(0, 8).forEach((n, i) => {
       prompt += `${i + 1}. [${n.source}] ${n.title}${n.snippet ? ` — ${n.snippet}` : ''}\n`
     })
@@ -164,13 +225,14 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   try {
     const body: ChatRequest = await req.json()
-    const { message, history, sentinelSnapshot, newsArticles } = body
+    const { message, history, sentinelSnapshot, newsArticles, mode } = body
 
     if (!message?.trim()) {
       return new Response(JSON.stringify({ error: 'message required' }), { status: 400 })
     }
 
-    const systemPrompt = buildSystemPrompt(sentinelSnapshot, newsArticles ?? [])
+    const chatMode: ChatMode = mode === 'expert' ? 'expert' : 'citizen'
+    const systemPrompt = buildSystemPrompt(sentinelSnapshot, newsArticles ?? [], chatMode)
 
     // Cap history to last 20 messages to avoid runaway token cost from a buggy / hostile client.
     const safeHistory = (history ?? []).slice(-20)
