@@ -1,0 +1,208 @@
+"use client"
+
+import { useState, useRef, useEffect } from "react"
+import { Bot, Zap, Newspaper, Activity } from "lucide-react"
+import { TopBar } from "@/components/dashboard/top-bar"
+import { useSentinel } from "@/contexts/sentinel-context"
+import { MessageBubble, type Message } from "./message-bubble"
+import { ChatInput } from "./chat-input"
+
+const SUGGESTIONS = [
+  "¿Cuál es el foco más peligroso ahora?",
+  "¿Qué hacer si hay humo en mi zona?",
+  "Resume la situación actual de incendios",
+  "¿Cuáles son las rutas de evacuación activas?",
+]
+
+export function ChatPage() {
+  const { sentinelUpdate } = useSentinel()
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [newsArticles, setNewsArticles] = useState<Array<{ title: string; snippet?: string; source: string; publishedAt: string }>>([])
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch('/api/news')
+      .then(r => r.json())
+      .then(d => setNewsArticles(d.articles ?? []))
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const sendMessage = async (content: string) => {
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content,
+      timestamp: new Date(),
+    }
+
+    const history = messages.map(m => ({ role: m.role, content: m.content }))
+    setMessages(prev => [...prev, userMsg])
+    setIsStreaming(true)
+
+    const assistantId = crypto.randomUUID()
+    setMessages(prev => [
+      ...prev,
+      { id: assistantId, role: 'assistant', content: '', timestamp: new Date() },
+    ])
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: content,
+          history,
+          sentinelSnapshot: sentinelUpdate,
+          newsArticles,
+        }),
+      })
+
+      if (!res.ok || !res.body) {
+        throw new Error('stream failed')
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      // SSE buffer: TCP chunks can split a JSON line in half. We keep the
+      // trailing incomplete line in `buffer` and prepend it to the next chunk.
+      // Without this, JSON.parse fails on partial lines and tokens are lost.
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''   // last item may be incomplete — save for next iteration
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(data)
+            const token: string = parsed.choices?.[0]?.delta?.content ?? ''
+            if (token) {
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId ? { ...m, content: m.content + token } : m
+                )
+              )
+            }
+          } catch {
+            // malformed SSE line — skip
+          }
+        }
+      }
+    } catch {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantId
+            ? { ...m, content: 'Error al conectar con SENTINEL AI. Verifique la conexión.' }
+            : m
+        )
+      )
+    } finally {
+      setIsStreaming(false)
+    }
+  }
+
+  const clearHistory = () => setMessages([])
+
+  const hasLiveData = !!sentinelUpdate
+  const hasNews = newsArticles.length > 0
+  const lastMessageIsStreaming =
+    isStreaming &&
+    messages.length > 0 &&
+    messages[messages.length - 1].role === 'assistant'
+
+  return (
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
+      <TopBar />
+
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 min-h-0">
+        {/* Chat header */}
+        <div className="flex items-center gap-3 py-4 border-b border-white/10 shrink-0">
+          <div className="w-10 h-10 rounded-full bg-orange-500/20 border border-orange-500/40 flex items-center justify-center">
+            <Bot className="w-5 h-5 text-orange-400" />
+          </div>
+          <div>
+            <h1 className="text-white font-black tracking-widest text-sm uppercase">SENTINEL AI</h1>
+            <p className="text-white/40 text-[10px] tracking-wider uppercase">Analista Operacional de Emergencias</p>
+          </div>
+          {/* Context chips */}
+          <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+            {hasLiveData && (
+              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-orange-500/30 text-orange-400/80 bg-orange-500/5 font-mono">
+                <Activity className="w-3 h-3" />
+                Datos en vivo
+              </span>
+            )}
+            {hasNews && (
+              <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-blue-500/30 text-blue-400/80 bg-blue-500/5 font-mono">
+                <Newspaper className="w-3 h-3" />
+                Noticias Chile
+              </span>
+            )}
+            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded border border-white/10 text-white/30 bg-white/5 font-mono">
+              <Zap className="w-3 h-3" />
+              Mistral Large
+            </span>
+          </div>
+        </div>
+
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto py-6 space-y-6 min-h-0">
+          {messages.length === 0 && (
+            <WelcomeScreen onSuggestion={sendMessage} />
+          )}
+          {messages.map((msg, i) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              isStreaming={lastMessageIsStreaming && i === messages.length - 1}
+            />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <ChatInput
+          onSend={sendMessage}
+          onClear={clearHistory}
+          disabled={isStreaming}
+        />
+      </div>
+    </div>
+  )
+}
+
+function WelcomeScreen({ onSuggestion }: { onSuggestion: (s: string) => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 gap-6 text-center">
+      <div className="w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center">
+        <Bot className="w-8 h-8 text-orange-400" />
+      </div>
+      <div>
+        <p className="text-white/70 text-sm">¿En qué puedo ayudarte hoy?</p>
+        <p className="text-white/30 text-xs mt-1">Tengo acceso a datos en vivo, noticias y conocimiento operacional</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
+        {SUGGESTIONS.map(s => (
+          <button
+            key={s}
+            onClick={() => onSuggestion(s)}
+            className="text-left text-xs px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/90 transition-colors"
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
