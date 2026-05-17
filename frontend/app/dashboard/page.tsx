@@ -14,7 +14,7 @@ export default function Dashboard() {
   return (
     <AuthGuard>
     <FireSelectionProvider>
-    <div className="h-screen flex flex-col bg-background overflow-hidden relative selection:bg-orange/30">
+    <div className="h-screen flex flex-col bg-background overflow-hidden relative selection:bg-orange/30 pb-16 md:pb-0">
       <TopBar />
 
       {/* Desktop */}
