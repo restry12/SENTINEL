@@ -107,6 +107,17 @@ export interface InfrastructurePoint {
   type: "hospital" | "school" | "emergency"
 }
 
+export interface PerFireExpansion {
+  lat: number
+  lon: number
+  frp: number
+  expansion_2h_km2: number
+  expansion_6h_km2: number
+  expansion_12h_km2: number
+  velocidad_kmh: number
+  direccion: string
+}
+
 export interface SentinelUpdate {
   timestamp: string
   fires: FireData[]
@@ -117,6 +128,7 @@ export interface SentinelUpdate {
   riskLevel: "low" | "medium" | "high" | "critical"
   riskAssessment?: RiskAssessment
   expansion?: ExpansionData
+  perFireExpansions?: PerFireExpansion[]
   airAlerts?: AirAlerts
   report?: AuthorityReport
   naturalRoutes?: NaturalRoutes
