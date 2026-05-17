@@ -107,6 +107,55 @@ export interface InfrastructurePoint {
   type: "hospital" | "school" | "emergency"
 }
 
+export type RiskCategory = 'bajo' | 'medio' | 'alto' | 'critico'
+
+export interface RiskFactors {
+  fwi: number
+  historial: number
+  terreno: number
+}
+
+export interface FireRiskCell {
+  id: string
+  lat: number
+  lon: number
+  size: number
+  score: number
+  category: RiskCategory
+  factors: RiskFactors
+  zona: string
+}
+
+export interface FireRiskGrid {
+  cells: FireRiskCell[]
+  generated_at: string
+  weather_point: { lat: number; lon: number }
+  bbox: { latMin: number; latMax: number; lonMin: number; lonMax: number }
+}
+
+export interface CellInfrastructure {
+  name: string
+  type: 'hospital' | 'school' | 'kindergarten' | 'fire_station' | 'police'
+  lat: number
+  lon: number
+  distance_km: number
+}
+
+export interface CellSocialImpact {
+  score: number
+  poblacion_estimada?: number
+  resumen: string
+}
+
+export interface CellDetail {
+  cell_id: string
+  infrastructure: CellInfrastructure[]
+  social_impact: CellSocialImpact
+  explicacion: string
+  recomendaciones: string[]
+  prioridad: 'baja' | 'media' | 'alta' | 'critica'
+}
+
 export interface PerFireExpansion {
   lat: number
   lon: number
@@ -132,26 +181,8 @@ export interface SentinelUpdate {
   airAlerts?: AirAlerts
   report?: AuthorityReport
   naturalRoutes?: NaturalRoutes
-  prediction?: PredictionResult
   // Optional — populated once Make.com / backend start sending infrastructure
   infrastructure?: InfrastructurePoint[]
-}
-
-export interface PredictionCell {
-  lat: number
-  lon: number
-  risk_score: number
-  fwi_score: number
-  historical_weight: number
-}
-
-export interface PredictionResult {
-  grid: PredictionCell[]
-  top_zones: Array<{ lat: number; lon: number; risk_score: number; zona: string; razon: string }>
-  analisis_6h: string
-  analisis_24h: string
-  analisis_72h: string
-  confianza: 'baja' | 'media' | 'alta'
 }
 
 export interface SocketStatus {
