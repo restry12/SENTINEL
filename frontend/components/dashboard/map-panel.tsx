@@ -33,6 +33,12 @@ export function MapPanel() {
   const toggleGrid = useCallback(async () => {
     const next = !showGrid
     setShowGrid(next)
+    if (!next) {
+      setSelectedRegion(null)
+      setRegionDetail(null)
+      setDetailLoading(false)
+      setDetailError(null)
+    }
     if (next && !riskMap && !gridLoading) {
       setGridLoading(true)
       setGridError(null)

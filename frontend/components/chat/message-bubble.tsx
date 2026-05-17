@@ -1,6 +1,7 @@
 "use client"
 
-import { Bot, User } from "lucide-react"
+import { User } from "lucide-react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 export interface Message {
@@ -19,37 +20,45 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   const isUser = message.role === 'user'
 
   return (
-    <div className={cn("flex gap-3 items-start", isUser && "flex-row-reverse")}>
-      {/* Avatar */}
-      <div className={cn(
-        "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-        isUser
-          ? "bg-white/10 border border-white/20"
-          : "bg-orange-500/20 border border-orange-500/40"
-      )}>
-        {isUser
-          ? <User className="w-4 h-4 text-white/70" />
-          : <Bot className="w-4 h-4 text-orange-400" />
-        }
+    <div className={cn("flex flex-col gap-1.5", isUser && "items-end")}>
+      {/* Label row */}
+      <div className={cn("flex items-center gap-1.5 px-1", isUser && "flex-row-reverse")}>
+        <div className={cn(
+          "w-5 h-5 rounded-full flex items-center justify-center shrink-0 overflow-hidden",
+          isUser
+            ? "bg-orange-500/15 border border-orange-500/30"
+            : "border border-cyan-500/25 shadow-[0_0_8px_rgba(34,211,238,0.15)]"
+        )}>
+          {isUser
+            ? <User className="w-2.5 h-2.5 text-orange-400" />
+            : <Image src="/condor.png" alt="SENTINEL AI" width={20} height={20} className="object-cover object-top w-full h-full" />
+          }
+        </div>
+        <span className={cn(
+          "text-[9px] font-bold uppercase tracking-[0.15em]",
+          isUser ? "text-orange-400/50" : "text-cyan-400/50"
+        )}>
+          {isUser ? "Tú" : "SENTINEL AI"}
+        </span>
       </div>
 
       {/* Bubble */}
       <div className={cn(
-        "max-w-[75%] rounded-xl px-4 py-3 text-sm leading-relaxed",
+        "max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
         isUser
-          ? "bg-white/10 border border-white/10 text-white"
-          : "bg-[#0d1420] border border-white/10 text-white/90"
+          ? "bg-[#1a0f02] border border-orange-500/20 text-white shadow-[0_0_24px_rgba(249,115,22,0.07)] rounded-tr-sm"
+          : "bg-[#040d18] border border-cyan-500/15 text-white/90 shadow-[0_0_24px_rgba(34,211,238,0.05)] rounded-tl-sm"
       )}>
         {message.content
           ? isUser
             ? message.content
             : <MarkdownContent text={message.content} />
           : isStreaming
-            ? <StreamingDots />
+            ? <AnalyzingIndicator />
             : null
         }
         {isStreaming && message.content && (
-          <span className="inline-block w-1.5 h-4 bg-orange-400/80 ml-0.5 animate-pulse align-middle" />
+          <span className="inline-block w-[2px] h-3.5 bg-cyan-400/70 ml-1 animate-pulse align-middle rounded-full" />
         )}
       </div>
     </div>
@@ -124,16 +133,21 @@ function renderInline(text: string): React.ReactNode {
   )
 }
 
-function StreamingDots() {
+function AnalyzingIndicator() {
   return (
-    <span className="flex items-center gap-1 py-0.5">
-      {[0, 1, 2].map(i => (
-        <span
-          key={i}
-          className="w-1.5 h-1.5 rounded-full bg-orange-400/60 animate-bounce"
-          style={{ animationDelay: `${i * 150}ms` }}
-        />
-      ))}
-    </span>
+    <div className="flex items-center gap-2.5 py-0.5">
+      <div className="flex items-center gap-1">
+        {[0, 1, 2].map(i => (
+          <span
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-cyan-400/50 animate-bounce"
+            style={{ animationDelay: `${i * 180}ms` }}
+          />
+        ))}
+      </div>
+      <span className="text-[10px] font-mono tracking-[0.15em] text-cyan-400/40 uppercase">
+        Analizando situación
+      </span>
+    </div>
   )
 }
