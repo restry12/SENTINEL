@@ -4,9 +4,9 @@
 
 **Goal:** Add a `/chat` page where operators can talk to SENTINEL AI — a Mistral Large–powered analyst that has full context of live fire data, AQI, authority reports, and recent news.
 
-**Architecture:** Next.js API route `POST /api/chat` handles all OpenRouter calls server-side (API key never reaches the client) and streams the response back as SSE. The client reads the stream token-by-token for a live "typing" effect. Context (SentinelUpdate snapshot + news articles) is serialized by the client and sent in the request body so the system prompt is always fresh.
+**Architecture:** Next.js API route `POST /api/chat` (Edge runtime) handles all OpenRouter calls server-side (API key never reaches the client) and streams the response back as SSE. The client reads the stream with a line buffer to safely handle chunks split mid-JSON, rendering tokens for a live "typing" effect. Context (SentinelUpdate snapshot + news articles) is serialized by the client and sent in the request body so the system prompt is always fresh.
 
-**Tech Stack:** Next.js 16 App Router, React 19, TypeScript, Tailwind v4, OpenRouter (`mistralai/mistral-large`), Web Streams API (ReadableStream), Lucide React icons, existing `useSentinel` context.
+**Tech Stack:** Next.js 16 App Router (Edge runtime for chat route), React 19, TypeScript, Tailwind v4, OpenRouter (`mistralai/mistral-large`), Web Streams API (ReadableStream), Lucide React icons, existing `useSentinel` context.
 
 ---
 
@@ -35,7 +35,10 @@
 // frontend/app/api/chat/route.ts
 import { NextRequest } from 'next/server'
 
-export const runtime = 'nodejs'
+// Edge runtime — supports long-running streaming responses and avoids
+// the 10s serverless timeout on Vercel Hobby. Compatible: only uses
+// fetch, Web Streams, and process.env (all available on Edge).
+export const runtime = 'edge'
 
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY ?? ''
 
@@ -542,13 +545,18 @@ export function ChatPage() {
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
+      // SSE buffer: TCP chunks can split a JSON line in half. We keep the
+      // trailing incomplete line in `buffer` and prepend it to the next chunk.
+      // Without this, JSON.parse fails on partial lines and tokens are lost.
+      let buffer = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split('\n')
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''   // last item may be incomplete — save for next iteration
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
