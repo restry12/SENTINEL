@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Wind, Activity, AlertTriangle, MapPin, Globe, ChevronDown, ChevronUp, ChevronLeft } from "lucide-react"
+import { Wind, Activity, MapPin, Globe, ChevronDown, ChevronUp, ChevronLeft, AlertTriangle } from "lucide-react"
+import { CollapsibleWidget } from "@/components/dashboard/widget"
 import type { CountryData, CityFeature } from "./world-air-map"
 
 type Category = "good" | "semi-good" | "semi-bad" | "bad" | "none"
@@ -35,7 +36,7 @@ export function AirLeftPanel({ selectedCountry, countryData, selectedCity, citie
       <div className="w-full h-full flex flex-col items-center justify-center text-center px-4 gap-3">
         <Globe className="w-10 h-10 text-text-muted opacity-40" />
         <p className="text-[11px] text-text-muted leading-relaxed">
-          Haz clic en un país para hacer zoom y explorar su calidad del aire
+          Haz clic en un país para explorar su calidad del aire
         </p>
       </div>
     )
@@ -44,95 +45,71 @@ export function AirLeftPanel({ selectedCountry, countryData, selectedCity, citie
   // ── CIUDAD SELECCIONADA ──
   if (selectedCity) {
     const BackBtn = () => (
-      <button
-        onClick={onBackToCountry}
-        className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-text-muted hover:text-white transition-colors"
-      >
-        <ChevronLeft className="w-3 h-3" />
-        {selectedCity.country}
+      <button onClick={onBackToCountry} className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-text-muted hover:text-white transition-colors">
+        <ChevronLeft className="w-3 h-3" />{selectedCity.country}
       </button>
     )
 
     if (!selectedCity.hasData) {
       return (
-        <div className="flex flex-col gap-3 w-full">
-          <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/10 rounded-lg p-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Activity className="w-3 h-3 text-text-muted" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Calidad del Aire</span>
-              </div>
-              <BackBtn />
-            </div>
-            <div className="flex items-center gap-1.5 mb-1">
+        <CollapsibleWidget title="Calidad del Aire" icon={<Activity className="w-3.5 h-3.5" />} className="w-full">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5">
               <MapPin className="w-3 h-3 text-text-muted" />
               <span className="text-[10px] text-text-muted">{selectedCity.country}</span>
             </div>
-            <h2 className="text-lg font-black text-white">{selectedCity.city}</h2>
-            <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10 flex items-center gap-3">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#334155] shrink-0" />
-              <p className="text-[11px] text-text-muted leading-relaxed">
-                Sin registros de calidad del aire para esta ciudad.
-              </p>
-            </div>
+            <BackBtn />
           </div>
-        </div>
+          <h2 className="text-lg font-black text-white">{selectedCity.city}</h2>
+          <div className="mt-3 p-3 rounded bg-white/5 border border-white/10 flex items-center gap-3">
+            <div className="w-2 h-2 rounded-full bg-[#334155] shrink-0" />
+            <p className="text-[11px] text-text-muted leading-relaxed">Sin registros de calidad del aire para esta ciudad.</p>
+          </div>
+        </CollapsibleWidget>
       )
     }
 
     const cat = selectedCity.category as Category
     const col = CAT_COLORS[cat]
+    const scorePercent = Math.min(100, selectedCity.score ?? 0)
     const pollutants = [
       { label:"PM2.5", value:selectedCity.pm25  },
       { label:"Ozone", value:selectedCity.ozone },
       { label:"NO2",   value:selectedCity.no2   },
       { label:"CO",    value:selectedCity.co    },
     ]
-    const scorePercent = Math.min(100, selectedCity.score ?? 0)
 
     return (
       <div className="flex flex-col gap-3 w-full">
-        <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-3 opacity-10">
-            <Activity className="w-10 h-10 text-blue" />
-          </div>
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Activity className="w-3 h-3 text-text-muted" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Ciudad</span>
+        <CollapsibleWidget title="Ciudad · Calidad del Aire" icon={<Activity className="w-3.5 h-3.5" />} className="w-full">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-3 h-3 text-text-muted" />
+              <span className="text-[10px] text-text-muted">{selectedCity.country}</span>
             </div>
             <BackBtn />
           </div>
-          <h2 className="text-lg font-black text-white leading-tight">{selectedCity.city}</h2>
-          <div className="flex items-center gap-1.5 mt-0.5 mb-3">
-            <MapPin className="w-3 h-3 text-text-muted" />
-            <span className="text-[10px] text-text-muted">{selectedCity.country}</span>
-          </div>
-          <div className="flex items-center justify-between">
+          <h2 className="text-xl font-black text-white leading-tight mb-1">{selectedCity.city}</h2>
+          <div className="flex items-center justify-between mb-4">
             <span className={`text-sm font-black ${col.text}`}>{CAT_LABELS[cat]}</span>
             <div className={`px-3 py-1 rounded border ${col.border} ${col.bg} text-[9px] font-black tracking-widest uppercase ${col.text}`}>
               AQI {selectedCity.avgAQI}
             </div>
           </div>
-          <div className="mt-3 space-y-1">
+          <div className="space-y-1">
             <div className="flex justify-between">
               <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Air Score</span>
               <span className="text-xs font-black text-white num">{scorePercent.toFixed(0)}<span className="text-[9px] text-text-muted">/100</span></span>
             </div>
             <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
               <div className="h-full rounded-full transition-all duration-700"
-                style={{ width:`${scorePercent}%`, background:"linear-gradient(90deg,#00ff7f,#ffd700,#ff6600,#ff1a1a)", backgroundSize:"400% 100%", backgroundPosition:`${scorePercent}% 0` }}
-              />
+                style={{ width:`${scorePercent}%`, background:"linear-gradient(90deg,#00ff7f,#ffd700,#ff6600,#ff1a1a)", backgroundSize:"400% 100%", backgroundPosition:`${scorePercent}% 0` }} />
             </div>
           </div>
-        </div>
+        </CollapsibleWidget>
 
-        <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-          <div className="flex items-center gap-2 mb-1">
-            <Wind className="w-3 h-3 text-text-muted" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Contaminante dominante</span>
-          </div>
-          <div className={`text-xl font-black ${col.text} num mb-3`}>{selectedCity.dominant ?? "—"}</div>
+        <CollapsibleWidget title="Contaminantes" icon={<Wind className="w-3.5 h-3.5" />} className="w-full">
+          <div className={`text-lg font-black ${col.text} num mb-3`}>{selectedCity.dominant ?? "—"}</div>
           {pollutants.map(({ label, value }) => {
             const isDom = label === selectedCity.dominant
             return (
@@ -154,7 +131,7 @@ export function AirLeftPanel({ selectedCountry, countryData, selectedCity, citie
               </div>
             )
           })}
-        </div>
+        </CollapsibleWidget>
       </div>
     )
   }
@@ -170,49 +147,34 @@ export function AirLeftPanel({ selectedCountry, countryData, selectedCity, citie
     { label:"NO2",   value:countryData.no2   },
     { label:"CO",    value:countryData.co    },
   ]
-
-  // Sort cities: most monitored first, then worst AQI
   const sortedCities = [...citiesInCountry].sort((a, b) => (b.records - a.records) || ((b.avgAQI ?? 0) - (a.avgAQI ?? 0)))
   const visibleCities = expanded ? sortedCities : sortedCities.slice(0, 3)
 
   return (
     <div className="flex flex-col gap-3 w-full">
-      {/* Country header */}
-      <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-3 opacity-10">
-          <Activity className="w-10 h-10 text-blue" />
-        </div>
-        <div className="flex items-center gap-2 mb-2">
-          <Activity className="w-3 h-3 text-text-muted" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Calidad del Aire · País</span>
-        </div>
-        <h2 className="text-lg font-black text-white leading-tight mb-3">{selectedCountry}</h2>
-        <div className="flex items-center justify-between">
+      <CollapsibleWidget title={`Calidad del Aire · País`} icon={<Activity className="w-3.5 h-3.5" />} className="w-full">
+        <h2 className="text-xl font-black text-white leading-tight mb-1">{selectedCountry}</h2>
+        <div className="flex items-center justify-between mb-4">
           <span className={`text-sm font-black ${col.text}`}>{CAT_LABELS[cat]}</span>
           <div className={`px-3 py-1 rounded border ${col.border} ${col.bg} text-[9px] font-black tracking-widest uppercase ${col.text}`}>
             AQI {countryData.avgAQI}
           </div>
         </div>
-        <div className="mt-3 space-y-1">
+        <div className="space-y-1">
           <div className="flex justify-between">
             <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted">Air Score</span>
             <span className="text-xs font-black text-white num">{scorePercent.toFixed(0)}<span className="text-[9px] text-text-muted">/100</span></span>
           </div>
           <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
             <div className="h-full rounded-full transition-all duration-700"
-              style={{ width:`${scorePercent}%`, background:"linear-gradient(90deg,#00ff7f,#ffd700,#ff6600,#ff1a1a)", backgroundSize:"400% 100%", backgroundPosition:`${scorePercent}% 0` }}
-            />
+              style={{ width:`${scorePercent}%`, background:"linear-gradient(90deg,#00ff7f,#ffd700,#ff6600,#ff1a1a)", backgroundSize:"400% 100%", backgroundPosition:`${scorePercent}% 0` }} />
           </div>
         </div>
-      </div>
+        <p className="mt-3 text-[10px] text-text-muted italic">Haz clic en otro país para comparar</p>
+      </CollapsibleWidget>
 
-      {/* Pollutants */}
-      <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-        <div className="flex items-center gap-2 mb-1">
-          <Wind className="w-3 h-3 text-text-muted" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Contaminante dominante</span>
-        </div>
-        <div className={`text-xl font-black ${col.text} num mb-3`}>{countryData.dominant}</div>
+      <CollapsibleWidget title="Contaminantes" icon={<Wind className="w-3.5 h-3.5" />} className="w-full">
+        <div className={`text-lg font-black ${col.text} num mb-3`}>{countryData.dominant}</div>
         {pollutants.map(({ label, value }) => {
           const isDom = label === countryData.dominant
           return (
@@ -227,20 +189,10 @@ export function AirLeftPanel({ selectedCountry, countryData, selectedCity, citie
             </div>
           )
         })}
-      </div>
+      </CollapsibleWidget>
 
-      {/* City list */}
       {sortedCities.length > 0 && (
-        <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <MapPin className="w-3 h-3 text-text-muted" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">
-                Ciudades · {sortedCities.length} con datos
-              </span>
-            </div>
-          </div>
-
+        <CollapsibleWidget title={`Ciudades · ${sortedCities.length} con datos`} icon={<MapPin className="w-3.5 h-3.5" />} className="w-full">
           <div className="space-y-1.5">
             {visibleCities.map((city) => {
               const cc = city.category as Category
@@ -249,49 +201,41 @@ export function AirLeftPanel({ selectedCountry, countryData, selectedCity, citie
                 <button
                   key={`${city.city}-${city.country}`}
                   onClick={() => onCitySelect(city)}
-                  className="w-full flex items-center justify-between py-2 px-2.5 rounded-lg bg-white/3 hover:bg-white/8 border border-white/5 hover:border-white/15 transition-all group text-left"
+                  className="w-full flex items-center justify-between py-2 px-2.5 rounded bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/15 transition-all group text-left"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cCol.glow, boxShadow: `0 0 5px ${cCol.glow}55` }} />
+                    <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cCol.glow, boxShadow:`0 0 5px ${cCol.glow}66` }} />
                     <div className="min-w-0">
-                      <div className="text-[10px] font-bold text-white group-hover:text-white truncate">{city.city}</div>
+                      <div className="text-[10px] font-bold text-white truncate">{city.city}</div>
                       <div className={`text-[8px] font-bold uppercase tracking-wider ${cCol.text}`}>{CAT_LABELS[cc]}</div>
                     </div>
                   </div>
-                  <div className={`text-[11px] font-black num shrink-0 ml-2 ${cCol.text}`}>
-                    {city.avgAQI}
-                  </div>
+                  <span className={`text-[11px] font-black num shrink-0 ml-2 ${cCol.text}`}>{city.avgAQI}</span>
                 </button>
               )
             })}
           </div>
-
           {sortedCities.length > 3 && (
             <button
               onClick={() => setExpanded(e => !e)}
-              className="w-full mt-3 flex items-center justify-center gap-1.5 py-1.5 rounded-lg border border-white/10 hover:border-white/20 text-[9px] font-bold uppercase tracking-widest text-text-muted hover:text-white transition-all"
+              className="w-full mt-3 flex items-center justify-center gap-1.5 py-1.5 rounded border border-white/10 hover:border-white/20 text-[9px] font-bold uppercase tracking-widest text-text-muted hover:text-white transition-all"
             >
               {expanded
                 ? <><ChevronUp className="w-3 h-3" />Ver menos</>
-                : <><ChevronDown className="w-3 h-3" />Ver más ({sortedCities.length - 3} ciudades)</>
+                : <><ChevronDown className="w-3 h-3" />Ver más ({sortedCities.length - 3})</>
               }
             </button>
           )}
-        </div>
+        </CollapsibleWidget>
       )}
 
-      {/* National summary */}
-      <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle className="w-3 h-3 text-text-muted" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Resumen nacional</span>
-        </div>
+      <CollapsibleWidget title="Resumen Nacional" icon={<AlertTriangle className="w-3.5 h-3.5" />} defaultOpen={false} className="w-full">
         <p className="text-[11px] text-text-2 leading-relaxed">
           {{
-            good:        `${selectedCountry} presenta una calidad del aire saludable. Niveles de contaminantes dentro de rangos seguros.`,
-            "semi-good": `La calidad del aire en ${selectedCountry} es aceptable, con niveles moderados. Grupos sensibles deben monitorear exposición.`,
-            "semi-bad":  `${selectedCountry} registra niveles elevados de contaminación. El contaminante dominante es ${countryData.dominant}. Monitoreo constante recomendado.`,
-            bad:         `Niveles críticos en ${selectedCountry}. AQI promedio supera umbrales de riesgo. Activar protocolos de emergencia ambiental.`,
+            good:        `${selectedCountry} presenta calidad del aire saludable. Contaminantes en rangos seguros.`,
+            "semi-good": `Calidad aceptable en ${selectedCountry}, niveles moderados. Grupos sensibles deben monitorear exposición.`,
+            "semi-bad":  `${selectedCountry} registra niveles elevados. Contaminante dominante: ${countryData.dominant}. Monitoreo constante recomendado.`,
+            bad:         `Niveles críticos en ${selectedCountry}. AQI supera umbrales de riesgo. Activar protocolos de emergencia.`,
             none:        "Sin datos suficientes para este país.",
           }[cat]}
         </p>
@@ -299,7 +243,7 @@ export function AirLeftPanel({ selectedCountry, countryData, selectedCity, citie
           <span className="text-[9px] text-text-muted">Ciudades en dataset</span>
           <span className="text-[10px] font-black text-white num">{countryData.cities.toLocaleString()}</span>
         </div>
-      </div>
+      </CollapsibleWidget>
     </div>
   )
 }

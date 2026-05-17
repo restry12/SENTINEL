@@ -1,6 +1,7 @@
 "use client"
 
 import { BarChart2, TrendingUp, TrendingDown, Minus, ShieldAlert, Globe } from "lucide-react"
+import { CollapsibleWidget } from "@/components/dashboard/widget"
 import type { CountryData, CityFeature } from "./world-air-map"
 
 type Category = "good" | "semi-good" | "semi-bad" | "bad" | "none"
@@ -37,45 +38,39 @@ interface Props {
 
 export function AirRightPanel({ selectedCountry, countryData, selectedCity, allCountryData, globalAvg, globalMax, globalMin }: Props) {
 
-  // ── VISTA GLOBAL (nada seleccionado) ──
+  // ── VISTA GLOBAL ──
   if (!selectedCountry && !selectedCity) {
     const cats = { good:0, "semi-good":0, "semi-bad":0, bad:0 } as Record<string,number>
     Object.values(allCountryData).forEach(d => { if (cats[d.category]!==undefined) cats[d.category]++ })
     const total = Object.keys(allCountryData).length
     const barConf: Record<string,{ bar:string; text:string }> = {
-      good:{ bar:"bg-green", text:"text-green-soft" }, "semi-good":{ bar:"bg-amber", text:"text-amber" },
+      good:{ bar:"bg-green-soft", text:"text-green-soft" }, "semi-good":{ bar:"bg-amber", text:"text-amber" },
       "semi-bad":{ bar:"bg-orange", text:"text-orange" }, bad:{ bar:"bg-red", text:"text-red" },
     }
+
     return (
       <div className="flex flex-col gap-3 w-full">
-        <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-          <div className="flex items-center gap-2 mb-3">
-            <Globe className="w-3 h-3 text-blue" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Resumen Global</span>
-          </div>
+        <CollapsibleWidget title="Resumen Global" icon={<Globe className="w-3.5 h-3.5" />} className="w-full">
           {[
-            { label:"Países con datos", value:total.toString(), color:"text-white" },
-            { label:"AQI promedio global", value:globalAvg.toFixed(1), color:"text-white" },
-            { label:"AQI máximo",  value:globalMax.toFixed(1), color:"text-red" },
-            { label:"AQI mínimo",  value:globalMin.toFixed(1), color:"text-green-soft" },
+            { label:"Países con datos",    value:total.toString(),      color:"text-white" },
+            { label:"AQI promedio global", value:globalAvg.toFixed(1),  color:"text-white" },
+            { label:"AQI máximo",          value:globalMax.toFixed(1),  color:"text-red" },
+            { label:"AQI mínimo",          value:globalMin.toFixed(1),  color:"text-green-soft" },
           ].map(({ label, value, color }) => (
-            <div key={label} className="flex justify-between py-1 border-b border-white/5 last:border-0">
+            <div key={label} className="flex justify-between py-1.5 border-b border-white/5 last:border-0">
               <span className="text-[10px] text-text-muted">{label}</span>
               <span className={`text-[11px] font-black num ${color}`}>{value}</span>
             </div>
           ))}
-        </div>
-        <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart2 className="w-3 h-3 text-text-muted" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Distribución global</span>
-          </div>
+        </CollapsibleWidget>
+
+        <CollapsibleWidget title="Distribución Global" icon={<BarChart2 className="w-3.5 h-3.5" />} className="w-full">
           {(["good","semi-good","semi-bad","bad"] as Category[]).map(cat => {
             const count = cats[cat] ?? 0
             const pct   = Math.round((count / total) * 100)
             const c     = barConf[cat]
             return (
-              <div key={cat} className="mb-3">
+              <div key={cat} className="mb-3 last:mb-0">
                 <div className="flex justify-between mb-1">
                   <span className={`text-[9px] font-bold uppercase ${c.text}`}>{CAT_LABELS[cat]}</span>
                   <span className="text-[9px] text-text-muted font-mono">{count} ({pct}%)</span>
@@ -86,7 +81,7 @@ export function AirRightPanel({ selectedCountry, countryData, selectedCity, allC
               </div>
             )
           })}
-        </div>
+        </CollapsibleWidget>
       </div>
     )
   }
@@ -95,102 +90,89 @@ export function AirRightPanel({ selectedCountry, countryData, selectedCity, allC
   if (selectedCity) {
     if (!selectedCity.hasData) {
       return (
-        <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-          <div className="flex items-center gap-2 mb-3">
-            <Globe className="w-3 h-3 text-text-muted" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Inteligencia del Aire</span>
-          </div>
+        <CollapsibleWidget title="Inteligencia · Ciudad" icon={<BarChart2 className="w-3.5 h-3.5" />} className="w-full">
           <p className="text-[11px] text-text-muted leading-relaxed">
-            No hay datos de contaminantes para <span className="text-white font-bold">{selectedCity.city}</span> en el dataset.
+            No hay datos para <span className="text-white font-bold">{selectedCity.city}</span>.
           </p>
           {countryData && (
             <div className="mt-3 pt-3 border-t border-white/5">
-              <div className="text-[9px] text-text-muted mb-1">Promedio del país ({selectedCity.country})</div>
+              <div className="text-[9px] text-text-muted mb-1">Promedio del país</div>
               <div className="text-sm font-black text-white num">AQI {countryData.avgAQI}</div>
             </div>
           )}
-        </div>
+        </CollapsibleWidget>
       )
     }
 
-    const cityAQI = selectedCity.avgAQI ?? 0
-    const vsG     = cityAQI - globalAvg
-    const countryVals = Object.entries(allCountryData)
-      .filter(([n]) => n === selectedCity.country)
+    const cityAQI  = selectedCity.avgAQI ?? 0
+    const vsG      = cityAQI - globalAvg
+    const countryVals = Object.entries(allCountryData).filter(([n]) => n === selectedCity.country)
     const countryAvg  = countryVals[0]?.[1]?.avgAQI ?? globalAvg
-    const vsC         = cityAQI - countryAvg
-    const cat         = selectedCity.category as Category
-    const risk        = riskConf[cat] ?? riskConf.none
-    let TrendIcon = Minus, trendText = "Estable", trendColor = "text-amber"
+    const vsC      = cityAQI - countryAvg
+    const cat      = selectedCity.category as Category
+    const risk     = riskConf[cat] ?? riskConf.none
+    let TrendIcon  = Minus, trendText = "Estable", trendColor = "text-amber"
     if (vsG > 30)  { TrendIcon = TrendingUp;   trendText = "Empeora"; trendColor = "text-red" }
     if (vsG < -20) { TrendIcon = TrendingDown; trendText = "Mejora";  trendColor = "text-green-soft" }
 
     return (
       <div className="flex flex-col gap-3 w-full">
-        <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart2 className="w-3 h-3 text-blue" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Inteligencia · Ciudad</span>
-          </div>
+        <CollapsibleWidget title="Inteligencia · Ciudad" icon={<BarChart2 className="w-3.5 h-3.5" />} className="w-full">
           {[
             { label:`Vs. promedio global (${globalAvg.toFixed(0)})`, value:(vsG>=0?"+":"")+vsG.toFixed(1), color:vsG>0?"text-red":"text-green-soft" },
             { label:`Vs. promedio ${selectedCity.country}`,          value:(vsC>=0?"+":"")+vsC.toFixed(1), color:vsC>0?"text-orange":"text-green-soft" },
             { label:"Registros en dataset", value:selectedCity.records.toLocaleString(), color:"text-text-2" },
           ].map(({ label, value, color }) => (
-            <div key={label} className="flex justify-between py-1 border-b border-white/5 last:border-0">
+            <div key={label} className="flex justify-between py-1.5 border-b border-white/5 last:border-0">
               <span className="text-[10px] text-text-muted">{label}</span>
               <span className={`text-[11px] font-black num ${color}`}>{value}</span>
             </div>
           ))}
-        </div>
-        <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-          <div className="grid grid-cols-2 gap-3 mb-3">
+        </CollapsibleWidget>
+
+        <CollapsibleWidget title="Riesgo y Recomendaciones" icon={<ShieldAlert className="w-3.5 h-3.5" />} className="w-full">
+          <div className="grid grid-cols-2 gap-2 mb-3">
             <div className="p-2 rounded bg-white/5 border border-white/10">
-              <div className="text-[8px] font-bold uppercase tracking-widest text-text-muted mb-1.5">Tendencia</div>
+              <div className="text-[8px] font-bold uppercase tracking-widest text-text-muted mb-1">Tendencia</div>
               <div className={`flex items-center gap-1.5 ${trendColor}`}>
-                <TrendIcon className="w-3.5 h-3.5" /><span className={`text-[11px] font-black`}>{trendText}</span>
+                <TrendIcon className="w-3.5 h-3.5" /><span className="text-[11px] font-black">{trendText}</span>
               </div>
             </div>
             <div className="p-2 rounded bg-white/5 border border-white/10">
-              <div className="text-[8px] font-bold uppercase tracking-widest text-text-muted mb-1.5">Riesgo</div>
+              <div className="text-[8px] font-bold uppercase tracking-widest text-text-muted mb-1">Riesgo</div>
               <span className={`text-[11px] font-black ${risk.color}`}>{risk.label}</span>
             </div>
           </div>
           <div className="text-[9px] text-text-muted italic mb-3">{risk.detail}</div>
-          <div className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Recomendaciones</div>
           <div className="space-y-2">
             {(recs[cat] ?? recs.none).map((r, i) => (
               <div key={i} className="flex items-start gap-2">
-                <ShieldAlert className="w-3 h-3 text-blue shrink-0 mt-0.5" />
+                <span className="w-4 h-4 flex items-center justify-center border border-blue/40 bg-blue/10 text-[8px] font-black text-blue rounded shrink-0 num">{i+1}</span>
                 <span className="text-[10px] text-text-2 leading-relaxed">{r}</span>
               </div>
             ))}
           </div>
-        </div>
+        </CollapsibleWidget>
       </div>
     )
   }
 
   // ── PAÍS SELECCIONADO ──
   if (!countryData) return null
-  const sorted = Object.entries(allCountryData).sort((a,b) => a[1].avgAQI - b[1].avgAQI)
-  const rank   = sorted.findIndex(([n]) => n === selectedCountry) + 1
-  const total  = sorted.length
+  const sorted  = Object.entries(allCountryData).sort((a,b) => a[1].avgAQI - b[1].avgAQI)
+  const rank    = sorted.findIndex(([n]) => n === selectedCountry) + 1
+  const total   = sorted.length
   const rankPct = Math.round(((total - rank + 1) / total) * 100)
-  const vsG    = countryData.avgAQI - globalAvg
-  const cat    = countryData.category as Category
-  const risk   = riskConf[cat] ?? riskConf.none
+  const vsG     = countryData.avgAQI - globalAvg
+  const cat     = countryData.category as Category
+  const risk    = riskConf[cat] ?? riskConf.none
   let TrendIcon = Minus, trendText = "Estable", trendColor = "text-amber"
   if (vsG > 20)  { TrendIcon = TrendingUp;   trendText = "Empeora"; trendColor = "text-red" }
   if (vsG < -15) { TrendIcon = TrendingDown; trendText = "Mejora";  trendColor = "text-green-soft" }
 
   return (
     <div className="flex flex-col gap-3 w-full">
-      <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-        <div className="flex items-center gap-2 mb-3">
-          <BarChart2 className="w-3 h-3 text-blue" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-muted">Inteligencia · País</span>
-        </div>
+      <CollapsibleWidget title="Inteligencia · País" icon={<BarChart2 className="w-3.5 h-3.5" />} className="w-full">
         {[
           { label:"AQI promedio", value:countryData.avgAQI.toFixed(1), color:"text-white" },
           { label:"AQI máximo",   value:countryData.maxAQI.toFixed(1), color:"text-red" },
@@ -199,7 +181,7 @@ export function AirRightPanel({ selectedCountry, countryData, selectedCity, allC
           { label:"Ranking global", value:`#${rank} de ${total}`, color:"text-blue" },
           { label:"Registros",    value:countryData.records.toLocaleString(), color:"text-text-2" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="flex justify-between py-1 border-b border-white/5 last:border-0">
+          <div key={label} className="flex justify-between py-1.5 border-b border-white/5 last:border-0">
             <span className="text-[10px] text-text-muted">{label}</span>
             <span className={`text-[11px] font-black num ${color}`}>{value}</span>
           </div>
@@ -212,30 +194,31 @@ export function AirRightPanel({ selectedCountry, countryData, selectedCity, allC
             <span>Mejor calidad</span><span>Peor calidad</span>
           </div>
         </div>
-      </div>
-      <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/15 rounded-lg p-4 shadow-2xl">
-        <div className="grid grid-cols-2 gap-3 mb-3">
+      </CollapsibleWidget>
+
+      <CollapsibleWidget title="Riesgo y Recomendaciones" icon={<ShieldAlert className="w-3.5 h-3.5" />} className="w-full">
+        <div className="grid grid-cols-2 gap-2 mb-3">
           <div className="p-2 rounded bg-white/5 border border-white/10">
-            <div className="text-[8px] font-bold uppercase tracking-widest text-text-muted mb-1.5">Tendencia</div>
+            <div className="text-[8px] font-bold uppercase tracking-widest text-text-muted mb-1">Tendencia</div>
             <div className={`flex items-center gap-1.5 ${trendColor}`}>
               <TrendIcon className="w-3.5 h-3.5" /><span className="text-[11px] font-black">{trendText}</span>
             </div>
           </div>
           <div className="p-2 rounded bg-white/5 border border-white/10">
-            <div className="text-[8px] font-bold uppercase tracking-widest text-text-muted mb-1.5">Riesgo</div>
+            <div className="text-[8px] font-bold uppercase tracking-widest text-text-muted mb-1">Riesgo</div>
             <span className={`text-[11px] font-black ${risk.color}`}>{risk.label}</span>
           </div>
         </div>
-        <div className="text-[9px] font-bold uppercase tracking-widest text-text-muted mb-2">Recomendaciones</div>
+        <div className="text-[9px] text-text-muted italic mb-3">{risk.detail}</div>
         <div className="space-y-2">
           {(recs[cat] ?? recs.none).map((r, i) => (
             <div key={i} className="flex items-start gap-2">
-              <ShieldAlert className="w-3 h-3 text-blue shrink-0 mt-0.5" />
+              <span className="w-4 h-4 flex items-center justify-center border border-blue/40 bg-blue/10 text-[8px] font-black text-blue rounded shrink-0 num">{i+1}</span>
               <span className="text-[10px] text-text-2 leading-relaxed">{r}</span>
             </div>
           ))}
         </div>
-      </div>
+      </CollapsibleWidget>
     </div>
   )
 }

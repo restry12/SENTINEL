@@ -43,7 +43,6 @@ function AirQualityPageInner() {
     ]).then(([cData, geoData]: [AirDataFile, { features: GeoFeature[] }]) => {
       setCountryData(cData)
       setCityFeatures(geoData.features)
-      // Auto-select worst country
       const worst = Object.entries(cData.countries).reduce((a, b) =>
         b[1].avgAQI > a[1].avgAQI ? b : a
       )
@@ -70,24 +69,17 @@ function AirQualityPageInner() {
     }
   }, [selectedCity])
 
-  // Cities of the selected country with AQI data, sorted by records desc
   const citiesInCountry = useMemo<CityFeature[]>(() => {
     if (!selectedCountry) return []
     return cityFeatures
       .filter(f => f.properties.country === selectedCountry && f.properties.hasData)
-      .map(f => ({
-        ...f.properties,
-        lng: f.geometry.coordinates[0],
-        lat: f.geometry.coordinates[1],
-      }))
+      .map(f => ({ ...f.properties, lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] }))
       .sort((a, b) => b.records - a.records) as CityFeature[]
   }, [cityFeatures, selectedCountry])
 
   const globalStats = useMemo(() => {
     if (!cityFeatures.length) return { avg: 0, max: 0, min: 0 }
-    const vals = cityFeatures
-      .filter(f => f.properties.hasData)
-      .map(f => f.properties.avgAQI as number)
+    const vals = cityFeatures.filter(f => f.properties.hasData).map(f => f.properties.avgAQI as number)
     if (!vals.length) return { avg: 0, max: 0, min: 0 }
     return {
       avg: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10,
@@ -123,36 +115,14 @@ function AirQualityPageInner() {
           <div className="absolute inset-0 bg-background flex items-center justify-center gap-3">
             <Wind className="w-5 h-5 text-blue animate-pulse" />
             <span className="text-[11px] font-black tracking-[0.2em] uppercase text-text-muted">
-              Cargando inteligencia de calidad del aire…
+              Cargando calidad del aire…
             </span>
           </div>
         )}
 
         {/* ── LEFT PANEL ── */}
-        <div className="absolute top-6 left-6 z-40 w-72 pointer-events-none flex flex-col gap-3 h-[calc(100vh-120px)]">
-          <div className="flex-1 overflow-y-auto pr-1 scrollbar-none pointer-events-auto flex flex-col gap-3 pb-4">
-
-            {/* Header */}
-            <div className="w-full bg-[#080c14]/80 backdrop-blur-xl border border-white/10 rounded-lg px-4 py-2.5 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[8px] font-bold uppercase tracking-[0.25em] text-text-muted">SENTINEL AIR</div>
-                  <div className="text-[11px] font-black tracking-widest text-white uppercase">
-                    {selectedCity ? selectedCity.city : selectedCountry ? selectedCountry : "Calidad del Aire"}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {selectedCountry
-                    ? <div className="w-1.5 h-1.5 rounded-full bg-blue animate-pulse" />
-                    : <div className="w-1.5 h-1.5 rounded-full bg-green-soft animate-pulse" />
-                  }
-                  <span className="text-[8px] font-bold text-text-muted uppercase tracking-widest">
-                    {selectedCity ? "Ciudad" : selectedCountry ? "País seleccionado" : `${Object.keys(countryData?.countries ?? {}).length} países`}
-                  </span>
-                </div>
-              </div>
-            </div>
-
+        <div className="absolute top-6 left-6 z-40 w-72 pointer-events-none h-[calc(100vh-120px)]">
+          <div className="h-full overflow-y-auto pr-1 scrollbar-none pointer-events-auto flex flex-col gap-3 pb-4">
             <AirLeftPanel
               selectedCountry={panelCountry}
               countryData={panelCountryData}
@@ -165,28 +135,18 @@ function AirQualityPageInner() {
         </div>
 
         {/* ── RIGHT PANEL ── */}
-        <div className="absolute top-6 right-6 z-40 w-72 pointer-events-none flex flex-col gap-3 h-[calc(100vh-120px)]">
-          <div className="flex-1 overflow-y-auto pl-1 scrollbar-none pointer-events-auto flex flex-col gap-3 pb-4">
-
-            {/* Header */}
-            <div className="w-full bg-[#080c14]/80 backdrop-blur-xl border border-white/10 rounded-lg px-4 py-2.5 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[8px] font-bold uppercase tracking-[0.25em] text-text-muted">Inteligencia</div>
-                  <div className="text-[11px] font-black tracking-widest text-white uppercase">Análisis del Aire</div>
-                </div>
-                {(selectedCountry || selectedCity) && (
-                  <button
-                    onClick={handleBack}
-                    className="flex items-center gap-1 text-[8px] font-bold text-text-muted hover:text-white transition-colors uppercase tracking-wider px-2 py-1 rounded border border-white/10 hover:border-white/20 pointer-events-auto"
-                  >
-                    <ChevronLeft className="w-3 h-3" />
-                    {selectedCity ? "País" : "Mundo"}
-                  </button>
-                )}
-              </div>
-            </div>
-
+        <div className="absolute top-6 right-6 z-40 w-72 pointer-events-none h-[calc(100vh-120px)]">
+          <div className="h-full overflow-y-auto pl-1 scrollbar-none pointer-events-auto flex flex-col gap-3 pb-4">
+            {/* Back button */}
+            {(selectedCountry || selectedCity) && (
+              <button
+                onClick={handleBack}
+                className="self-end flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-text-muted hover:text-white transition-colors px-3 py-1.5 rounded border border-white/10 hover:border-white/20 bg-[#0a0b0e]/80 backdrop-blur-md pointer-events-auto"
+              >
+                <ChevronLeft className="w-3 h-3" />
+                {selectedCity ? "País" : "Mundo"}
+              </button>
+            )}
             <AirRightPanel
               selectedCountry={panelCountry}
               countryData={panelCountryData}
@@ -200,12 +160,12 @@ function AirQualityPageInner() {
         </div>
 
         {/* ── LEGEND ── */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40">
-          <div className="flex items-center gap-1 bg-[#080c14]/90 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2 shadow-2xl">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+          <div className="flex items-center gap-1 bg-[#0a0b0e]/80 backdrop-blur-md border border-white/10 rounded-full px-4 py-2 shadow-2xl">
             <span className="text-[8px] font-bold uppercase tracking-widest text-text-muted mr-2">Air Score</span>
             {legend.map(({ color, label, range }) => (
-              <div key={label} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ background:`${color}15` }}>
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor:color, boxShadow:`0 0 6px ${color}` }} />
+              <div key={label} className="flex items-center gap-1.5 px-2 py-1 rounded-full" style={{ background:`${color}18` }}>
+                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor:color, boxShadow:`0 0 5px ${color}` }} />
                 <span className="text-[9px] font-bold text-white">{label}</span>
                 <span className="text-[8px] text-text-muted font-mono">{range}</span>
               </div>
@@ -220,7 +180,7 @@ function AirQualityPageInner() {
             className="absolute pointer-events-auto z-40"
             style={{ bottom: "5.5rem", left: "50%", transform: "translateX(-50%)" }}
           >
-            <div className="flex items-center gap-2 bg-[#080c14]/90 backdrop-blur-xl border border-white/15 rounded-full px-4 py-2 shadow-2xl hover:border-white/30 transition-all">
+            <div className="flex items-center gap-2 bg-[#0a0b0e]/80 backdrop-blur-md border border-white/15 rounded-full px-4 py-2 shadow-2xl hover:border-white/30 transition-all">
               <ChevronLeft className="w-3.5 h-3.5 text-text-muted" />
               <span className="text-[9px] font-bold uppercase tracking-widest text-text-muted">
                 {selectedCity ? "Volver al país" : "Volver al mundo"}
