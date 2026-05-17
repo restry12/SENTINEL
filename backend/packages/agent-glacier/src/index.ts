@@ -22,6 +22,14 @@ function getLastMassChange(glacierId: string): number {
 const app = express()
 app.use(express.json({ limit: '10mb' }))
 
+app.use((_req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN ?? '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  next()
+})
+app.options('*', (_req, res) => res.sendStatus(204))
+
 app.get('/glaciers', (_req, res) => {
   const data: GlacierWithMass[] = catalog.map(g => ({
     ...g,

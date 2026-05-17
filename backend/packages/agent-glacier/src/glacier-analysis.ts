@@ -30,7 +30,10 @@ export async function fetchGlacierClimate(
   const temp_avg = Math.round(json.main.temp * 10) / 10
   const temp_max = Math.round(json.main.temp_max * 10) / 10
   const precipitation_mm = Math.round((json.rain?.['1h'] ?? 0) * 10) / 10
-  const snowfall_cm = Math.round(((json.snow?.['1h'] ?? 0) / 10) * 10) / 10
+  // OpenWeather snow['1h'] is mm/hr. Scale to monthly cm estimate (24h * 30d / 10mm→cm).
+  // If not currently snowing, precipitation factor remains uncertain but avoids false max-risk.
+  const hourlySnowMm = json.snow?.['1h'] ?? 0
+  const snowfall_cm = Math.round(hourlySnowMm > 0 ? (hourlySnowMm * 24 * 30) / 10 : 25)
   const days_above_zero = estimateDaysAboveZero(lat, altitudeM, temp_avg, currentMonth)
   const thermal_anomaly = Math.round((temp_avg - thermalBaseline(altitudeM)) * 10) / 10
 
