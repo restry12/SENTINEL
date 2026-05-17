@@ -66,6 +66,7 @@ export interface SentinelUpdate {
   airAlerts?: AirAlerts
   report?: AuthorityReport
   naturalRoutes?: NaturalRoutes
+  prediction?: PredictionResult
 }
 
 export interface AlertPayload {
@@ -174,6 +175,29 @@ export interface NaturalRoutes {
 export interface RoutesResult {
   routes: RouteData[]
   naturalRoutes: NaturalRoutes | null
+}
+
+export interface PredictionCell {
+  lat: number
+  lon: number
+  risk_score: number        // 0-1 combined (FWI × 0.6 + historical × 0.4)
+  fwi_score: number         // 0-1 weather-only component
+  historical_weight: number // 0-1 history-only component
+}
+
+export interface PredictionResult {
+  grid: PredictionCell[]
+  top_zones: Array<{
+    lat: number
+    lon: number
+    risk_score: number
+    zona: string    // human-readable zone name from LLM
+    razon: string   // why this zone is at risk, from LLM
+  }>
+  analisis_6h: string
+  analisis_24h: string
+  analisis_72h: string
+  confianza: 'baja' | 'media' | 'alta'
 }
 
 // Agent contract — POST /analyze

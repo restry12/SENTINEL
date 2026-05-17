@@ -7,24 +7,48 @@ const EVACUATION_DESTINATIONS: Array<{ name: string; lat: number; lon: number }>
   { name: 'Victoria', lat: -38.2333, lon: -72.3333 },
 ]
 
-// ORS route fetch (unchanged)
+// Build a buffered bounding-box polygon around fire hotspots for ORS avoid_polygons
+function buildAvoidPolygon(fires: FireData[]): object | undefined {
+  if (fires.length === 0) return undefined
+  const BUFFER_DEG = 0.15 // ~15 km buffer
+  const lats = fires.map(f => f.lat)
+  const lons = fires.map(f => f.lon)
+  const minLat = Math.min(...lats) - BUFFER_DEG
+  const maxLat = Math.max(...lats) + BUFFER_DEG
+  const minLon = Math.min(...lons) - BUFFER_DEG
+  const maxLon = Math.max(...lons) + BUFFER_DEG
+  return {
+    type: 'Polygon',
+    coordinates: [[
+      [minLon, minLat],
+      [maxLon, minLat],
+      [maxLon, maxLat],
+      [minLon, maxLat],
+      [minLon, minLat],
+    ]],
+  }
+}
+
 async function fetchOrsRoute(
   apiKey: string,
   fromLon: number,
   fromLat: number,
   toLon: number,
-  toLat: number
+  toLat: number,
+  avoidPolygon?: object
 ): Promise<Omit<RouteData, 'id'> | null> {
   const url = 'https://api.openrouteservice.org/v2/directions/driving-car'
+  const body: Record<string, unknown> = {
+    coordinates: [[fromLon, fromLat], [toLon, toLat]],
+  }
+  if (avoidPolygon) body.options = { avoid_polygons: avoidPolygon }
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: apiKey,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      coordinates: [[fromLon, fromLat], [toLon, toLat]],
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {
@@ -99,12 +123,13 @@ export async function calculateEvacuationRoutes(fires: FireData[]): Promise<Rout
   const avgLat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
   const avgLon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
 
-  // ORS routes (geometry for map display)
+  // ORS routes (geometry for map display, avoiding fire zone)
+  const avoidPolygon = buildAvoidPolygon(fires)
   const routes: RouteData[] = []
   if (apiKey) {
     for (const dest of EVACUATION_DESTINATIONS) {
       try {
-        const route = await fetchOrsRoute(apiKey, avgLon, avgLat, dest.lon, dest.lat)
+        const route = await fetchOrsRoute(apiKey, avgLon, avgLat, dest.lon, dest.lat, avoidPolygon)
         if (route) routes.push({ ...route, id: dest.name })
       } catch (err) {
         console.warn(`[agent-routes] route to ${dest.name} failed:`, err)
