@@ -1,6 +1,6 @@
 "use client"
 import dynamic from "next/dynamic"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { Loader2 } from "lucide-react"
 import { useSentinel } from "@/contexts/sentinel-context"
 import type { FireRiskGrid, FireRiskCell, CellDetail } from "@/hooks/use-socket"
@@ -27,6 +27,8 @@ export function MapPanel() {
   const [selectedCell, setSelectedCell] = useState<FireRiskCell | null>(null)
   const [cellDetail, setCellDetail] = useState<CellDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const requestIdRef = useRef(0)
 
   const toggleGrid = useCallback(async () => {
     const next = !showGrid
@@ -48,8 +50,10 @@ export function MapPanel() {
   }, [showGrid, riskGrid, gridLoading])
 
   const handleCellClick = useCallback(async (cell: FireRiskCell) => {
+    const reqId = ++requestIdRef.current
     setSelectedCell(cell)
     setCellDetail(null)
+    setDetailError(null)
     setDetailLoading(true)
     try {
       const res = await fetch('/api/cell-detail', {
@@ -58,11 +62,13 @@ export function MapPanel() {
         body: JSON.stringify({ cell }),
       })
       const data = await res.json()
+      if (reqId !== requestIdRef.current) return
       if (data.ok) setCellDetail(data.detail as CellDetail)
+      else setDetailError('No se pudo cargar el detalle de la celda')
     } catch {
-      /* keep panel open with no detail — score + factors still shown */
+      if (reqId === requestIdRef.current) setDetailError('No se pudo cargar el detalle de la celda')
     } finally {
-      setDetailLoading(false)
+      if (reqId === requestIdRef.current) setDetailLoading(false)
     }
   }, [])
 
@@ -92,7 +98,8 @@ export function MapPanel() {
           cell={selectedCell}
           detail={cellDetail}
           loading={detailLoading}
-          onClose={() => { setSelectedCell(null); setCellDetail(null) }}
+          detailError={detailError}
+          onClose={() => { setSelectedCell(null); setCellDetail(null); setDetailLoading(false); setDetailError(null) }}
         />
 
         {/* Situational Intelligence Overlay */}

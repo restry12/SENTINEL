@@ -30,11 +30,13 @@ export function FireRiskCellPanel({
   cell,
   detail,
   loading,
+  detailError,
   onClose,
 }: {
   cell: FireRiskCell | null
   detail: CellDetail | null
   loading: boolean
+  detailError: string | null
   onClose: () => void
 }) {
   if (!cell) return null
@@ -101,6 +103,13 @@ export function FireRiskCellPanel({
           <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/20 rounded-lg p-4 shadow-2xl flex items-center gap-2 text-text-muted">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-[11px]">Analizando infraestructura e impacto…</span>
+          </div>
+        )}
+
+        {/* Detail fetch failure */}
+        {!loading && detailError && !detail && (
+          <div className="w-full bg-[#0a0b0e]/90 backdrop-blur-xl border border-white/20 rounded-lg p-4 shadow-2xl">
+            <span className="text-[11px] text-red">{detailError}</span>
           </div>
         )}
 
