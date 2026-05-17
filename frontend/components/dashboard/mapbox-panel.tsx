@@ -36,24 +36,31 @@ const TOKEN =
 
 type ExpansionKey = '2h' | '6h' | '12h'
 
-// Elliptical fire spread model (simplified Rothermel).
+// Elliptical fire spread model — shape from wind, size from LLM area (km²).
 function makeFireSpreadPolygon(
   lat: number, lon: number,
   windDegFrom: number, windSpeedMs: number,
-  hours: number
+  expansionKm2: number
 ) {
   const windKmh = windSpeedMs * 3.6
   const spreadRad = ((windDegFrom + 180) % 360) * (Math.PI / 180)
   const sinS = Math.sin(spreadRad)
   const cosS = Math.cos(spreadRad)
 
-  const ros_forward = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
+  // Shape ratios from wind (Rothermel simplified)
+  const ros_forward = Math.max(0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002, 0.5)
   const ros_backing = 0.3
   const ros_flank = Math.sqrt(ros_forward * ros_backing)
 
-  const d_forward = ros_forward * hours
-  const d_backing = ros_backing * hours
-  const d_flank = Math.max(ros_flank * hours, 0.3)
+  // Scale the ellipse so its area matches expansionKm2: area = π * a * b
+  // a = k*(ros_forward+ros_backing)/2, b = k*ros_flank
+  // → k = sqrt(expansionKm2 / (π * (ros_forward+ros_backing)/2 * ros_flank))
+  const shapeArea = Math.PI * ((ros_forward + ros_backing) / 2) * ros_flank
+  const k = Math.sqrt(Math.max(expansionKm2, 0.01) / shapeArea)
+
+  const d_forward = k * ros_forward
+  const d_backing = k * ros_backing
+  const d_flank = Math.max(k * ros_flank, 0.05)
 
   const a = (d_forward + d_backing) / 2
   const b = d_flank
@@ -83,16 +90,6 @@ function makeFireSpreadPolygon(
   }
 }
 
-function computeFireSpreadArea(windSpeedMs: number, hours: number) {
-  const windKmh = windSpeedMs * 3.6
-  const ros_f = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
-  const ros_b = 0.3
-  const ros_l = Math.sqrt(ros_f * ros_b)
-  const a = (ros_f * hours + ros_b * hours) / 2
-  const b = Math.max(ros_l * hours, 0.3)
-  const km2 = Math.PI * a * b
-  return { km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) }
-}
 
 const EXP_CONFIG: Record<ExpansionKey, {
   hours: number
@@ -102,6 +99,7 @@ const EXP_CONFIG: Record<ExpansionKey, {
   '6h':  { hours: 6,  colorCore: '#c2410c', colorMid: '#ea580c', colorOuter: '#fb923c' },
   '12h': { hours: 12, colorCore: '#b45309', colorMid: '#d97706', colorOuter: '#fbbf24' },
 }
+
 
 export function MapboxPanel({ 
   showHeatmap = false,
@@ -127,8 +125,8 @@ export function MapboxPanel({
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: [-71.90, -38.28],
-      zoom: 9,
+      center: [-80, -5],
+      zoom: 2.5,
       projection: 'globe' as any,
     })
     
@@ -144,7 +142,6 @@ export function MapboxPanel({
     })
     
     mapRef.current = map
-<<<<<<< Updated upstream
 
     const observer = new ResizeObserver(() => {
       map.resize()
@@ -155,12 +152,7 @@ export function MapboxPanel({
       observer.disconnect()
       map.remove()
       mapRef.current = null 
-=======
-    return () => { 
-      map.remove()
-      mapRef.current = null
-      setMapLoaded(false) 
->>>>>>> Stashed changes
+      setMapLoaded(false)
     }
   }, [])
 
@@ -220,15 +212,6 @@ export function MapboxPanel({
       if (selectFireRef) selectFireRef.current = null
     }
 
-    const wDeg   = sentinelUpdate?.weather?.deg   ?? 315
-    const wSpeed = sentinelUpdate?.weather?.speed ?? 6.7
-    const sDeg   = (wDeg + 180) % 360
-    const sDirLabel = degToCompass(sDeg)
-    const wKmh  = Math.round(wSpeed * 3.6)
-    const a2  = computeFireSpreadArea(wSpeed, 2)
-    const a6  = computeFireSpreadArea(wSpeed, 6)
-    const a12 = computeFireSpreadArea(wSpeed, 12)
-
     const apply = () => {
       cleanup()
       const fires = sentinelUpdate?.fires ?? []
@@ -243,41 +226,22 @@ export function MapboxPanel({
         const weather = weatherJson ? JSON.parse(weatherJson) : undefined
         const intensity: FireIntensity = frp >= 300 ? 'critical' : frp >= 100 ? 'high' : 'moderate'
 
-        const fireWDeg   = weather?.deg   ?? wDeg
-        const fireWSpeed = weather?.speed ?? wSpeed
+        const fireWDeg   = weather?.deg   ?? 0
+        const fireWSpeed = weather?.speed ?? 0
         const fireSDeg   = (fireWDeg + 180) % 360
         const fireSDirLabel = degToCompass(fireSDeg)
         const fireWKmh   = Math.round(fireWSpeed * 3.6)
-        const fireA2  = computeFireSpreadArea(fireWSpeed, 2)
-        const fireA6  = computeFireSpreadArea(fireWSpeed, 6)
-        const fireA12 = computeFireSpreadArea(fireWSpeed, 12)
 
-        const popupData: PopupData = {
-          id, color, intensity: String(intensity),
-          frp, lat, lon,
-          sDirLabel: fireSDirLabel, wKmh: fireWKmh,
-          a2: fireA2, a6: fireA6, a12: fireA12,
-          weather, pm25,
-        }
-
-        currentPopupRef.current?.popup.remove()
+        const roundCoord = (v: number) => Math.round(v * 10000) / 10000
+        const perFire = sentinelUpdate?.perFireExpansions
+          ?.find(e => roundCoord(e.lat) === roundCoord(lat) && roundCoord(e.lon) === roundCoord(lon))
+        const toArea = (km2: number) => ({ km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) })
+        const fireA2  = perFire ? toArea(perFire.expansion_2h_km2)  : undefined
+        const fireA6  = perFire ? toArea(perFire.expansion_6h_km2)  : undefined
+        const fireA12 = perFire ? toArea(perFire.expansion_12h_km2) : undefined
 
         const m = mapRef.current
         if (!m) return
-
-        const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '320px' })
-          .setLngLat([lon, lat])
-          .setHTML(buildPopupHTML(popupData, '2h'))
-          .addTo(m)
-
-        popup.getElement()?.addEventListener('click', (ev) => {
-          const btn = (ev.target as HTMLElement).closest('[data-sentinel-key]')
-          if (!btn) return
-          const key = btn.getAttribute('data-sentinel-key') as ExpansionKey
-          setActiveExpansion(prev => prev === key ? null : key)
-        })
-
-        currentPopupRef.current = { popup, data: popupData }
 
         setSelectedFire({
           id, lat, lon, frp, brightness,
@@ -294,22 +258,24 @@ export function MapboxPanel({
         } as any)
 
         m.flyTo({ 
-          center: [lon, lat], 
-          zoom: Math.max(m.getZoom(), 11), 
+          center: [lon + 0.12, lat], 
+          zoom: 10, 
           duration: 1500, 
           essential: true 
         })
       }
 
       // Register for HotspotSearch — updated each time fires reload
-      selectFireRef.current = (idx, allFires) => {
-        const m = mapRef.current
-        if (!m) return
-        const f = allFires[idx]
-        if (!f) return
-        const id = `FIRE-${String(idx + 1).padStart(3, '0')}`
-        const isCritical = (sentinelUpdate?.riskLevel === 'critical') || f.frp >= 300
-        openFire(f.lat, f.lon, id, f.frp, f.brightness, f.weather ? JSON.stringify(f.weather) : '', f.pm25 ?? null, isCritical)
+      if (selectFireRef) {
+        selectFireRef.current = (idx, allFires) => {
+          const m = mapRef.current
+          if (!m) return
+          const f = allFires[idx]
+          if (!f) return
+          const id = `FIRE-${String(idx + 1).padStart(3, '0')}`
+          const isCritical = (sentinelUpdate?.riskLevel === 'critical') || f.frp >= 300
+          openFire(f.lat, f.lon, id, f.frp, f.brightness, f.weather ? JSON.stringify(f.weather) : '', f.pm25 ?? null, isCritical)
+        }
       }
 
       if (fires.length === 0) return
@@ -416,65 +382,6 @@ export function MapboxPanel({
         })
       })
 
-<<<<<<< Updated upstream
-      // Shared handler — called from map click AND from HotspotSearch
-      function openFire(
-        lat: number, lon: number,
-        id: string, frp: number, brightness: number,
-        weatherJson: string, pm25: number | null,
-        critical: boolean,
-      ) {
-        const weather = weatherJson ? JSON.parse(weatherJson) : undefined
-        const intensity: FireIntensity = frp >= 300 ? 'critical' : frp >= 100 ? 'high' : 'moderate'
-
-        const fireWDeg   = weather?.deg   ?? wDeg
-        const fireWSpeed = weather?.speed ?? wSpeed
-        const fireSDeg   = (fireWDeg + 180) % 360
-        const fireSDirLabel = degToCompass(fireSDeg)
-        const fireWKmh   = Math.round(fireWSpeed * 3.6)
-        const fireA2  = computeFireSpreadArea(fireWSpeed, 2)
-        const fireA6  = computeFireSpreadArea(fireWSpeed, 6)
-        const fireA12 = computeFireSpreadArea(fireWSpeed, 12)
-
-        setSelectedFire({
-          id, lat, lon, frp, brightness,
-          intensity, windImpactDir: fireSDirLabel, windKmh: fireWKmh,
-          expansion2h: fireA2, expansion6h: fireA6, expansion12h: fireA12,
-          weather,
-        })
-        setActiveExpansion('2h')
-
-        const sel = map!.getSource('fires-selected-src') as mapboxgl.GeoJSONSource
-        sel?.setData({
-          type: 'FeatureCollection',
-          features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [lon, lat] } }],
-        } as any)
-
-        // Focus map with offset to show popup clearly to the right of left-side widgets
-        // Centering the fire point slightly to the left so it has room for expansion rings
-        map!.flyTo({ 
-          center: [lon + 0.12, lat], 
-          zoom: 10, 
-          duration: 1100, 
-          essential: true 
-        })
-      }
-
-      // Register for HotspotSearch — updated each time fires reload
-      if (selectFireRef) {
-        selectFireRef.current = (idx, allFires) => {
-          const f = allFires[idx]
-          if (!f) return
-          const id = `FIRE-${String(idx + 1).padStart(3, '0')}`
-          const isCritical = (sentinelUpdate?.riskLevel === 'critical') || f.frp >= 300
-          openFire(f.lat, f.lon, id, f.frp, f.brightness, f.weather ? JSON.stringify(f.weather) : '', f.pm25 ?? null, isCritical)
-        }
-      }
-
-      // Click a fire → flyTo + context
-=======
-      // Click a fire → flyTo + popup + selectedFire context
->>>>>>> Stashed changes
       map.on('click', POINTS, (e) => {
         const feat = e.features?.[0]
         if (!feat) return
@@ -504,11 +411,7 @@ export function MapboxPanel({
 
     if (map.isStyleLoaded()) apply()
     else map.once('style.load', apply)
-<<<<<<< Updated upstream
-  }, [sentinelUpdate, setSelectedFire, setActiveExpansion, selectFireRef])
-=======
-  }, [sentinelUpdate, setSelectedFire, mapLoaded])
->>>>>>> Stashed changes
+  }, [sentinelUpdate, setSelectedFire, setActiveExpansion, selectFireRef, mapLoaded])
 
   useEffect(() => {
     const map = mapRef.current
@@ -548,94 +451,147 @@ export function MapboxPanel({
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
+    if (!map || !mapLoaded) return
 
-    const EXP_LAYER_IDS = ['exp-outer-fill', 'exp-outer-glow', 'exp-outer-line', 'exp-mid-fill', 'exp-core-fill', 'exp-core-line', 'exp-arrow']
-    const EXP_SOURCE_IDS = ['exp-outer', 'exp-mid', 'exp-core', 'exp-arrow-src']
-
-    const drawExpansion = () => {
+    const apply = () => {
       if (!map.getStyle()) return
-      EXP_LAYER_IDS.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) })
-      EXP_SOURCE_IDS.forEach(id => { if (map.getSource(id)) map.removeSource(id) })
+      const heatId = 'prediction-heatmap'
+      const gridId = 'prediction-grid'
+      if (map.getLayer(heatId)) map.removeLayer(heatId)
+      if (map.getLayer(gridId)) map.removeLayer(gridId)
+      if (map.getSource(gridId)) map.removeSource(gridId)
 
-      if (!selectedFire || !activeExpansion) return
+      const pred = sentinelUpdate?.prediction
+      if (!pred || !showHeatmap) return
 
-      const cfg = EXP_CONFIG[activeExpansion]
-      const windDeg     = selectedFire?.weather?.deg   ?? sentinelUpdate?.weather?.deg   ?? 315
-      const windSpeedMs = selectedFire?.weather?.speed ?? sentinelUpdate?.weather?.speed ?? 6.7
-      const exp = sentinelUpdate?.expansion
-      const backendPoly = activeExpansion === '2h' ? exp?.expansion_2h
-        : activeExpansion === '6h' ? exp?.expansion_6h
-        : exp?.expansion_12h
+      const features = pred.grid.map(c => ({
+        type: 'Feature',
+        properties: { risk: c.risk_score },
+        geometry: { type: 'Point', coordinates: [c.lon, c.lat] },
+      }))
 
-      const tipKm = (0.5 + windSpeedMs * 3.6 * 0.15 + (windSpeedMs * 3.6) ** 2 * 0.002) * cfg.hours
-      const spreadRad = ((windDeg + 180) % 360) * Math.PI / 180
-      const tipLon = selectedFire.lon + Math.sin(spreadRad) * tipKm / (111 * Math.cos(selectedFire.lat * Math.PI / 180))
-      const tipLat = selectedFire.lat + Math.cos(spreadRad) * tipKm / 111
+      map.addSource(gridId, { type: 'geojson', data: { type: 'FeatureCollection', features } as any })
 
-      map.addSource('exp-outer', { type: 'geojson', data: makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours) as any })
-      map.addSource('exp-mid',   { type: 'geojson', data: makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours * 0.55) as any })
-      map.addSource('exp-core',  { type: 'geojson', data: makeFireSpreadPolygon(selectedFire.lat, selectedFire.lon, windDeg, windSpeedMs, cfg.hours * 0.25) as any })
-      map.addSource('exp-arrow-src', {
-        type: 'geojson',
-        data: {
-          type: 'Feature', properties: {},
-          geometry: { type: 'LineString', coordinates: [[selectedFire.lon, selectedFire.lat], [tipLon, tipLat]] },
-        } as any,
+      map.addLayer({
+        id: heatId,
+        type: 'heatmap',
+        source: gridId,
+        maxzoom: 12,
+        paint: {
+          'heatmap-weight': ['interpolate', ['linear'], ['get', 'risk'], 0, 0, 1, 1],
+          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 3],
+          'heatmap-color': [
+            'interpolate', ['linear'], ['heatmap-density'],
+            0, 'rgba(0,0,0,0)',
+            0.2, 'rgba(34,197,94,0.3)',
+            0.4, 'rgba(234,179,8,0.4)',
+            0.6, 'rgba(249,115,22,0.5)',
+            0.8, 'rgba(239,68,68,0.6)',
+            1, 'rgba(220,38,38,0.7)',
+          ],
+          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 12, 20],
+          'heatmap-opacity': 0.6,
+        },
       })
-
-      map.addLayer({ id: 'exp-outer-glow', type: 'line', source: 'exp-outer', paint: { 'line-color': cfg.colorOuter, 'line-width': 14, 'line-opacity': 0.08, 'line-blur': 4 } })
-      map.addLayer({ id: 'exp-outer-fill', type: 'fill', source: 'exp-outer', paint: { 'fill-color': cfg.colorOuter, 'fill-opacity': 0.07 } })
-      map.addLayer({ id: 'exp-outer-line', type: 'line', source: 'exp-outer', paint: { 'line-color': cfg.colorOuter, 'line-width': 1.5, 'line-opacity': 0.7, 'line-dasharray': [4, 3] } })
-      map.addLayer({ id: 'exp-mid-fill', type: 'fill', source: 'exp-mid', paint: { 'fill-color': cfg.colorMid, 'fill-opacity': 0.14 } })
-      map.addLayer({ id: 'exp-core-fill', type: 'fill', source: 'exp-core', paint: { 'fill-color': cfg.colorCore, 'fill-opacity': 0.28 } })
-      map.addLayer({ id: 'exp-core-line', type: 'line', source: 'exp-core', paint: { 'line-color': cfg.colorCore, 'line-width': 2.5, 'line-opacity': 0.9 } })
-      map.addLayer({ id: 'exp-arrow', type: 'line', source: 'exp-arrow-src', paint: { 'line-color': '#ffffff', 'line-width': 2, 'line-opacity': 0.5, 'line-dasharray': [6, 4] } })
     }
 
-    if (map.isStyleLoaded()) drawExpansion()
-    else map.once('style.load', drawExpansion)
-  }, [selectedFire, activeExpansion, sentinelUpdate])
+    if (map.isStyleLoaded()) apply()
+    else map.once('style.load', apply)
+  }, [sentinelUpdate, showHeatmap, mapLoaded])
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map) return
-    const cleanup = () => {
+    if (!map || !mapLoaded) return
+
+    const apply = () => {
       if (!map.getStyle()) return
-      if (map.getLayer('prediction-heatmap-line')) map.removeLayer('prediction-heatmap-line')
-      if (map.getLayer('prediction-heatmap-fill')) map.removeLayer('prediction-heatmap-fill')
-      if (map.getSource('prediction-heatmap')) map.removeSource('prediction-heatmap')
+      const expId = 'fire-expansion'
+      const expLineId = 'fire-expansion-line'
+      if (map.getLayer(expId)) map.removeLayer(expId)
+      if (map.getLayer(expLineId)) map.removeLayer(expLineId)
+      if (map.getSource(expId)) map.removeSource(expId)
+
+      if (!selectedFire || !activeExpansion) return
+
+      const config = EXP_CONFIG[activeExpansion]
+      const expansionKm2 =
+        activeExpansion === '2h'  ? (selectedFire.expansion2h?.km2  ?? config.hours * 5) :
+        activeExpansion === '6h'  ? (selectedFire.expansion6h?.km2  ?? config.hours * 5) :
+                                    (selectedFire.expansion12h?.km2 ?? config.hours * 5)
+      const poly = makeFireSpreadPolygon(
+        selectedFire.lat, selectedFire.lon,
+        selectedFire.weather?.deg ?? 0,
+        selectedFire.weather?.speed ?? 0,
+        expansionKm2
+      )
+
+      map.addSource(expId, { type: 'geojson', data: poly as any })
+      map.addLayer({
+        id: expId, type: 'fill', source: expId,
+        paint: { 'fill-color': config.colorMid, 'fill-opacity': 0.25 },
+      })
+      map.addLayer({
+        id: expLineId, type: 'line', source: expId,
+        paint: { 'line-color': config.colorMid, 'line-width': 2, 'line-dasharray': [2, 2] },
+      })
     }
-    const draw = () => {
-      cleanup()
-      if (!showHeatmap) return
-      const grid = sentinelUpdate?.prediction?.grid ?? []
-      if (grid.length === 0) return
-      const features = grid.map(c => ({
-        type: 'Feature' as const,
-        properties: { risk: c.risk_score },
-        geometry: { type: 'Polygon' as const, coordinates: [[[c.lon, c.lat], [c.lon + 0.25, c.lat], [c.lon + 0.25, c.lat + 0.25], [c.lon, c.lat + 0.25], [c.lon, c.lat]]] },
-      }))
-      map.addSource('prediction-heatmap', { type: 'geojson', data: { type: 'FeatureCollection', features } as any })
-      map.addLayer({ id: 'prediction-heatmap-fill', type: 'fill', source: 'prediction-heatmap', paint: { 'fill-color': ['step', ['get', 'risk'], '#22c55e', 0.35, '#eab308', 0.5, '#f97316', 0.75, '#ef4444'], 'fill-opacity': 0.35 } })
-      map.addLayer({ id: 'prediction-heatmap-line', type: 'line', source: 'prediction-heatmap', paint: { 'line-color': 'rgba(255,255,255,0.05)', 'line-width': 0.5 } })
+
+    if (map.isStyleLoaded()) apply()
+    else map.once('style.load', apply)
+  }, [selectedFire, activeExpansion, mapLoaded])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapLoaded) return
+
+    const apply = () => {
+      if (!map.getStyle()) return
+      const infraId = 'sentinel-infrastructure'
+      if (map.getLayer(infraId)) map.removeLayer(infraId)
+      if (map.getSource(infraId)) map.removeSource(infraId)
+
+      const infra = sentinelUpdate?.infrastructure ?? []
+      if (infra.length === 0) return
+
+      map.addSource(infraId, {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: infra.map(f => ({
+            type: 'Feature',
+            properties: { name: f.name, type: f.type },
+            geometry: { type: 'Point', coordinates: [f.lon, f.lat] },
+          })),
+        } as any,
+      })
+
+      map.addLayer({
+        id: infraId, type: 'circle', source: infraId,
+        paint: {
+          'circle-radius': 6,
+          'circle-color': [
+            'match', ['get', 'type'],
+            'hospital', '#ef4444',
+            'school', '#3b82f6',
+            '#fbbf24',
+          ],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#fff',
+        },
+      })
     }
-    if (map.isStyleLoaded()) draw()
-    else map.once('style.load', draw)
-  }, [showHeatmap, sentinelUpdate?.prediction])
+
+    if (map.isStyleLoaded()) apply()
+    else map.once('style.load', apply)
+  }, [sentinelUpdate, mapLoaded])
 
   return (
-<<<<<<< Updated upstream
-    <div className="absolute inset-0 w-full h-full">
-      <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
-=======
     <div className="absolute inset-0 w-full h-full bg-[#04050a] z-0">
       <div 
         ref={mapContainerRef} 
         className="w-full h-full" 
         style={{ position: 'relative', width: '100%', height: '100%' }}
       />
->>>>>>> Stashed changes
     </div>
   )
 }

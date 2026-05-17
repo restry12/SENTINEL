@@ -23,19 +23,12 @@ export function useSentinel(): SentinelContextValue {
   return ctx
 }
 
-import { degToCompass } from "@/lib/utils"
-
-// Display-ready metrics. When no live update yet, falls back to the demo values
-// so the dashboard never looks empty/broken before the first analysis arrives.
 export function useSentinelMetrics() {
   const { sentinelUpdate: u, connected, status } = useSentinel()
   const hasData = u !== null
 
   const frpMax = u ? u.fires.reduce((m, f) => Math.max(m, f.frp), 0) : 0
-  const windSpeedKmh = u ? Math.round(u.weather.speed * 3.6) : 0
-  const windDir = u ? degToCompass(u.weather.deg) : "—"
   const aqi = u?.airQuality.aqi ?? 0
-  const humidity = u?.weather.humidity ?? 0
   const riskLevel = u ? (u.riskLevel).toUpperCase() : "NO DATA"
   const populationAtRisk = u?.report?.poblacion_en_riesgo_estimada ?? null
   const briefing =
@@ -47,10 +40,7 @@ export function useSentinelMetrics() {
     status,
     update: u,
     frpMax,
-    windSpeedKmh,
-    windDir,
     aqi,
-    humidity,
     riskLevel,
     populationAtRisk,
     briefing,

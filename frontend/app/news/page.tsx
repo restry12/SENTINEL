@@ -4,10 +4,10 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { TopBar } from '@/components/dashboard/top-bar'
 import { AuthGuard } from '@/components/auth-guard'
 import { useLang } from '@/contexts/language-context'
-import { 
-  ExternalLink, RefreshCw, Newspaper, AlertTriangle, 
+import {
+  ExternalLink, RefreshCw, Newspaper, AlertTriangle,
   Search, TrendingUp, Shield, Globe, Clock, Filter,
-  Flame, Wind, Info, Building2, ChevronRight, Activity
+  Info, ChevronRight, Activity
 } from 'lucide-react'
 import type { NewsArticle, NewsResponse } from '@/app/api/news/types'
 
@@ -155,6 +155,33 @@ function NewsFilters({ activeFilter, setFilter, searchQuery, setSearch }: {
   )
 }
 
+function isFire(title: string) {
+  const t = title.toLowerCase()
+  return t.includes('incendio') || t.includes('fuego') || t.includes('quema')
+}
+
+function articleColor(title: string): string {
+  const t = title.toLowerCase()
+  if (t.includes('incendio') || t.includes('fuego') || t.includes('quema'))
+    return "linear-gradient(135deg, #7f1d1d 0%, #3f0a0a 100%)"
+  if (t.includes('contaminaci') || t.includes('calidad') || t.includes('aire') || t.includes('smog'))
+    return "linear-gradient(135deg, #14532d 0%, #052e10 100%)"
+  if (t.includes('lluvia') || t.includes('inundaci') || t.includes('agua'))
+    return "linear-gradient(135deg, #1e3a5f 0%, #0a1a30 100%)"
+  if (t.includes('sismo') || t.includes('terremoto'))
+    return "linear-gradient(135deg, #4a3000 0%, #1c1000 100%)"
+  return "linear-gradient(135deg, #1e293b 0%, #0a0f1a 100%)"
+}
+
+function ArticleImagePlaceholder({ title, className = "" }: { title: string; className?: string }) {
+  return (
+    <div
+      className={`w-full h-full ${className}`}
+      style={{ background: articleColor(title) }}
+    />
+  )
+}
+
 function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: boolean }) {
   if (loading) return <div className="w-full h-80 rounded-2xl border border-white/5 bg-surface/30 animate-pulse" />
   if (!article) return null
@@ -167,32 +194,23 @@ function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: bo
       
       <div className="flex flex-col lg:flex-row h-full">
         {/* Visual Side */}
-        <div className="w-full lg:w-2/5 h-64 lg:h-auto relative bg-surface/40 flex items-center justify-center overflow-hidden">
-           <div className="absolute inset-0 opacity-20 group-hover:scale-110 transition-transform duration-1000">
-              <div className="absolute inset-0 bg-gradient-to-br from-orange/20 to-blue/20 mix-blend-overlay" />
-              <div className="absolute inset-0 grid grid-cols-12 grid-rows-12 gap-1 p-4">
-                {Array.from({ length: 48 }).map((_, i) => (
-                  <div key={i} className="bg-white/5 border border-white/5 rounded-sm" />
-                ))}
-              </div>
-           </div>
-           <div className="relative z-10 flex flex-col items-center gap-4">
-              <div className={`p-5 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl ${variant === 'orange' ? 'text-orange animate-pulse' : 'text-blue'}`}>
-                 {variant === 'orange' ? <Flame className="w-12 h-12" /> : <Wind className="w-12 h-12" />}
-              </div>
-              <div className="flex flex-col items-center">
-                 <span className="text-[10px] font-black tracking-[0.4em] text-white/40 uppercase">Breaking</span>
-                 <span className="text-[11px] font-mono text-white/20 italic">Intelligence Stream</span>
-              </div>
-           </div>
-           <div className="absolute top-4 left-4 flex gap-1">
-             <div className="w-1 h-1 rounded-full bg-orange" />
-             <div className="w-1 h-1 rounded-full bg-orange/40" />
-             <div className="w-1 h-1 rounded-full bg-orange/20" />
-           </div>
-           <div className="absolute bottom-4 right-4">
-              <span className="text-[8px] font-mono text-white/30 tracking-widest uppercase">Sentinel-V3.8 // A4-Report</span>
-           </div>
+        <div className="w-full lg:w-2/5 h-64 lg:h-auto relative bg-surface/40 overflow-hidden">
+          {article.imageUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={article.imageUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-80 group-hover:opacity-100"
+            />
+          ) : (
+            <ArticleImagePlaceholder title={article.title} className="absolute inset-0" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#04050a]/60" />
+          <div className="absolute top-4 left-4 flex gap-1">
+            <div className="w-1 h-1 rounded-full bg-orange" />
+            <div className="w-1 h-1 rounded-full bg-orange/40" />
+            <div className="w-1 h-1 rounded-full bg-orange/20" />
+          </div>
         </div>
 
         {/* Content Side */}
@@ -229,19 +247,33 @@ function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: bo
 }
 
 function ArticleCard({ article }: { article: NewsArticle }) {
-  const isFire = article.title.toLowerCase().includes('incendio') || article.title.toLowerCase().includes('fuego')
-  
   return (
     <a
       href={article.url || '#'}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex flex-col p-6 rounded-xl border border-white/5 bg-surface/30 hover:border-white/15 hover:bg-surface/50 transition-all duration-300 backdrop-blur-md relative"
+      className="group flex flex-col rounded-xl border border-white/5 bg-surface/30 hover:border-white/15 hover:bg-surface/50 transition-all duration-300 backdrop-blur-md relative overflow-hidden"
     >
-      <div className="absolute top-0 left-0 w-8 h-[1px] bg-white/20 group-hover:bg-orange transition-colors" />
-      
+      <div className="absolute top-0 left-0 w-8 h-[1px] bg-white/20 group-hover:bg-orange transition-colors z-10" />
+
+      {/* Article image */}
+      <div className="w-full h-36 relative overflow-hidden shrink-0">
+        {article.imageUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={article.imageUrl}
+            alt=""
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
+          />
+        ) : (
+          <ArticleImagePlaceholder title={article.title} />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#04050a]/80 to-transparent" />
+      </div>
+
+      <div className="flex flex-col p-6 flex-1">
       <div className="flex items-start justify-between gap-4 mb-5">
-        <Badge variant={isFire ? 'orange' : 'default'}>{article.source}</Badge>
+        <Badge variant={isFire(article.title) ? 'orange' : 'default'}>{article.source}</Badge>
         <div className="flex items-center gap-1.5 text-[9px] font-bold text-text-dim uppercase tracking-wider">
           <Clock className="w-3 h-3" />
           {formatRelativeTime(article.publishedAt)}
@@ -261,6 +293,7 @@ function ArticleCard({ article }: { article: NewsArticle }) {
           Leer Inteligencia
         </span>
         <ExternalLink className="w-3.5 h-3.5 text-text-muted group-hover:text-orange transition-all duration-300" />
+      </div>
       </div>
     </a>
   )
