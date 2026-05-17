@@ -179,6 +179,7 @@ function TornadoPageInner() {
           gridData={gridData}
           selectedPoint={selectedPoint}
           onPointSelect={handlePointSelect}
+          onBack={handleBack}
           loading={gridLoading}
           detail={detail}
         />
