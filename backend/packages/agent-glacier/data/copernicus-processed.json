@@ -1,0 +1,47 @@
+{
+  "glaciar-grey": [
+    { "year": 2020, "mass_change_mmwe": -850 },
+    { "year": 2021, "mass_change_mmwe": -920 },
+    { "year": 2022, "mass_change_mmwe": -1050 }
+  ],
+  "perito-moreno": [
+    { "year": 2020, "mass_change_mmwe": -100 },
+    { "year": 2021, "mass_change_mmwe": -150 },
+    { "year": 2022, "mass_change_mmwe": -200 }
+  ],
+  "aletsch-glacier": [
+    { "year": 2020, "mass_change_mmwe": -1200 },
+    { "year": 2021, "mass_change_mmwe": -1350 },
+    { "year": 2022, "mass_change_mmwe": -4000 }
+  ],
+  "columbia-glacier": [
+    { "year": 2020, "mass_change_mmwe": -2500 },
+    { "year": 2021, "mass_change_mmwe": -2800 },
+    { "year": 2022, "mass_change_mmwe": -3100 }
+  ],
+  "mer-de-glace": [
+    { "year": 2020, "mass_change_mmwe": -1500 },
+    { "year": 2021, "mass_change_mmwe": -1700 },
+    { "year": 2022, "mass_change_mmwe": -2200 }
+  ],
+  "vatnajokull": [
+    { "year": 2020, "mass_change_mmwe": -600 },
+    { "year": 2021, "mass_change_mmwe": -750 },
+    { "year": 2022, "mass_change_mmwe": -900 }
+  ],
+  "franz-josef": [
+    { "year": 2020, "mass_change_mmwe": -1100 },
+    { "year": 2021, "mass_change_mmwe": -1250 },
+    { "year": 2022, "mass_change_mmwe": -1400 }
+  ],
+  "quelccaya": [
+    { "year": 2020, "mass_change_mmwe": -900 },
+    { "year": 2021, "mass_change_mmwe": -1100 },
+    { "year": 2022, "mass_change_mmwe": -1300 }
+  ],
+  "baltoro": [
+    { "year": 2020, "mass_change_mmwe": -200 },
+    { "year": 2021, "mass_change_mmwe": -250 },
+    { "year": 2022, "mass_change_mmwe": -300 }
+  ]
+}
