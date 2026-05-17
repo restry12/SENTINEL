@@ -1,10 +1,12 @@
 "use client"
 
 import { useEffect, useState, type ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
+import { BottomNav } from "@/components/ui/bottom-nav"
 
 export function AuthGuard({ children }: { children: ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [authorized, setAuthorized] = useState(false)
 
   useEffect(() => {
@@ -24,5 +26,12 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     )
   }
 
-  return <>{children}</>
+  const isCitizen = pathname === "/dashboard/citizen"
+
+  return (
+    <>
+      {children}
+      {!isCitizen && <BottomNav />}
+    </>
+  )
 }
