@@ -249,7 +249,7 @@ export function MapboxPanel({
           expansion2h: fireA2, expansion6h: fireA6, expansion12h: fireA12,
           weather,
         })
-        setActiveExpansion('2h')
+        setActiveExpansion(perFire ? '2h' : null)
 
         const sel = m.getSource('fires-selected-src') as mapboxgl.GeoJSONSource
         sel?.setData({
@@ -511,13 +511,14 @@ export function MapboxPanel({
       if (map.getLayer(expLineId)) map.removeLayer(expLineId)
       if (map.getSource(expId)) map.removeSource(expId)
 
-      if (!selectedFire || !activeExpansion) return
+      if (!selectedFire || !activeExpansion || !selectedFire.weather) return
 
       const config = EXP_CONFIG[activeExpansion]
       const expansionKm2 =
-        activeExpansion === '2h'  ? (selectedFire.expansion2h?.km2  ?? config.hours * 5) :
-        activeExpansion === '6h'  ? (selectedFire.expansion6h?.km2  ?? config.hours * 5) :
-                                    (selectedFire.expansion12h?.km2 ?? config.hours * 5)
+        activeExpansion === '2h'  ? selectedFire.expansion2h?.km2 :
+        activeExpansion === '6h'  ? selectedFire.expansion6h?.km2 :
+                                    selectedFire.expansion12h?.km2
+      if (expansionKm2 == null) return
       const poly = makeFireSpreadPolygon(
         selectedFire.lat, selectedFire.lon,
         selectedFire.weather?.deg ?? 0,
