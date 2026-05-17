@@ -84,6 +84,7 @@ export function TopBar() {
                 { href: '/dashboard',         label: tx.navDashboard },
                 { href: '/air',               label: tx.navAir },
                 { href: '/news',              label: tx.navNews ?? 'Noticias' },
+                { href: '/chat',              label: tx.navChat ?? 'SENTINEL AI' },
                 { href: '/dashboard/citizen', label: 'Ciudadano' },
               ] as const).map(({ href, label }) => (
                 <Link
