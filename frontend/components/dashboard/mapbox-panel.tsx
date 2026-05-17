@@ -691,14 +691,15 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
       const expansions = sentinelUpdate?.perFireExpansions ?? []
       if (expansions.length === 0) return
 
-      const windDeg = sentinelUpdate?.weather?.deg ?? 315
-      const windSpeedMs = sentinelUpdate?.weather?.speed ?? 6.7
+      const globalWindDeg   = sentinelUpdate?.weather?.deg   ?? 315
+      const globalWindSpeed = sentinelUpdate?.weather?.speed ?? 6.7
       const hours = EXP_CONFIG[activeExpansion].hours
 
-      // Generate ellipse polygon for each fire using its FRP-adjusted spread
       const features = expansions.map(pf => {
-        const frpFactor = 1 + (pf.frp / 500) * 0.3
-        return makeFireSpreadPolygon(pf.lat, pf.lon, windDeg, windSpeedMs * frpFactor, hours)
+        const pfWindDeg   = directionToDeg(pf.direccion) ?? globalWindDeg
+        const pfWindSpeed = pf.velocidad_kmh > 0 ? pf.velocidad_kmh / 3.6 : globalWindSpeed
+        const frpFactor   = 1 + (pf.frp / 500) * 0.3
+        return makeFireSpreadPolygon(pf.lat, pf.lon, pfWindDeg, pfWindSpeed * frpFactor, hours)
       })
 
       map.addSource(PF_SRC, {
