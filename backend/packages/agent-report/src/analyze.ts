@@ -7,9 +7,10 @@ export async function generateReport(
   a2: ExpansionData,
   a3: AirAlerts
 ): Promise<AuthorityReport> {
-  const system = `Eres un redactor experto de reportes de emergencia para servicios de bomberos, CONAF y autoridades civiles en Latinoamérica.
+  const system = `Eres un redactor experto de reportes de emergencia para servicios de bomberos, CONAF y autoridades civiles en Chile (especialmente zonas forestales del sur).
 Recibes datos consolidados de un incendio activo.
 Debes responder SOLO con JSON válido, sin texto adicional, sin markdown, sin bloques de código.
+IMPORTANTE: Todas las referencias geográficas, instituciones y protocolos deben ser pertinentes a CHILE.
 El JSON debe tener exactamente esta estructura:
 {
   "reporte_id": "SENTINEL-YYYYMMDD-XXX",

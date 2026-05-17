@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { LanguageProvider } from '@/contexts/language-context'
 import { Toaster } from 'sonner'
 import { SentinelProvider } from '@/contexts/sentinel-context'
+import { FireSelectionProvider } from '@/contexts/fire-selection-context'
 import './globals.css'
 import 'mapbox-gl/dist/mapbox-gl.css'
 
@@ -29,12 +30,6 @@ export const metadata: Metadata = {
   },
 }
 
-export const viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -45,7 +40,9 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <LanguageProvider>
           <SentinelProvider>
-            {children}
+            <FireSelectionProvider>
+              {children}
+            </FireSelectionProvider>
           </SentinelProvider>
         </LanguageProvider>
         <Toaster position="top-right" richColors />
