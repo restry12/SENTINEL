@@ -135,6 +135,7 @@ export function SentinelMap({ size = 360, user, fires, route, expansion }: Senti
           style: "mapbox://styles/mapbox/satellite-streets-v12",
           center: [user.lon, user.lat],
           zoom: 14,
+          minZoom: 13,
           attributionControl: false,
         })
         mapRef.current = map
@@ -273,8 +274,6 @@ export function SentinelMap({ size = 360, user, fires, route, expansion }: Senti
             new mapboxgl.Marker({ element: makeLabelEl(route.label, "#bbf7d0"), offset: [0, 18] })
               .setLngLat([dest.lon, dest.lat]).addTo(map),
           )
-
-          map.setMinZoom(12)
         })
       })
       .catch((err) => console.error("[SentinelMap] mapbox-gl load failed:", err))
