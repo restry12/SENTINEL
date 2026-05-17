@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { CITIZEN_MOCK, type CitizenData, type NaturalRoute, type ScreenRisk } from '@/lib/citizen-mock-data'
 import type { SentinelUpdate } from '@/hooks/use-socket'
@@ -135,6 +135,13 @@ export function CitizenApp() {
       setScreen('alert')
     }
   }, [triggerCitizen, connected, sentinelUpdate])
+
+  useEffect(() => {
+    if (screen !== 'alert' && screen !== 'safe') return
+    if (!userLoc || !sentinelUpdate || sentinelUpdate.fires.length === 0) return
+    const nearest = nearestFireKm(userLoc, sentinelUpdate.fires)
+    setScreen(nearest <= CITIZEN_ALERT_RADIUS_KM ? 'alert' : 'safe')
+  }, [sentinelUpdate, userLoc, screen])
 
   const route = data.naturalRoutes[0] ?? CITIZEN_MOCK.naturalRoutes[0]
 
