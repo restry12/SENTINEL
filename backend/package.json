@@ -7,7 +7,7 @@
     "shared/*"
   ],
   "scripts": {
-    "dev": "concurrently -n backend,fire,weather,air,routes,report,prediction -c cyan,red,blue,green,yellow,magenta,white \"npm run dev -w packages/backend\" \"npm run dev -w packages/agent-fire\" \"npm run dev -w packages/agent-weather\" \"npm run dev -w packages/agent-air\" \"npm run dev -w packages/agent-routes\" \"npm run dev -w packages/agent-report\" \"npm run dev -w packages/agent-prediction\"",
+    "dev": "concurrently -n backend,fire,weather,air,routes,report,prediction,glacier -c cyan,red,blue,green,yellow,magenta,white,gray \"npm run dev -w packages/backend\" \"npm run dev -w packages/agent-fire\" \"npm run dev -w packages/agent-weather\" \"npm run dev -w packages/agent-air\" \"npm run dev -w packages/agent-routes\" \"npm run dev -w packages/agent-report\" \"npm run dev -w packages/agent-prediction\" \"npm run dev -w packages/agent-glacier\"",
     "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
