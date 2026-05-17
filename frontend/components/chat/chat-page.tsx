@@ -200,7 +200,7 @@ export function ChatPage() {
           </div>
           <div>
             <h1 className="text-white font-black tracking-widest text-sm uppercase">SENTINEL AI</h1>
-            <p className="text-white/40 text-[10px] tracking-wider uppercase">
+            <p className="text-white/40 text-[10px] tracking-wider">
               {mode === 'citizen'
                 ? 'Te ayudo a entender qué pasa y qué hacer'
                 : 'Analista operacional · datos en vivo, predicción, rutas'}
@@ -209,13 +209,13 @@ export function ChatPage() {
           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
             <div
               className="flex items-center rounded-md border border-white/10 bg-white/5 p-0.5"
-              role="tablist"
+              role="radiogroup"
               aria-label="Modo de respuesta"
             >
               <button
                 type="button"
-                role="tab"
-                aria-selected={mode === 'citizen'}
+                role="radio"
+                aria-checked={mode === 'citizen'}
                 onClick={() => updateMode('citizen')}
                 className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded font-mono transition-colors ${
                   mode === 'citizen'
@@ -228,8 +228,8 @@ export function ChatPage() {
               </button>
               <button
                 type="button"
-                role="tab"
-                aria-selected={mode === 'expert'}
+                role="radio"
+                aria-checked={mode === 'expert'}
                 onClick={() => updateMode('expert')}
                 className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded font-mono transition-colors ${
                   mode === 'expert'
