@@ -1,12 +1,14 @@
-import type { FireData, WeatherData, FireAnalysis, RiskAssessment, ExpansionData, GeoJSONFeature, PerFireExpansion } from '@sentinel/types'
+import type { FireData, WeatherData, FireAnalysis, RiskAssessment, ExpansionData, GeoJSONFeature, PerFireExpansion, RegionalContext } from '@sentinel/types'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
-function degreesToCardinal(deg: number): string {
+type PerFireExpansionFields = Pick<PerFireExpansion, 'expansion_2h_km2' | 'expansion_6h_km2' | 'expansion_12h_km2' | 'velocidad_kmh' | 'direccion'>
+
+export function degreesToCardinal(deg: number): string {
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
   return dirs[Math.round(deg / 45) % 8]
 }
 
-function centroid(fires: FireData[]): { lat: number; lon: number } {
+export function centroid(fires: { lat: number; lon: number }[]): { lat: number; lon: number } {
   const lat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
   const lon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
   return { lat: parseFloat(lat.toFixed(4)), lon: parseFloat(lon.toFixed(4)) }
@@ -41,6 +43,86 @@ function toClimateData(weather: WeatherData) {
     wind_direction: degreesToCardinal(weather.deg),
     humidity_pct: weather.humidity,
     precipitation_mm: 0,
+  }
+}
+
+// A_context: Regional fire behavior inference from coordinates
+async function runAContext(fire: FireData): Promise<RegionalContext> {
+  const system = `Eres un experto en comportamiento de incendios forestales en América Latina.
+Recibes las coordenadas exactas de un foco de incendio y debes inferir el contexto regional de comportamiento del fuego.
+Responde SOLO con JSON válido, sin texto adicional, sin markdown, sin bloques de código.
+El JSON debe tener exactamente esta estructura:
+{
+  "region_name": "nombre descriptivo de la región geográfica",
+  "country": "país donde se localiza el foco",
+  "vegetation_type": "tipo de vegetación predominante en la zona",
+  "terrain_type": "tipo de terreno (montañoso, planicie, costal, etc.)",
+  "spread_multiplier": número entre 0.5 y 2.0 que escala la tasa base de propagación relativa a un incendio típico,
+  "max_ros_kmh": número máximo realista de tasa de propagación en km/h para esta región y vegetación,
+  "reference_fires": ["array de 1-3 incendios reales históricos de la zona en formato 'Nombre Año: X ha en Y horas con vientos de Z km/h'"],
+  "context_summary": "resumen breve del comportamiento típico del fuego en esta región para calibrar predicciones"
+}
+CRITERIOS DE CALIBRACIÓN:
+- Estepa patagónica / pastizales secos: spread_multiplier 1.4-2.0, max_ros_kmh 15-20
+- Bosque templado húmedo (Araucanía, Valdivia): spread_multiplier 0.6-0.8, max_ros_kmh 5-8
+- Bosque mediterráneo / matorral (Chile central): spread_multiplier 1.0-1.3, max_ros_kmh 8-12
+- Amazonia / selva tropical: spread_multiplier 0.4-0.6, max_ros_kmh 2-5
+- Cerrado brasileño / sabana: spread_multiplier 1.2-1.6, max_ros_kmh 10-15
+- Chaco: spread_multiplier 1.1-1.5, max_ros_kmh 8-14`
+
+  const user = `Foco de incendio en lat ${fire.lat}, lon ${fire.lon} (FRP: ${fire.frp} MW).
+Infiere el contexto regional y devuelve el JSON de calibración.`
+
+  const raw = await callOpenRouter(MODELS.large, system, user)
+  return parseJSON<RegionalContext>(raw, 'A_context')
+}
+
+// A2 per-fire: expansion predictor calibrated with regional context
+async function runA2PerFire(
+  fire: FireData,
+  weather: WeatherData,
+  ctx: RegionalContext,
+): Promise<PerFireExpansionFields> {
+  const windKmh = Math.round(weather.speed * 3.6)
+  const windDir = degreesToCardinal((weather.deg + 180) % 360)
+
+  const system = `Eres un experto en modelado de propagación de incendios forestales en América Latina.
+Recibes datos de un foco específico y un contexto regional que DEBES usar como restricción absoluta.
+Responde SOLO con JSON válido, sin texto adicional, sin markdown, sin bloques de código.
+El JSON debe tener exactamente esta estructura:
+{
+  "expansion_2h_km2": número,
+  "expansion_6h_km2": número,
+  "expansion_12h_km2": número,
+  "velocidad_kmh": número,
+  "direccion": "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW"
+}
+RESTRICCIONES ABSOLUTAS (no negociables):
+1. velocidad_kmh NUNCA puede superar max_ros_kmh del contexto regional
+2. expansion_12h_km2 NUNCA puede superar 3 × (max_ros_kmh × 12)² × π / 4
+3. Los valores deben ser coherentes con reference_fires del contexto regional
+4. La progresión debe ser realista: expansion_2h_km2 < expansion_6h_km2 < expansion_12h_km2
+5. Aplicar spread_multiplier del contexto regional sobre la tasa base calculada por el viento`
+
+  const user = `FOCO: lat ${fire.lat}, lon ${fire.lon}, FRP ${fire.frp} MW
+CLIMA: viento ${windKmh} km/h dirección ${windDir}, humedad ${weather.humidity}%
+CONTEXTO REGIONAL:
+${JSON.stringify(ctx, null, 2)}
+Calcula la expansión del incendio respetando las restricciones absolutas del contexto regional.`
+
+  const raw = await callOpenRouter(MODELS.large, system, user)
+  return parseJSON<PerFireExpansionFields>(raw, 'A2PerFire')
+}
+
+async function analyzePerFire(fire: FireData, weather: WeatherData): Promise<PerFireExpansion> {
+  const ctx = await runAContext(fire)
+  const exp = await runA2PerFire(fire, weather, ctx)
+  return {
+    lat: fire.lat,
+    lon: fire.lon,
+    frp: fire.frp,
+    ...exp,
+    regional_context: ctx,
   }
 }
 
@@ -108,41 +190,6 @@ function expansionToGeoJSON(expansion: ExpansionData): GeoJSONFeature {
   }
 }
 
-// Mathematical fire spread model (simplified Rothermel) — per fire, no LLM needed
-function computePerFireExpansions(fires: FireData[], weather: WeatherData): PerFireExpansion[] {
-  const windKmh = weather.speed * 3.6
-  const windDir = degreesToCardinal((weather.deg + 180) % 360) // spread direction (opposite to wind origin)
-  const top150 = [...fires].sort((a, b) => b.frp - a.frp).slice(0, 150)
-
-  return top150.map(fire => {
-    // Rate of spread varies by FRP intensity (hotter fires spread faster)
-    const frpFactor = 1 + (fire.frp / 500) * 0.3 // mild boost for intense fires
-    const ros_forward = (0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002) * frpFactor
-    const ros_backing = 0.3
-    const ros_flank = Math.sqrt(ros_forward * ros_backing)
-
-    function areaKm2(hours: number): number {
-      const df = ros_forward * hours
-      const db = ros_backing * hours
-      const dfl = Math.max(ros_flank * hours, 0.3)
-      const a = (df + db) / 2
-      const b = dfl
-      return Math.round(Math.PI * a * b * 100) / 100
-    }
-
-    return {
-      lat: fire.lat,
-      lon: fire.lon,
-      frp: fire.frp,
-      expansion_2h_km2: areaKm2(2),
-      expansion_6h_km2: areaKm2(6),
-      expansion_12h_km2: areaKm2(12),
-      velocidad_kmh: Math.round(ros_forward * 10) / 10,
-      direccion: windDir,
-    }
-  })
-}
-
 const EMPTY: FireAnalysis = {
   polygon: {
     type: 'Feature',
@@ -163,21 +210,34 @@ const EMPTY: FireAnalysis = {
 export async function analyzeFireExpansion(fires: FireData[], weather: WeatherData): Promise<FireAnalysis> {
   if (fires.length === 0) return EMPTY
 
-  // Per-fire mathematical expansion (always computed, no LLM dependency)
-  const perFireExpansions = computePerFireExpansions(fires, weather)
-
   const nasaData = toNasaData(fires)
   const climateData = toClimateData(weather)
   const center = centroid(fires)
 
-  // A1 first, then A2 uses A1 output + real coordinates (sequential by design)
-  const a1 = await runA1(nasaData, climateData)
-  const a2 = await runA2(a1, climateData, center)
+  // Top 50 fires by FRP — per-fire agents in parallel
+  const top50 = [...fires].sort((a, b) => b.frp - a.frp).slice(0, 50)
+  const [a1Result, perFireResults] = await Promise.all([
+    runA1(nasaData, climateData),
+    Promise.allSettled(top50.map(f => analyzePerFire(f, weather))),
+  ])
 
-  return {
-    polygon: expansionToGeoJSON(a2),
-    riskAssessment: a1,
-    expansion: a2,
-    perFireExpansions,
+  const perFireExpansions = perFireResults
+    .filter((r): r is PromiseFulfilledResult<PerFireExpansion> => r.status === 'fulfilled')
+    .map(r => r.value)
+
+  try {
+    const a2 = await runA2(a1Result, climateData, center)
+    return {
+      polygon: expansionToGeoJSON(a2),
+      riskAssessment: a1Result,
+      expansion: a2,
+      perFireExpansions,
+    }
+  } catch {
+    return {
+      ...EMPTY,
+      riskAssessment: a1Result,
+      perFireExpansions,
+    }
   }
 }

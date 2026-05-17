@@ -83,16 +83,6 @@ function makeFireSpreadPolygon(
   }
 }
 
-function computeFireSpreadArea(windSpeedMs: number, hours: number) {
-  const windKmh = windSpeedMs * 3.6
-  const ros_f = 0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002
-  const ros_b = 0.3
-  const ros_l = Math.sqrt(ros_f * ros_b)
-  const a = (ros_f * hours + ros_b * hours) / 2
-  const b = Math.max(ros_l * hours, 0.3)
-  const km2 = Math.PI * a * b
-  return { km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) }
-}
 
 const EXP_CONFIG: Record<ExpansionKey, {
   hours: number
@@ -234,9 +224,14 @@ export function MapboxPanel({
         const fireSDeg   = (fireWDeg + 180) % 360
         const fireSDirLabel = degToCompass(fireSDeg)
         const fireWKmh   = Math.round(fireWSpeed * 3.6)
-        const fireA2  = computeFireSpreadArea(fireWSpeed, 2)
-        const fireA6  = computeFireSpreadArea(fireWSpeed, 6)
-        const fireA12 = computeFireSpreadArea(fireWSpeed, 12)
+
+        const roundCoord = (v: number) => Math.round(v * 10000) / 10000
+        const perFire = sentinelUpdate?.perFireExpansions
+          ?.find(e => roundCoord(e.lat) === roundCoord(lat) && roundCoord(e.lon) === roundCoord(lon))
+        const toArea = (km2: number) => ({ km2: Math.round(km2 * 10) / 10, ha: Math.round(km2 * 100) })
+        const fireA2  = perFire ? toArea(perFire.expansion_2h_km2)  : undefined
+        const fireA6  = perFire ? toArea(perFire.expansion_6h_km2)  : undefined
+        const fireA12 = perFire ? toArea(perFire.expansion_12h_km2) : undefined
 
         const m = mapRef.current
         if (!m) return
