@@ -7,7 +7,7 @@ export type Lang = 'es' | 'en'
 export const t = {
   es: {
     // TopBar
-    brandSub:        'Inteligencia de Incendios',
+    brandSub:        'Inteligencia de Amenazas Ambientales',
     statusCritical:  'Crítico Activo',
     hotspots:        'FOCOS',
     operational:     'OPERACIONAL',
@@ -152,7 +152,7 @@ export const t = {
     },
   },
   en: {
-    brandSub:        'Wildfire Intelligence',
+    brandSub:        'Environmental Threat Intelligence',
     statusCritical:  'Critical Active',
     hotspots:        'HOTSPOTS',
     operational:     'OPERATIONAL',

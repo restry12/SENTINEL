@@ -66,8 +66,8 @@ export function WelcomeSequence({ onSuggestion, mode }: Props) {
   const [displayed, setDisplayed] = useState('')
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('landing'), 1420)
-    const t2 = setTimeout(() => setPhase('speaking'), 2050)
+    const t1 = setTimeout(() => setPhase('landing'),  400)
+    const t2 = setTimeout(() => setPhase('speaking'), 1900)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
 
@@ -90,16 +90,20 @@ export function WelcomeSequence({ onSuggestion, mode }: Props) {
     ? "Describe humo, fuego, mala calidad del aire, viento extremo o una emergencia cercana."
     : "Consulta datos operacionales, predicciones de propagación y recursos de respuesta."
 
-  const isCentered = phase !== 'idle'
-  const condorStyle: React.CSSProperties = isCentered
-    ? { top: '32px', left: '50%', transform: 'translateX(-50%)', width: '112px', height: '112px' }
-    : { top: '0px',  left: '0px',  transform: 'none',           width: '48px',  height: '48px' }
+  const condorStyle: React.CSSProperties =
+    phase === 'idle'
+      ? { top: '0px',   left: '0px',                transform: 'none',             width: '48px',  height: '48px'  }
+      : phase === 'entry'
+      ? { top: '16px',  left: 'calc(100% - 112px)', transform: 'none',             width: '112px', height: '112px' }
+      : phase === 'landing'
+      ? { top: '330px', left: '0px',                transform: 'none',             width: '112px', height: '112px' }
+      : { top: '32px',  left: '50%',                transform: 'translateX(-50%)', width: '112px', height: '112px' }
 
   return (
     <div className="relative w-full" style={{ minHeight: '480px' }}>
       <div
-        className="absolute z-20 transition-all ease-[cubic-bezier(0.34,1.15,0.64,1)]"
-        style={{ transitionDuration: '960ms', ...condorStyle }}
+        className="absolute z-20 transition-all ease-[cubic-bezier(0.25,0.8,0.25,1)]"
+        style={{ transitionDuration: '1400ms', ...condorStyle }}
       >
         <CondorGuideAvatar state={phase} />
       </div>
