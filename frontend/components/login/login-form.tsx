@@ -16,27 +16,26 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { useLang } from '@/lib/i18n/language-context'
 import styles from '@/app/login/login.module.css'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
-const loginSchema = z.object({
-  email: z.string().email({ message: 'Email inválido' }),
-  password: z.string().min(1, { message: 'Contraseña requerida' }),
-})
-
-type LoginFormValues = z.infer<typeof loginSchema>
-
 export function LoginForm() {
   const [isLoading, setIsLoading] = React.useState(false)
   const router = useRouter()
+  const { t } = useLang()
+
+  const loginSchema = z.object({
+    email: z.string().email({ message: t('zodLoginEmail') }),
+    password: z.string().min(1, { message: t('zodLoginPassword') }),
+  })
+
+  type LoginFormValues = z.infer<typeof loginSchema>
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+    defaultValues: { email: '', password: '' },
   })
 
   async function onSubmit(data: LoginFormValues) {
@@ -52,21 +51,15 @@ export function LoginForm() {
       if (response.ok && result.ok && result.token) {
         localStorage.setItem('sentinel_token', result.token)
         localStorage.setItem('sentinel_user', JSON.stringify(result.user ?? {}))
-        toast.success('Acceso concedido', {
-          description: 'Sincronizando con el centro de comando...',
-        })
-        setTimeout(() => {
-          router.push('/dashboard')
-        }, 1000)
+        toast.success(t('loginSuccessTitle'), { description: t('loginSuccessDesc') })
+        setTimeout(() => router.push('/dashboard'), 1000)
       } else {
-        toast.error('Error de acceso', {
-          description: result.error ?? 'Credenciales inválidas o cuenta no autorizada.',
+        toast.error(t('loginErrorTitle'), {
+          description: result.error ?? t('loginErrorDesc'),
         })
       }
-    } catch (error) {
-      toast.error('Error de conexión', {
-        description: 'No se pudo contactar con el servidor de autenticación.',
-      })
+    } catch {
+      toast.error(t('loginConnErrorTitle'), { description: t('loginConnErrorDesc') })
     } finally {
       setIsLoading(false)
     }
@@ -75,10 +68,8 @@ export function LoginForm() {
   return (
     <div className="grid gap-6">
       <div className={styles.authHeader}>
-        <h1 className={styles.authTitle}>Bienvenido a SENTINEL</h1>
-        <p className={styles.authSub}>
-          Ingrese sus credenciales para acceder al comando central de monitoreo.
-        </p>
+        <h1 className={styles.authTitle}>{t('loginTitle')}</h1>
+        <p className={styles.authSub}>{t('loginSub')}</p>
       </div>
 
       <Form {...form}>
@@ -89,11 +80,11 @@ export function LoginForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-[10.5px] font-mono tracking-[0.2em] text-sentinel-text-3 uppercase">
-                  Email de Operador
+                  {t('loginEmailLabel')}
                 </FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="operador@sentinel.air"
+                    placeholder={t('loginEmailPlaceholder')}
                     type="email"
                     autoCapitalize="none"
                     autoComplete="email"
@@ -113,7 +104,7 @@ export function LoginForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-[10.5px] font-mono tracking-[0.2em] text-sentinel-text-3 uppercase">
-                  Clave de Acceso
+                  {t('loginPasswordLabel')}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -134,16 +125,12 @@ export function LoginForm() {
             disabled={isLoading}
             className="w-full bg-sentinel-cyan-2 hover:bg-sentinel-cyan text-sentinel-bg-0 font-mono tracking-widest uppercase text-xs h-11 mt-6"
           >
-            {isLoading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              'Iniciar Sesión'
-            )}
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : t('loginButton')}
           </Button>
         </form>
       </Form>
 
-      <div className={styles.divider}>O continúa sin cuenta</div>
+      <div className={styles.divider}>{t('loginDivider')}</div>
 
       <Button
         variant="outline"
@@ -155,7 +142,7 @@ export function LoginForm() {
         }}
         className="w-full h-11 border border-orange/30 bg-orange/5 hover:bg-orange/10 hover:border-orange/50 text-orange font-mono tracking-widest uppercase text-[10px] transition-all duration-200 shadow-[0_0_20px_rgba(255,126,21,0.08)] hover:shadow-[0_0_24px_rgba(255,126,21,0.18)]"
       >
-        Ver Demo →
+        {t('loginDemo')}
       </Button>
     </div>
   )
