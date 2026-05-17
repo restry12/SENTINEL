@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { createContext, useContext, useState, useRef, type ReactNode, type MutableRefObject } from "react"
+import type { FireData } from "@/hooks/use-socket"
 
 export type FireIntensity = 'critical' | 'high' | 'moderate'
 
@@ -22,14 +23,16 @@ export interface SelectedFireData {
 interface FireSelectionContextValue {
   selectedFire: SelectedFireData | null
   setSelectedFire: (fire: SelectedFireData | null) => void
+  selectFireRef: MutableRefObject<((index: number, fires: FireData[]) => void) | null>
 }
 
 const FireSelectionContext = createContext<FireSelectionContextValue | null>(null)
 
 export function FireSelectionProvider({ children }: { children: ReactNode }) {
   const [selectedFire, setSelectedFire] = useState<SelectedFireData | null>(null)
+  const selectFireRef = useRef<((index: number, fires: FireData[]) => void) | null>(null)
   return (
-    <FireSelectionContext.Provider value={{ selectedFire, setSelectedFire }}>
+    <FireSelectionContext.Provider value={{ selectedFire, setSelectedFire, selectFireRef }}>
       {children}
     </FireSelectionContext.Provider>
   )
