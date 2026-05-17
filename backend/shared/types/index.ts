@@ -182,6 +182,7 @@ export interface NaturalRoute {
   instrucciones: string
   estado: 'LIBRE' | 'CONGESTIONADA' | 'BLOQUEADA'
   prioridad: 1 | 2 | 3
+  bearing_deg?: number
 }
 
 export interface NaturalRoutes {
