@@ -5,6 +5,7 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { useFireSelection, type SelectedFireData, type FireIntensity } from '@/contexts/fire-selection-context'
 import { degToCompass } from '@/lib/utils'
+import { useGeolocation } from '@/hooks/use-geolocation'
 
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
@@ -94,6 +95,8 @@ interface PopupData {
   lat: number; lon: number
   sDirLabel: string; wKmh: number
   a2: FireArea; a6: FireArea; a12: FireArea
+  weather?: { speed: number; deg: number; humidity: number; temp?: number }
+  pm25?: number | null
 }
 
 function fmtKm2(v: number) { return v >= 1000 ? `${(v/1000).toFixed(1)}k km²` : `${v} km²` }
@@ -131,6 +134,33 @@ function buildPopupHTML(d: PopupData, active: ExpansionKey | null): string {
           <div style="font-size:20px;font-weight:900;color:#fb923c;line-height:1;">${d.sDirLabel}<span style="font-size:10px;color:rgba(255,255,255,0.35);margin-left:3px;">${d.wKmh}km/h</span></div>
         </div>
       </div>
+
+      <!-- Per-fire weather + air quality -->
+      ${d.weather ? `
+      <div style="padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:8px;">CLIMA + AIRE EN EL FOCO</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;">
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:7px 10px;">
+            <div style="font-size:8px;letter-spacing:0.16em;color:rgba(255,255,255,0.3);">VIENTO</div>
+            <div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px;">${d.weather.speed.toFixed(1)}<span style="font-size:9px;color:rgba(255,255,255,0.35);"> m/s · ${d.weather.deg}°</span></div>
+          </div>
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:7px 10px;">
+            <div style="font-size:8px;letter-spacing:0.16em;color:rgba(255,255,255,0.3);">HUMEDAD</div>
+            <div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px;">${d.weather.humidity}<span style="font-size:9px;color:rgba(255,255,255,0.35);"> %</span></div>
+          </div>
+          ${typeof d.weather.temp === 'number' ? `
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:7px 10px;">
+            <div style="font-size:8px;letter-spacing:0.16em;color:rgba(255,255,255,0.3);">TEMP</div>
+            <div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px;">${d.weather.temp.toFixed(1)}<span style="font-size:9px;color:rgba(255,255,255,0.35);"> °C</span></div>
+          </div>` : ''}
+          ${d.pm25 !== undefined ? `
+          <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:7px 10px;">
+            <div style="font-size:8px;letter-spacing:0.16em;color:rgba(255,255,255,0.3);">PM2.5</div>
+            <div style="font-size:13px;font-weight:800;color:#fff;margin-top:2px;">${d.pm25 === null ? 's/d' : `${d.pm25}<span style="font-size:9px;color:rgba(255,255,255,0.35);"> µg/m³</span>`}</div>
+          </div>` : ''}
+        </div>
+      </div>
+      ` : ''}
 
       <!-- Active expansion hero block -->
       ${activeArea ? `
@@ -202,6 +232,38 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     return () => { map.remove(); mapRef.current = null }
   }, [])
 
+  // User GPS position marker
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !userCoords) return
+    const apply = () => {
+      const data = {
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'Point' as const, coordinates: [userCoords.lon, userCoords.lat] },
+      }
+      const src = map.getSource('user-loc') as mapboxgl.GeoJSONSource | undefined
+      if (src) {
+        src.setData(data)
+      } else {
+        map.addSource('user-loc', { type: 'geojson', data })
+        map.addLayer({
+          id: 'user-loc-halo', type: 'circle', source: 'user-loc',
+          paint: { 'circle-radius': 20, 'circle-color': '#3b82f6', 'circle-opacity': 0.18, 'circle-blur': 1 },
+        })
+        map.addLayer({
+          id: 'user-loc-dot', type: 'circle', source: 'user-loc',
+          paint: {
+            'circle-radius': 7, 'circle-color': '#3b82f6',
+            'circle-stroke-width': 2, 'circle-stroke-color': 'rgba(255,255,255,0.9)',
+          },
+        })
+      }
+    }
+    if (map.isStyleLoaded()) apply()
+    else map.once('style.load', apply)
+  }, [userCoords])
+
   // Fire markers
   useEffect(() => {
     const map = mapRef.current
@@ -214,6 +276,8 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
           lat: f.lat, lon: f.lon, frp: f.frp,
           brightness: f.brightness,
           intensity: sentinelUpdate.riskLevel,
+          weather: f.weather,
+          pm25: f.pm25,
         }))
       : []
 
@@ -266,6 +330,8 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         id: inc.id, color, intensity: String(inc.intensity),
         frp: inc.frp, lat: inc.lat, lon: inc.lon,
         sDirLabel, wKmh, a2, a6, a12,
+        weather: (inc as any).weather,
+        pm25: (inc as any).pm25,
       }
 
       const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '320px' })

@@ -1,9 +1,18 @@
+export interface FirePerFireWeather {
+  speed: number      // m/s
+  deg: number        // grados meteorológicos
+  humidity: number   // 0-100%
+  temp?: number       // °C, opcional
+}
+
 export interface FireData {
   lat: number
   lon: number
   frp: number        // Fire Radiative Power (MW)
   brightness: number
   timestamp: string
+  weather?: FirePerFireWeather   // clima de ESE foco (OpenWeather vía Make.com)
+  pm25?: number | null            // pm25 de ESE foco (OpenAQ); null = sin estación cerca
 }
 
 export interface WeatherData {
