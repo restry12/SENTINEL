@@ -148,12 +148,12 @@ Para otros países de América, usa "autoridades locales de emergencia" si no co
 
 Reglas para esta situación:
 - Si el usuario pregunta por focos específicos, AQI actual, ubicaciones, FRP o cualquier métrica concreta: di literalmente "No tengo datos en vivo en este momento" y NO inventes números, coordenadas ni nombres.
-- Sí puedes responder preguntas generales: protocolos de evacuación, cómo interpretar AQI, qué hacer ante humo, números de emergencia chilenos (132 Bomberos, 133 Carabineros, 134 PDI), buenas prácticas.
+- Sí puedes responder preguntas generales: protocolos de evacuación, cómo interpretar AQI, qué hacer ante humo, buenas prácticas. Si el usuario menciona un país, puedes usar los números de emergencia oficiales de ese país (911 en EEUU/Canadá, 132 Bomberos en Chile, 911 en Argentina, 911 en México, 193 Bomberos en Brasil, 123 en Colombia). Si no menciona país, di "marca el número de emergencias local de tu país" en vez de inventar.
 - Sugiere recargar la página o esperar próxima actualización del backend si el usuario insiste en datos en vivo.`
   }
 
   if (news.length > 0) {
-    prompt += `\n\n## NOTICIAS RECIENTES (Chile)\n`
+    prompt += `\n\n## NOTICIAS RECIENTES\n`
     news.slice(0, 8).forEach((n, i) => {
       prompt += `${i + 1}. [${n.source}] ${n.title}${n.snippet ? ` — ${n.snippet}` : ''}\n`
     })
