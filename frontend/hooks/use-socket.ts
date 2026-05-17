@@ -120,8 +120,26 @@ export interface SentinelUpdate {
   airAlerts?: AirAlerts
   report?: AuthorityReport
   naturalRoutes?: NaturalRoutes
+  prediction?: PredictionResult
   // Optional — populated once Make.com / backend start sending infrastructure
   infrastructure?: InfrastructurePoint[]
+}
+
+export interface PredictionCell {
+  lat: number
+  lon: number
+  risk_score: number
+  fwi_score: number
+  historical_weight: number
+}
+
+export interface PredictionResult {
+  grid: PredictionCell[]
+  top_zones: Array<{ lat: number; lon: number; risk_score: number; zona: string; razon: string }>
+  analisis_6h: string
+  analisis_24h: string
+  analisis_72h: string
+  confianza: 'baja' | 'media' | 'alta'
 }
 
 export interface SocketStatus {
