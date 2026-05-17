@@ -96,9 +96,13 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
 
       if (citizenWebhookUrl) {
         // Delegate to Make.com — it fetches FIRMS/Weather/AQ and calls back to /api/trigger/citizen
+        const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+        const webhookSecret = process.env.MAKE_CITIZEN_WEBHOOK_SECRET
+        if (webhookSecret) webhookHeaders['Authorization'] = webhookSecret
+
         fetch(citizenWebhookUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: webhookHeaders,
           body: JSON.stringify({ lat, lon, socketId: socket.id }),
         }).catch((err) => {
           console.error('[trigger-citizen] Make.com webhook call failed:', err)
