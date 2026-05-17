@@ -116,17 +116,12 @@ export function ChatPage() {
             const parsed = JSON.parse(data)
             const token: string = parsed.choices?.[0]?.delta?.content ?? ''
             if (token) {
-              fullResponseText += token
               setMessages(prev =>
                 prev.map(m => m.id === assistantId ? { ...m, content: m.content + token } : m)
               )
             }
           } catch { /* malformed SSE line */ }
         }
-      }
-
-      if (fullResponseText.trim()) {
-        playVoice(fullResponseText.trim())
       }
     } catch (err) {
       if ((err as { name?: string })?.name !== 'AbortError') {

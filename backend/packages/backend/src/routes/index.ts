@@ -255,11 +255,8 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       pm25?: unknown
     }
 
-    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : null
-    if (!socketId) {
-      res.status(400).json({ ok: false, error: 'socketId required' })
-      return
-    }
+    // socketId optional — if present, result targets that socket; otherwise broadcasts to all
+    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
 
     const runId = typeof body.runId === 'string' ? body.runId : undefined
     const cachedFires = runId ? (getRun(runId) ?? []) : []
@@ -276,7 +273,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
 
     res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
 
-    executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId).catch((err) => {
+    executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId ?? undefined).catch((err) => {
       console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
     })
   })

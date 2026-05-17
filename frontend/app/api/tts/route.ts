@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       .replace(/`/g, '')    // Quita formato de código
       .replace(/\n+/g, ' '); // Reemplaza saltos de línea por espacios
 
-    const selectedVoice = isSpanish(text) ? "Spanish_EnergeticBoy" : "English_Trustworth_Man";
+    const selectedVoice = isSpanish(text) ? "Japanese_IntellectualSenior" : "English_Trustworth_Man";
 
     // Rotación de llaves emparejadas con sus respectivos Group IDs
     const accounts = [

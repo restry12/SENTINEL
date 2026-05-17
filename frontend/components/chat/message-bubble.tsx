@@ -109,16 +109,25 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
           <button 
             onClick={handlePlayAudio}
             disabled={isLoadingAudio}
-            className="absolute -right-10 bottom-2 p-1.5 rounded-md text-white/30 hover:text-white/70 hover:bg-white/5 transition-all opacity-0 group-hover:opacity-100"
-            title="Escuchar mensaje"
+            className={cn(
+              "absolute -right-2 -bottom-2 flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all duration-300",
+              "bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300",
+              "shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:shadow-[0_0_20px_rgba(34,211,238,0.25)]",
+              "opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0",
+              isLoadingAudio && "opacity-100 translate-y-0"
+            )}
+            title="Escuchar respuesta"
           >
             {isLoadingAudio ? (
-              <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+              <Loader2 className="w-3 h-3 animate-spin" />
             ) : isPlaying ? (
-              <VolumeX className="w-4 h-4 text-orange-400" />
+              <VolumeX className="w-3 h-3" />
             ) : (
-              <Volume2 className="w-4 h-4" />
+              <Volume2 className="w-3 h-3" />
             )}
+            <span className="text-[9px] font-bold uppercase tracking-widest">
+              {isLoadingAudio ? "Cargando" : isPlaying ? "Parar" : "Escuchar"}
+            </span>
           </button>
         )}
       </div>
