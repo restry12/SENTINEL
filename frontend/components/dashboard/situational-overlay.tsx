@@ -25,7 +25,7 @@ export function SituationalOverlay() {
   const meetingPoint = naturalRoutes?.punto_encuentro_principal ?? null
 
   return (
-    <div className="absolute top-24 bottom-8 right-6 z-40 w-80 pointer-events-none flex flex-col items-end">
+    <div className="hidden md:flex absolute top-24 bottom-8 right-6 z-40 w-80 pointer-events-none flex-col items-end">
       <div className="flex-1 overflow-y-auto pl-3 scrollbar-none pointer-events-auto flex flex-col gap-3 items-end pb-4">
         
         {/* Social Impact Widget */}
