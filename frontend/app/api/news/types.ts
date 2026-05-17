@@ -4,6 +4,7 @@ export interface NewsArticle {
   publishedAt: string
   url: string
   snippet: string
+  imageUrl?: string
 }
 
 export interface NewsResponse {
