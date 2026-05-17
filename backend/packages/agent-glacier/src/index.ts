@@ -6,15 +6,27 @@ import { catalog, copernicus } from './data'
 
 type GlacierWithMass = GlacierInfo & { lastMassChange: number }
 
+type GeoFeature = {
+  type: 'Feature'
+  geometry: { type: 'Point'; coordinates: [number, number] }
+  properties: { id: string; name: string; lastMassChange: number }
+}
+
+type GeoCollection = { type: 'FeatureCollection'; features: GeoFeature[] }
+
+function getLastMassChange(glacierId: string): number {
+  const history: GlacierMassData[] = copernicus[glacierId] ?? []
+  return history[history.length - 1]?.mass_change_mmwe ?? 0
+}
+
 const app = express()
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
 
 app.get('/glaciers', (_req, res) => {
-  const data: GlacierWithMass[] = catalog.map(g => {
-    const history: GlacierMassData[] = copernicus[g.id] ?? []
-    const lastMassChange = history[history.length - 1]?.mass_change_mmwe ?? 0
-    return { ...g, lastMassChange }
-  })
+  const data: GlacierWithMass[] = catalog.map(g => ({
+    ...g,
+    lastMassChange: getLastMassChange(g.id),
+  }))
   res.json({ success: true, data } satisfies AgentResponse<GlacierWithMass[]>)
 })
 
@@ -28,32 +40,26 @@ app.post('/analyze', async (req, res) => {
     const data = await buildGlacierAnalysis(glacierId)
     res.json({ success: true, data } satisfies AgentResponse<GlacierAnalysis>)
   } catch (err) {
-    const error = err instanceof Error ? err.message : 'Unknown error'
-    res.status(500).json({ success: false, data: null, error } satisfies AgentResponse<GlacierAnalysis>)
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    const isNotFound = message.startsWith('Glaciar no encontrado')
+    res.status(isNotFound ? 404 : 500).json({ success: false, data: null, error: message } satisfies AgentResponse<GlacierAnalysis>)
   }
 })
 
 app.get('/glaciers/risk-grid', (_req, res) => {
-  const features = catalog.map(g => {
-    const history: GlacierMassData[] = copernicus[g.id] ?? []
-    const lastMassChange = history[history.length - 1]?.mass_change_mmwe ?? 0
-    return {
-      type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [g.lon, g.lat] },
-      properties: { id: g.id, name: g.name, lastMassChange },
-    }
-  })
-  res.json({
-    success: true,
-    data: { type: 'FeatureCollection', features },
-  })
+  const features: GeoFeature[] = catalog.map(g => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Point' as const, coordinates: [g.lon, g.lat] as [number, number] },
+    properties: { id: g.id, name: g.name, lastMassChange: getLastMassChange(g.id) },
+  }))
+  res.json({ success: true, data: { type: 'FeatureCollection', features } } satisfies AgentResponse<GeoCollection>)
 })
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'agent-glacier' })
 })
 
-const PORT = process.env.PORT ?? 3006
+const PORT = Number(process.env.PORT ?? 3006)
 app.listen(PORT, () => {
   console.log(`[agent-glacier] running on port ${PORT}`)
 })
