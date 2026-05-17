@@ -604,8 +604,8 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
       if (!selectedFire || !activeExpansion) return
 
       const cfg = EXP_CONFIG[activeExpansion]
-      const windDeg = sentinelUpdate?.weather?.deg ?? 315
-      const windSpeedMs = sentinelUpdate?.weather?.speed ?? 6.7
+      const windDeg     = selectedFire?.weather?.deg   ?? sentinelUpdate?.weather?.deg   ?? 315
+      const windSpeedMs = selectedFire?.weather?.speed ?? sentinelUpdate?.weather?.speed ?? 6.7
       const exp = sentinelUpdate?.expansion
       const backendPoly = activeExpansion === '2h' ? exp?.expansion_2h
         : activeExpansion === '6h' ? exp?.expansion_6h
