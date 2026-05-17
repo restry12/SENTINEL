@@ -2,6 +2,7 @@ import type { Express } from 'express'
 import type { Server } from 'socket.io'
 import type { PollingController } from '../controllers/polling'
 import { rateLimit } from 'express-rate-limit'
+import { randomUUID } from 'crypto'
 import { executeAndBroadcast } from '../socket/handlers'
 import { parseFirmsCSV } from '../utils/parseFirmsCSV'
 import { dedupeFires } from '../utils/dedupeFires'
@@ -18,31 +19,29 @@ import historyRouter from './history'
 
 const ENRICH_LIMIT = 50
 
-// Citizen session store: maps lat+lon key → socketId for the duration of a Make.com round-trip.
-// Make.com echoes back {{1.lat}} and {{1.lon}} verbatim, so we can recover the socketId without
-// passing it through Make.com's entire scenario.
+// Citizen session store: UUID → socketId, valid for one Make.com round-trip.
+// citizen-init generates a citizenSessionId and sends it to Make.com; Make.com echoes it back
+// in the /api/trigger/citizen callback so we can emit only to the requesting socket.
+// UUID keys ensure 5 concurrent users at the same location each get their own targeted response.
 const CITIZEN_SESSION_TTL_MS = 10 * 60 * 1000
 const citizenSessions = new Map<string, { socketId: string; createdAt: number }>()
 
-function citizenSessionKey(lat: number, lon: number): string {
-  return `${lat.toFixed(6)},${lon.toFixed(6)}`
-}
-
-function storeCitizenSession(lat: number, lon: number, socketId: string): void {
+function storeCitizenSession(sessionId: string, socketId: string): void {
   const now = Date.now()
   for (const [k, v] of citizenSessions) {
     if (now - v.createdAt > CITIZEN_SESSION_TTL_MS) citizenSessions.delete(k)
   }
-  citizenSessions.set(citizenSessionKey(lat, lon), { socketId, createdAt: now })
+  citizenSessions.set(sessionId, { socketId, createdAt: now })
 }
 
-function getCitizenSocketId(lat: number, lon: number): string | undefined {
-  const entry = citizenSessions.get(citizenSessionKey(lat, lon))
+function getCitizenSocketId(sessionId: string): string | undefined {
+  const entry = citizenSessions.get(sessionId)
   if (!entry) return undefined
   if (Date.now() - entry.createdAt > CITIZEN_SESSION_TTL_MS) {
-    citizenSessions.delete(citizenSessionKey(lat, lon))
+    citizenSessions.delete(sessionId)
     return undefined
   }
+  citizenSessions.delete(sessionId)
   return entry.socketId
 }
 
@@ -187,6 +186,34 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     })
   })
 
+  // POST /api/fires/citizen-filter — recibe CSV de NASA + lat/lon del usuario como query params.
+  // Filtra los focos a ≤2 km del usuario, los guarda bajo un runId y lo devuelve.
+  // Make.com módulo ciudadano: POST /api/fires/citizen-filter?lat={{1.lat}}&lon={{1.lon}}
+  app.post('/api/fires/citizen-filter', (req, res) => {
+    const userLat = parseFloat(req.query.lat as string)
+    const userLon = parseFloat(req.query.lon as string)
+
+    if (!isFinite(userLat) || !isFinite(userLon)) {
+      res.status(400).json({ ok: false, error: 'lat and lon query params required' })
+      return
+    }
+
+    const csv = typeof req.body === 'string' ? req.body : ''
+    const all = csv ? parseFirmsCSV(csv) : []
+    const deduped = dedupeFires(all)
+
+    const nearby = deduped.filter(f => {
+      const dLat = (f.lat - userLat) * Math.PI / 180
+      const dLon = (f.lon - userLon) * Math.PI / 180
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(userLat * Math.PI / 180) * Math.cos(f.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+      return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= 2
+    })
+
+    const runId = storeRun(nearby)
+    res.json({ runId, fires: nearby, total: all.length })
+  })
+
   // POST /api/trigger/full — recibe fires[] de Make.com (rate limited)
   // Cada fire trae: { lat, lon, frp, brightness, speed, deg, humidity, date, pm25 }
   app.post('/api/trigger/full', triggerLimiter, async (req, res) => {
@@ -239,10 +266,11 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       return
     }
 
-    // Store socketId server-side keyed by lat+lon. Make.com echoes back {{1.lat}} and {{1.lon}}
-    // verbatim, so we can recover the socketId in /api/trigger/citizen without passing it through
-    // Make.com's entire scenario (where it would arrive empty if the socket wasn't connected yet).
-    if (socketId) storeCitizenSession(lat, lon, socketId)
+    // Generate a UUID session ID, store the socketId under it, and send the UUID to Make.com.
+    // Make.com echoes it back via {{1.citizenSessionId}} so the callback can retrieve the exact
+    // socket for this user — works correctly even with multiple concurrent citizen sessions.
+    const citizenSessionId = randomUUID()
+    if (socketId) storeCitizenSession(citizenSessionId, socketId)
 
     const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
     if (citizenWebhookUrl) {
@@ -254,6 +282,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
         headers: webhookHeaders,
         body: JSON.stringify({
           lat, lon,
+          citizenSessionId,
           west:  Math.round((lon - 0.018) * 10000) / 10000,
           south: Math.round((lat - 0.018) * 10000) / 10000,
           east:  Math.round((lon + 0.018) * 10000) / 10000,
@@ -342,9 +371,8 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   // citizen-routes to the requesting socket.
   app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
     const body = req.body as {
+      citizenSessionId?: unknown
       runId?: unknown
-      fires?: unknown
-      socketId?: unknown
       lat?: unknown
       lon?: unknown
       weather?: unknown
@@ -354,35 +382,25 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
 
-    // Recover socketId from the server-side session store (keyed by lat+lon) as primary source.
-    // Make.com echoes back the original lat/lon via {{1.lat}}/{{1.lon}}, so this lookup is reliable.
-    // Fall back to the body field in case it somehow arrives populated.
-    const socketId = (lat !== undefined && lon !== undefined ? getCitizenSocketId(lat, lon) : undefined)
-      ?? (typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined)
+    const citizenSessionId = typeof body.citizenSessionId === 'string' ? body.citizenSessionId : undefined
+    const socketId = citizenSessionId ? getCitizenSocketId(citizenSessionId) : undefined
 
     const runId = typeof body.runId === 'string' ? body.runId : undefined
-    const cachedFires = runId ? (getRun(runId) ?? []) : []
-    const rawFires = cachedFires.length > 0
-      ? cachedFires
-      : Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
+    const nearbyFires = runId ? (getRun(runId) ?? []) : []
 
-    const enriched = mapRawFiresToFireData(rawFires as Record<string, unknown>[])
+    res.status(202).json({ ok: true, accepted: true, fires: nearbyFires.length })
 
-    res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
-
-    if (!lat || !lon || enriched.length === 0) {
-      // No fires within the 2 km bbox — user is not in immediate danger, nothing to route
+    if (!lat || !lon || nearbyFires.length === 0) {
       return
     }
 
     const agentRoutesUrlCitizen = process.env.AGENT_ROUTES_URL
     if (!agentRoutesUrlCitizen) return
 
-    // Use per-fire weather from Make.com; fall back to last known global weather
-    const firstFireWeather = enriched[0]?.weather
+    const bodyWeather = body.weather as { speed?: number; deg?: number } | undefined
     const fallbackWeather = getLastUpdate()?.weather ?? { speed: 0, deg: 0 }
-    const windSpeedMs = firstFireWeather?.speed ?? fallbackWeather.speed ?? 0
-    const windDirDeg = firstFireWeather?.deg ?? fallbackWeather.deg ?? 0
+    const windSpeedMs = bodyWeather?.speed ?? fallbackWeather.speed ?? 0
+    const windDirDeg = bodyWeather?.deg ?? fallbackWeather.deg ?? 0
 
     ;(async () => {
       try {
@@ -392,7 +410,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
           body: JSON.stringify({
             userLat: lat,
             userLon: lon,
-            fires: enriched,
+            fires: nearbyFires as unknown[],
             weather: {
               wind_speed_kmh: Math.round(windSpeedMs * 3.6),
               wind_dir_deg: windDirDeg,
