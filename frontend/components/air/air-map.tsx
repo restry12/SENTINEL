@@ -6,6 +6,7 @@ import { drawFrame }         from "./smoke-engine"
 import type { WindData, FirePoint, InfrastructurePoint } from "./types"
 
 const TOKEN =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
   "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
 
 const INFRA_COLORS = { hospital: "#ef4444", school: "#f97316", emergency: "#3b82f6" } as const
