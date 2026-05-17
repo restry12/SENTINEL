@@ -1,5 +1,6 @@
 "use client"
 import dynamic from "next/dynamic"
+import { useState, useEffect } from "react"
 import { useSentinel } from "@/contexts/sentinel-context"
 
 const MapboxPanel = dynamic(
@@ -19,6 +20,16 @@ function MapLabel({ label, value }: { label: string, value: string | React.React
 export function MapPanel() {
   const { sentinelUpdate: u } = useSentinel()
   const fires = u?.fires ?? []
+
+  const criticalFires = fires.filter(f => f.frp > 35).sort((a, b) => b.frp - a.frp)
+  const [critIdx, setCritIdx] = useState(0)
+  useEffect(() => {
+    if (criticalFires.length < 2) return
+    const t = setInterval(() => setCritIdx(i => (i + 1) % criticalFires.length), 2500)
+    return () => clearInterval(t)
+  }, [criticalFires.length])
+  const activeCrit = criticalFires[critIdx]
+
   const centroid = fires.length > 0
     ? {
         lat: fires.reduce((s, f) => s + f.lat, 0) / fires.length,
@@ -46,9 +57,17 @@ export function MapPanel() {
 
         <div className="hidden xl:flex items-center gap-6">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_6px_var(--red)] animate-pulse" />
-              <span className="text-[9.5px] font-bold tracking-[0.14em] text-text-dim uppercase">Critical Fire</span>
+            <div className="flex items-center gap-2 min-w-[140px]">
+              <div className="w-2 h-2 rounded-full bg-red shadow-[0_0_6px_var(--red)] animate-pulse shrink-0" />
+              {activeCrit ? (
+                <span className="text-[9.5px] font-bold tracking-[0.1em] text-red uppercase tabular-nums transition-all duration-500">
+                  {Math.abs(activeCrit.lat).toFixed(2)}°{activeCrit.lat < 0 ? "S" : "N"}&nbsp;
+                  {Math.abs(activeCrit.lon).toFixed(2)}°{activeCrit.lon < 0 ? "W" : "E"}&nbsp;
+                  <span className="text-text-dim">|</span>&nbsp;{activeCrit.frp.toFixed(0)}MW
+                </span>
+              ) : (
+                <span className="text-[9.5px] font-bold tracking-[0.14em] text-text-dim uppercase">Critical Fire</span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-orange shadow-[0_0_6px_var(--orange)]" />
