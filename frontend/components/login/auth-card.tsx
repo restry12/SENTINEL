@@ -3,42 +3,35 @@
 import * as React from 'react'
 import { LoginForm } from './login-form'
 import { RegisterForm } from './register-form'
+import { useLang } from '@/lib/i18n/language-context'
 import styles from '@/app/login/login.module.css'
 import { cn } from '@/lib/utils'
 
 export function AuthCard() {
   const [activeTab, setActiveTab] = React.useState<'login' | 'register'>('login')
+  const { t } = useLang()
 
   return (
     <div className={`${styles.authCard} w-full`}>
-      {/* Corner decorative elements (handled by CSS in login.module.css) */}
       <span className={styles.cardCornerBottomLeft} />
       <span className={styles.cardCornerBottomRight} />
 
       <div className={styles.tabGroup}>
         <div
           className={styles.tabIndicator}
-          style={{
-            transform: activeTab === 'login' ? 'translateX(0)' : 'translateX(100%)',
-          }}
+          style={{ transform: activeTab === 'login' ? 'translateX(0)' : 'translateX(100%)' }}
         />
         <button
-          className={cn(
-            styles.tabButton,
-            activeTab === 'login' && styles.tabButtonActive
-          )}
+          className={cn(styles.tabButton, activeTab === 'login' && styles.tabButtonActive)}
           onClick={() => setActiveTab('login')}
         >
-          Iniciar Sesión
+          {t('tabLogin')}
         </button>
         <button
-          className={cn(
-            styles.tabButton,
-            activeTab === 'register' && styles.tabButtonActive
-          )}
+          className={cn(styles.tabButton, activeTab === 'register' && styles.tabButtonActive)}
           onClick={() => setActiveTab('register')}
         >
-          Registrarse
+          {t('tabRegister')}
         </button>
       </div>
 
@@ -57,22 +50,16 @@ export function AuthCard() {
       <div className={styles.formFooter}>
         {activeTab === 'login' ? (
           <p>
-            ¿No tiene una cuenta?{' '}
-            <button
-              onClick={() => setActiveTab('register')}
-              className={styles.formLink}
-            >
-              Solicite acceso aquí
+            {t('footerNoAccount')}{' '}
+            <button onClick={() => setActiveTab('register')} className={styles.formLink}>
+              {t('footerRequestAccess')}
             </button>
           </p>
         ) : (
           <p>
-            ¿Ya tiene una cuenta?{' '}
-            <button
-              onClick={() => setActiveTab('login')}
-              className={styles.formLink}
-            >
-              Ingrese aquí
+            {t('footerHasAccount')}{' '}
+            <button onClick={() => setActiveTab('login')} className={styles.formLink}>
+              {t('footerSignIn')}
             </button>
           </p>
         )}
