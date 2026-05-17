@@ -18,6 +18,34 @@ import historyRouter from './history'
 
 const ENRICH_LIMIT = 50
 
+// Citizen session store: maps lat+lon key → socketId for the duration of a Make.com round-trip.
+// Make.com echoes back {{1.lat}} and {{1.lon}} verbatim, so we can recover the socketId without
+// passing it through Make.com's entire scenario.
+const CITIZEN_SESSION_TTL_MS = 10 * 60 * 1000
+const citizenSessions = new Map<string, { socketId: string; createdAt: number }>()
+
+function citizenSessionKey(lat: number, lon: number): string {
+  return `${lat.toFixed(6)},${lon.toFixed(6)}`
+}
+
+function storeCitizenSession(lat: number, lon: number, socketId: string): void {
+  const now = Date.now()
+  for (const [k, v] of citizenSessions) {
+    if (now - v.createdAt > CITIZEN_SESSION_TTL_MS) citizenSessions.delete(k)
+  }
+  citizenSessions.set(citizenSessionKey(lat, lon), { socketId, createdAt: now })
+}
+
+function getCitizenSocketId(lat: number, lon: number): string | undefined {
+  const entry = citizenSessions.get(citizenSessionKey(lat, lon))
+  if (!entry) return undefined
+  if (Date.now() - entry.createdAt > CITIZEN_SESSION_TTL_MS) {
+    citizenSessions.delete(citizenSessionKey(lat, lon))
+    return undefined
+  }
+  return entry.socketId
+}
+
 type RawCitizenBody = { fires?: unknown; lat?: unknown; lon?: unknown; socketId?: unknown }
 
 export function parseCitizenBody(body: RawCitizenBody): {
@@ -211,6 +239,11 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       return
     }
 
+    // Store socketId server-side keyed by lat+lon. Make.com echoes back {{1.lat}} and {{1.lon}}
+    // verbatim, so we can recover the socketId in /api/trigger/citizen without passing it through
+    // Make.com's entire scenario (where it would arrive empty if the socket wasn't connected yet).
+    if (socketId) storeCitizenSession(lat, lon, socketId)
+
     const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
     if (citizenWebhookUrl) {
       const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
@@ -221,7 +254,6 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
         headers: webhookHeaders,
         body: JSON.stringify({
           lat, lon,
-          ...(socketId ? { socketId } : {}),
           west:  Math.round((lon - 0.018) * 10000) / 10000,
           south: Math.round((lat - 0.018) * 10000) / 10000,
           east:  Math.round((lon + 0.018) * 10000) / 10000,
@@ -319,16 +351,20 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       pm25?: unknown
     }
 
-    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
+    const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+    const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+
+    // Recover socketId from the server-side session store (keyed by lat+lon) as primary source.
+    // Make.com echoes back the original lat/lon via {{1.lat}}/{{1.lon}}, so this lookup is reliable.
+    // Fall back to the body field in case it somehow arrives populated.
+    const socketId = (lat !== undefined && lon !== undefined ? getCitizenSocketId(lat, lon) : undefined)
+      ?? (typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined)
 
     const runId = typeof body.runId === 'string' ? body.runId : undefined
     const cachedFires = runId ? (getRun(runId) ?? []) : []
     const rawFires = cachedFires.length > 0
       ? cachedFires
       : Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
-
-    const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
-    const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
 
     const enriched = mapRawFiresToFireData(rawFires as Record<string, unknown>[])
 
