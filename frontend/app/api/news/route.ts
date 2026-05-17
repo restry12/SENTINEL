@@ -33,22 +33,60 @@ function extractTag(xml: string, tag: string): string {
   return plainMatch ? plainMatch[1].trim() : ''
 }
 
+function decodeHTMLEntities(text: string): string {
+  return text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+}
+
 function parseRSS(xml: string): NewsArticle[] {
   const items = xml.match(/<item>([\s\S]*?)<\/item>/g) ?? []
   return items.flatMap(item => {
-    const title = extractTag(item, 'title')
+    let title = decodeHTMLEntities(extractTag(item, 'title'))
     if (!title) return []
-    const source = extractTag(item, 'source')
+    
+    let source = decodeHTMLEntities(extractTag(item, 'source'))
     const pubDate = extractTag(item, 'pubDate')
-    const description = extractTag(item, 'description').replace(/<[^>]+>/g, '').slice(0, 220)
+    
+    // Clean title: "Headline - Source Name" -> "Headline"
+    if (source && title.toLowerCase().endsWith(source.toLowerCase())) {
+      const lastHyphen = title.lastIndexOf(' - ')
+      if (lastHyphen > -1) title = title.substring(0, lastHyphen).trim()
+    }
+
+    // AGGRESSIVE SNIPPET CLEANING
+    let rawDesc = extractTag(item, 'description')
+    
+    // 1. Remove all HTML tags
+    let cleanDesc = rawDesc.replace(/<[^>]+>/g, ' ')
+    
+    // 2. Decode entities
+    cleanDesc = decodeHTMLEntities(cleanDesc)
+    
+    // 3. REMOVE LONG LINKS (Google News often dumps huge base64 links here)
+    // This removes any string longer than 40 chars that looks like a URL or base64 junk
+    cleanDesc = cleanDesc.replace(/https?:\/\/[^\s]+/g, '')
+    cleanDesc = cleanDesc.replace(/[a-zA-Z0-9_-]{40,}/g, '') // Long alphanumeric junk
+    
+    // 4. Final trim and whitespace normalization
+    cleanDesc = cleanDesc.replace(/\s+/g, ' ').trim()
+    
+    // 5. If it's too short or still looks like junk, clear it
+    if (cleanDesc.length < 10) cleanDesc = ''
+
     const linkMatch = item.match(/<link>([^<]+)<\/link>/)
     const url = linkMatch ? linkMatch[1].trim() : ''
+    
     return [{
       title,
-      source,
+      source: source || 'Fuente externa',
       publishedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
       url,
-      snippet: description,
+      snippet: cleanDesc.slice(0, 180),
     }]
   })
 }

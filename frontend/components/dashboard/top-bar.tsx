@@ -1,29 +1,38 @@
 "use client"
 
-import { Activity, Globe } from "lucide-react"
+import { Globe, RadarIcon, Shield, Activity, Search } from "lucide-react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLang } from "@/contexts/language-context"
 import { useSentinel } from "@/contexts/sentinel-context"
+import { toast } from "sonner"
 import { HotspotSearch } from "@/components/dashboard/hotspot-search"
 
 export function TopBar() {
   const pathname = usePathname()
   const { lang, toggle, tx } = useLang()
-  const { connected, status, sentinelUpdate } = useSentinel()
+  const { connected, status, trigger, sentinelUpdate } = useSentinel()
   const [time, setTime] = useState<string>("")
 
   const fireCount = sentinelUpdate?.fires.length ?? 0
   const isLoading = status.state === "loading"
+  const riskLevel = (sentinelUpdate?.riskLevel ?? "stable").toLowerCase()
+  
   const statusLabel = !connected
     ? "OFFLINE"
     : isLoading
       ? "ANALIZANDO…"
       : status.state === "error"
         ? "ERROR"
-        : (sentinelUpdate?.riskLevel ?? "").toUpperCase() || (connected ? "EN LÍNEA" : tx.statusCritical)
-  const statusColor = !connected || status.state === "error" ? "text-text-muted" : "text-red"
+        : riskLevel === 'critical' ? 'SITUACIÓN CRÍTICA'
+        : riskLevel === 'high' ? 'ALERTA ALTA'
+        : 'ESTADO OPERATIVO'
+
+  const statusColor = !connected || status.state === "error" ? "text-text-muted" 
+    : riskLevel === 'critical' ? "text-red drop-shadow-[0_0_8px_rgba(255,51,51,0.5)]"
+    : riskLevel === 'high' ? "text-orange drop-shadow-[0_0_8px_rgba(255,126,21,0.5)]"
+    : "text-green-soft"
 
   useEffect(() => {
     const updateTime = () => {
@@ -35,103 +44,113 @@ export function TopBar() {
     return () => clearInterval(timer)
   }, [])
 
+  const onTrigger = () => {
+    toast.info("Activando Agente 1: Actualizando datos satelitales en tiempo real...", {
+      duration: 3000,
+      icon: <RadarIcon className="w-4 h-4 animate-spin text-orange" />
+    })
+    trigger()
+  }
+
   return (
     <div className="flex flex-col shrink-0 z-50">
-      <div className="h-[1.5px] bg-[linear-gradient(90deg,transparent_0%,rgba(255,126,21,0.2)_10%,rgba(255,51,51,0.8)_50%,rgba(255,126,21,0.2)_90%,transparent_100%)] shadow-[0_0_15px_rgba(255,51,51,0.3)]" />
+      <header className="h-[72px] px-8 border-b border-white/10 bg-[#080c14/80] backdrop-blur-2xl flex items-center justify-between gap-8 relative overflow-hidden">
+        {/* Animated Glow Line */}
+        <div className={`absolute bottom-0 left-0 h-[2px] transition-all duration-1000 ease-in-out ${
+          riskLevel === 'critical' ? 'bg-red shadow-[0_0_15px_rgba(255,51,51,0.8)]' : 
+          riskLevel === 'high' ? 'bg-orange shadow-[0_0_15px_rgba(249,115,22,0.8)]' : 
+          'bg-blue shadow-[0_0_15px_rgba(56,189,248,0.8)]'
+        }`} style={{ width: connected ? '100%' : '0%' }} />
 
-      {/* Mobile header */}
-      <header className="md:hidden h-12 px-4 border-b border-white/5 bg-[#080c14/90] backdrop-blur-xl flex items-center justify-between gap-3">
-        <img
-          src="/sentinel-logo.png"
-          alt="SENTINEL"
-          className="h-8 w-auto object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.25)]"
-        />
-        <div className={`px-3 py-1.5 rounded-full border border-red/40 bg-[linear-gradient(180deg,rgba(255,51,51,0.15),rgba(255,51,51,0.05))] ${statusColor} flex items-center gap-2`}>
-          <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(255,51,51,1)] ${connected ? "bg-red animate-pulse" : "bg-text-muted"}`} />
-          <span className="text-[10px] font-black tracking-[0.2em] uppercase whitespace-nowrap">{statusLabel}</span>
-        </div>
-        <button
-          onClick={toggle}
-          className="flex items-center gap-1 px-2 py-1.5 bg-surface border border-border-2 rounded-lg text-[10px] font-black tracking-widest text-foreground hover:border-blue/50 transition-all"
-        >
-          <Globe className="w-3.5 h-3.5" />
-          <span>{lang === 'es' ? 'ES' : 'EN'}</span>
-        </button>
-      </header>
-
-      {/* Desktop header */}
-      <header className="hidden md:flex h-[64px] px-6 border-b border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_70%)] bg-[#080c14/90] backdrop-blur-xl items-center justify-between gap-4">
-        {/* Brand */}
-        <div className="w-80 flex items-center gap-3">
-          <img
-            src="/sentinel-logo.png"
-            alt="SENTINEL"
-            className="h-[42px] w-auto object-contain drop-shadow-[0_0_10px_rgba(56,189,248,0.25)]"
-          />
-          <div className="flex flex-col gap-0.5 leading-none">
-            <span className="text-[15px] font-black tracking-[0.2em] text-white uppercase drop-shadow-sm">SENTINEL</span>
-            <span className="text-[9px] font-bold tracking-[0.25em] text-text-muted uppercase">{tx.brandSub}</span>
+        {/* Brand Section */}
+        <div className="flex items-center gap-4 min-w-[250px]">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue/20 blur-xl rounded-full" />
+            <img
+              src="/sentinel-logo.png"
+              alt="SENTINEL"
+              className="h-[48px] w-auto relative z-10"
+            />
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-black tracking-[0.25em] text-white leading-none">SENTINEL</h1>
+            <p className="text-[9px] font-bold tracking-[0.3em] text-text-muted mt-1.5 uppercase opacity-70">{tx.brandSub}</p>
           </div>
         </div>
 
-        {/* Center */}
-        <div className="flex-1 flex items-center justify-center gap-4">
-          <nav className="flex items-center gap-1 p-1 rounded-lg border border-white/5 bg-surface/40 backdrop-blur-md">
-            {([
-              { href: '/dashboard',         label: tx.navDashboard },
-              { href: '/air',               label: tx.navAir },
-              { href: '/news',              label: tx.navNews },
-              { href: '/dashboard/citizen', label: 'Ciudadano' },
-            ] as const).map(({ href, label }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`px-4 py-1.5 rounded text-[10px] font-mono font-bold tracking-widest uppercase transition-all duration-200 ${
-                  pathname === href
-                    ? 'bg-orange/15 text-orange border border-orange/30 shadow-[0_0_12px_rgba(255,126,21,0.15)]'
-                    : 'text-text-muted hover:text-foreground hover:bg-white/5'
-                }`}
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className={`px-4 py-2 rounded-full border border-red/40 bg-[linear-gradient(180deg,rgba(255,51,51,0.15),rgba(255,51,51,0.05))] ${statusColor} flex items-center gap-3 shadow-[0_10px_30px_-10px_rgba(255,51,51,0.3),inset_0_1px_1px_rgba(255,255,255,0.05)] animate-in fade-in zoom-in duration-500`}>
-            <div className={`w-2 h-2 rounded-full shadow-[0_0_12px_rgba(255,51,51,1)] ${connected ? "bg-red animate-pulse" : "bg-text-muted"}`} />
-            <span className="text-[11px] font-black tracking-[0.2em] uppercase whitespace-nowrap">{statusLabel}</span>
+        {/* Tactical Status & Navigation */}
+        <div className="flex-1 flex items-center justify-center gap-6">
+          <div className={`flex items-center gap-4 px-6 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl transition-all duration-500 ${
+            riskLevel === 'critical' ? 'border-red/30 bg-red/5' : ''
+          }`}>
+            <div className="flex items-center gap-3 pr-4 border-r border-white/10">
+              <div className={`w-2 h-2 rounded-full ${connected ? (riskLevel === 'critical' ? 'bg-red' : 'bg-green') : 'bg-text-muted'} ${connected ? 'animate-pulse' : ''}`} />
+              <span className={`text-[11px] font-black tracking-[0.2em] uppercase ${statusColor}`}>{statusLabel}</span>
+            </div>
+            
+            <nav className="flex items-center gap-1">
+              {([
+                { href: '/dashboard',         label: tx.navDashboard },
+                { href: '/air',               label: tx.navAir },
+                { href: '/news',              label: tx.navNews ?? 'Noticias' },
+                { href: '/dashboard/citizen', label: 'Ciudadano' },
+              ] as const).map(({ href, label }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all duration-300 ${
+                    pathname === href
+                      ? 'bg-white/10 text-white border border-white/20'
+                      : 'text-text-muted hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
           </div>
 
-
+          {/* New Search Component from Main */}
           <HotspotSearch />
 
-          <div className="hidden lg:flex items-center gap-3 px-4 py-2 bg-surface/60 border border-white/5 rounded-lg text-[11px] font-bold tracking-[0.15em] text-text-dim backdrop-blur-md">
-            <span>{tx.hotspots}</span>
-            <span className="text-orange-soft font-mono text-base leading-none num drop-shadow-[0_0_8px_rgba(255,174,66,0.4)]">{fireCount.toLocaleString()}</span>
-          </div>
+          <button
+            onClick={onTrigger}
+            disabled={isLoading || !connected}
+            className={`group relative flex items-center gap-3 px-5 py-2.5 rounded-lg border transition-all duration-300 overflow-hidden ${
+              isLoading ? 'border-orange/30 bg-orange/5' : 'border-blue/40 bg-blue/10 hover:bg-blue/20 text-blue-soft'
+            }`}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            <RadarIcon className={`w-4 h-4 ${isLoading ? "animate-spin text-orange" : "text-blue"}`} />
+            <span className="text-[11px] font-black tracking-[0.2em] uppercase">{isLoading ? "Procesando" : "Escanear"}</span>
+          </button>
         </div>
 
-        {/* Right */}
-        <div className="w-80 flex items-center justify-end gap-3">
-          <div className="hidden xl:flex items-center gap-2.5 px-3 py-2 bg-green/5 border border-green/20 rounded-lg text-[11px] font-bold tracking-[0.15em] text-green-soft shadow-lg shadow-green/5">
-            <Activity className="w-3.5 h-3.5" />
-            <span>{tx.operational}</span>
+        {/* Telemetry & Global Info */}
+        <div className="flex items-center justify-end gap-4 min-w-[250px]">
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-3 px-3 py-1.5 bg-white/5 border border-white/10 rounded-md">
+              <span className="text-[9px] font-bold text-text-muted tracking-widest uppercase">Hotspots</span>
+              <span className="text-sm font-black text-orange num leading-none">{fireCount.toLocaleString()}</span>
+            </div>
+            <div className="text-[11px] font-mono text-text-muted flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-soft animate-pulse" />
+              {time || "00:00:00"} <span className="opacity-50">UTC</span>
+            </div>
           </div>
 
-          <div className="px-3 py-2 bg-surface/60 border border-white/5 rounded-lg flex items-center gap-3 whitespace-nowrap shadow-inner">
-            <div className="w-1.5 h-1.5 rounded-full bg-green shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
-            <span className="text-[12px] font-mono font-bold text-foreground tracking-widest uppercase">
-              {time || "00:00:00"} <span className="text-text-muted font-normal ml-0.5 text-[10px]">UTC</span>
-            </span>
-          </div>
+          <div className="h-10 w-[1px] bg-white/10 mx-2" />
 
           <button
             onClick={toggle}
-            className="flex items-center gap-2 px-3 py-2 bg-surface border border-border-2 rounded-lg text-[11px] font-black tracking-[0.1em] text-foreground hover:border-blue/50 hover:bg-blue/5 hover:text-blue transition-all duration-200"
+            className="w-12 h-10 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[11px] font-black transition-colors"
           >
-            <Globe className="w-3.5 h-3.5" />
-            <span>{lang === 'es' ? 'ES' : 'EN'}</span>
+            {lang.toUpperCase()}
           </button>
+          
+          <div className="w-10 h-10 rounded-full border border-white/20 bg-gradient-to-br from-white/10 to-transparent flex items-center justify-center text-white/50 hover:text-white transition-colors cursor-pointer">
+            <Shield className="w-5 h-5" />
+          </div>
         </div>
       </header>
     </div>
