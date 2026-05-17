@@ -146,7 +146,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     ]
 
     // Forward client cancellation + 60s hard timeout so a hanging OpenRouter call
-    // doesn't keep burning tokens after the user closes the tab.
+    // doesn't keep burning tokens after the user closes the tab. AbortSignal.any
+    // is gated because Edge runtime support is inconsistent across Next versions.
+    const timeoutSignal = AbortSignal.timeout(60_000)
+    const signal = typeof (AbortSignal as { any?: unknown }).any === 'function'
+      ? AbortSignal.any([req.signal, timeoutSignal])
+      : timeoutSignal
+
     const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -161,7 +167,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         temperature: 0.3,
         stream: true,
       }),
-      signal: AbortSignal.any([req.signal, AbortSignal.timeout(60_000)]),
+      signal,
     })
 
     if (!upstream.ok) {
