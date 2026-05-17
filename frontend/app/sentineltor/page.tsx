@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useGeolocation } from '@/hooks/use-geolocation'
 import { IOSDevice } from '@/components/sentineltor/ios-frame'
 import { ScreenLocating, ScreenAlert, ScreenShelter, ScreenInShelter, ScreenHelp } from '@/components/sentineltor/screens'
 
@@ -15,6 +16,9 @@ const STATES: { id: ScreenId; label: string; step: string; danger?: boolean }[] 
 ]
 
 export default function SentinelTorPage() {
+  const liveCoords = useGeolocation()
+  const coords = liveCoords || { lat: 19.4326, lon: -99.1332 }
+
   const [state, setState] = useState<ScreenId>('locating')
   const [completed, setCompleted] = useState<Set<number>>(new Set([0]))
   const [picked, setPicked] = useState('basement')
@@ -22,11 +26,11 @@ export default function SentinelTorPage() {
   const screen = (() => {
     const set = (s: string) => setState(s as ScreenId)
     switch (state) {
-      case 'locating':   return <ScreenLocating setState={set}/>
-      case 'alert':      return <ScreenAlert setState={set}/>
-      case 'shelter':    return <ScreenShelter setState={set} completed={completed} setCompleted={setCompleted} picked={picked} setPicked={setPicked}/>
-      case 'in-shelter': return <ScreenInShelter setState={set}/>
-      case 'help':       return <ScreenHelp setState={set}/>
+      case 'locating':   return <ScreenLocating setState={set} coords={coords}/>
+      case 'alert':      return <ScreenAlert setState={set} coords={coords}/>
+      case 'shelter':    return <ScreenShelter setState={set} completed={completed} setCompleted={setCompleted} picked={picked} setPicked={setPicked} coords={coords}/>
+      case 'in-shelter': return <ScreenInShelter setState={set} coords={coords}/>
+      case 'help':       return <ScreenHelp setState={set} coords={coords}/>
     }
   })()
 

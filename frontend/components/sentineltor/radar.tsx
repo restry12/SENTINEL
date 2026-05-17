@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { GeoCoords } from '@/hooks/use-geolocation'
 
 function injectStyles() {
   if (typeof document === 'undefined') return
@@ -48,9 +49,10 @@ function injectStyles() {
 interface RadarProps {
   variant?: 'alert' | 'locating' | 'in-shelter' | 'help'
   height?: number
+  coords?: GeoCoords
 }
 
-export function Radar({ variant = 'alert', height = 320 }: RadarProps) {
+export function Radar({ variant = 'alert', height = 320, coords }: RadarProps) {
   useEffect(() => { injectStyles() }, [])
 
   const quiet = variant === 'locating'
@@ -176,8 +178,8 @@ export function Radar({ variant = 'alert', height = 320 }: RadarProps) {
       )}
       <g style={{ font: '600 9px ui-monospace, "JetBrains Mono", monospace', letterSpacing: 1 }}>
         <text x="14" y="22" fill="rgba(150,200,255,0.55)">SCAN · 2.4GHz</text>
-        <text x="14" y="36" fill="rgba(150,200,255,0.35)">LAT  19.4326° N</text>
-        <text x="14" y="48" fill="rgba(150,200,255,0.35)">LON  99.1332° W</text>
+        <text x="14" y="36" fill="rgba(150,200,255,0.35)">LAT  {(coords?.lat ?? 19.4326).toFixed(4)}° {(coords?.lat ?? 19.4326) >= 0 ? 'N' : 'S'}</text>
+        <text x="14" y="48" fill="rgba(150,200,255,0.35)">LON  {Math.abs(coords?.lon ?? -99.1332).toFixed(4)}° {(coords?.lon ?? -99.1332) >= 0 ? 'E' : 'W'}</text>
         <text x="386" y="22" textAnchor="end" fill="rgba(255,122,61,0.85)">{quiet ? 'STANDBY' : 'LIVE'}</text>
         <text x="386" y="36" textAnchor="end" fill="rgba(150,200,255,0.35)">RNG 10KM</text>
       </g>
