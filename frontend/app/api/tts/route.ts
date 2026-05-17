@@ -42,32 +42,32 @@ export async function POST(req: Request) {
 
     const selectedVoice = isSpanish(text) ? "Spanish_EnergeticBoy" : "English_Trustworth_Man";
 
-    const groupId = process.env.MINIMAX_GROUP_ID || "";
-    const url = `https://api.minimaxi.chat/v1/t2a_v2${groupId ? `?GroupId=${groupId}` : ''}`;
+    // Rotación de llaves emparejadas con sus respectivos Group IDs
+    const accounts = [
+      { key: process.env.MINIMAX_API_KEY, group: process.env.MINIMAX_GROUP_ID },
+      { key: process.env.MINIMAX_API_KEY_1, group: process.env.MINIMAX_GROUP_ID_1 },
+      { key: process.env.MINIMAX_API_KEY_2, group: process.env.MINIMAX_GROUP_ID_2 },
+      { key: process.env.MINIMAX_API_KEY_3, group: process.env.MINIMAX_GROUP_ID_3 },
+      { key: process.env.MINIMAX_API_KEY_4, group: process.env.MINIMAX_GROUP_ID_4 }
+    ].filter(acc => Boolean(acc.key)); // Solo deja las cuentas que tengan una API Key configurada
 
-    // Rotación de llaves para evitar el límite diario
-    const apiKeys = [
-      process.env.MINIMAX_API_KEY,
-      process.env.MINIMAX_API_KEY_1,
-      process.env.MINIMAX_API_KEY_2,
-      process.env.MINIMAX_API_KEY_3,
-      process.env.MINIMAX_API_KEY_4
-    ].filter(Boolean); // Solo deja las que no estén vacías
-
-    if (apiKeys.length === 0) {
+    if (accounts.length === 0) {
       return new Response(JSON.stringify({ error: "No MiniMax API keys configured" }), { 
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       })
     }
 
-    // Elige una llave al azar
-    const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
+    // Elige una cuenta al azar
+    const randomAccount = accounts[Math.floor(Math.random() * accounts.length)];
+    
+    const groupId = randomAccount.group || "";
+    const url = `https://api.minimaxi.chat/v1/t2a_v2${groupId ? `?GroupId=${groupId}` : ''}`;
 
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${randomKey}`,
+        "Authorization": `Bearer ${randomAccount.key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
