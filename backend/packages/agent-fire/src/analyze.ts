@@ -1,4 +1,4 @@
-import type { FireData, WeatherData, FireAnalysis, RiskAssessment, ExpansionData, GeoJSONFeature } from '@sentinel/types'
+import type { FireData, WeatherData, FireAnalysis, RiskAssessment, ExpansionData, GeoJSONFeature, PerFireExpansion } from '@sentinel/types'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
 function degreesToCardinal(deg: number): string {
@@ -108,6 +108,41 @@ function expansionToGeoJSON(expansion: ExpansionData): GeoJSONFeature {
   }
 }
 
+// Mathematical fire spread model (simplified Rothermel) — per fire, no LLM needed
+function computePerFireExpansions(fires: FireData[], weather: WeatherData): PerFireExpansion[] {
+  const windKmh = weather.speed * 3.6
+  const windDir = degreesToCardinal((weather.deg + 180) % 360) // spread direction (opposite to wind origin)
+  const top150 = [...fires].sort((a, b) => b.frp - a.frp).slice(0, 150)
+
+  return top150.map(fire => {
+    // Rate of spread varies by FRP intensity (hotter fires spread faster)
+    const frpFactor = 1 + (fire.frp / 500) * 0.3 // mild boost for intense fires
+    const ros_forward = (0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002) * frpFactor
+    const ros_backing = 0.3
+    const ros_flank = Math.sqrt(ros_forward * ros_backing)
+
+    function areaKm2(hours: number): number {
+      const df = ros_forward * hours
+      const db = ros_backing * hours
+      const dfl = Math.max(ros_flank * hours, 0.3)
+      const a = (df + db) / 2
+      const b = dfl
+      return Math.round(Math.PI * a * b * 100) / 100
+    }
+
+    return {
+      lat: fire.lat,
+      lon: fire.lon,
+      frp: fire.frp,
+      expansion_2h_km2: areaKm2(2),
+      expansion_6h_km2: areaKm2(6),
+      expansion_12h_km2: areaKm2(12),
+      velocidad_kmh: Math.round(ros_forward * 10) / 10,
+      direccion: windDir,
+    }
+  })
+}
+
 const EMPTY: FireAnalysis = {
   polygon: {
     type: 'Feature',
@@ -122,10 +157,14 @@ const EMPTY: FireAnalysis = {
     velocidad_propagacion_kmh: 0,
     direccion_principal: 'N',
   },
+  perFireExpansions: [],
 }
 
 export async function analyzeFireExpansion(fires: FireData[], weather: WeatherData): Promise<FireAnalysis> {
   if (fires.length === 0) return EMPTY
+
+  // Per-fire mathematical expansion (always computed, no LLM dependency)
+  const perFireExpansions = computePerFireExpansions(fires, weather)
 
   const nasaData = toNasaData(fires)
   const climateData = toClimateData(weather)
@@ -139,5 +178,6 @@ export async function analyzeFireExpansion(fires: FireData[], weather: WeatherDa
     polygon: expansionToGeoJSON(a2),
     riskAssessment: a1,
     expansion: a2,
+    perFireExpansions,
   }
 }
