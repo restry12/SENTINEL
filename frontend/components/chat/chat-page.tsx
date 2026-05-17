@@ -263,7 +263,7 @@ export function ChatPage() {
         {/* Messages area */}
         <div className="flex-1 overflow-y-auto py-6 space-y-6 min-h-0">
           {messages.length === 0 && (
-            <WelcomeScreen onSuggestion={sendMessage} />
+            <WelcomeScreen onSuggestion={sendMessage} mode={mode} />
           )}
           {messages.map((msg, i) => (
             <MessageBubble
@@ -285,7 +285,19 @@ export function ChatPage() {
   )
 }
 
-function WelcomeScreen({ onSuggestion }: { onSuggestion: (s: string) => void }) {
+function WelcomeScreen({
+  onSuggestion,
+  mode,
+}: {
+  onSuggestion: (s: string) => void
+  mode: ChatMode
+}) {
+  const suggestions = mode === 'citizen' ? CITIZEN_SUGGESTIONS : EXPERT_SUGGESTIONS
+  const subtitle =
+    mode === 'citizen'
+      ? 'Pregúntame qué está pasando y qué puedes hacer'
+      : 'Datos en vivo, predicción, recursos operacionales'
+
   return (
     <div className="flex flex-col items-center justify-center py-16 gap-6 text-center">
       <div className="w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center">
@@ -293,10 +305,10 @@ function WelcomeScreen({ onSuggestion }: { onSuggestion: (s: string) => void }) 
       </div>
       <div>
         <p className="text-white/70 text-sm">¿En qué puedo ayudarte hoy?</p>
-        <p className="text-white/30 text-xs mt-1">Tengo acceso a datos en vivo, noticias y conocimiento operacional</p>
+        <p className="text-white/30 text-xs mt-1">{subtitle}</p>
       </div>
       <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
-        {CITIZEN_SUGGESTIONS.map(s => (
+        {suggestions.map(s => (
           <button
             key={s}
             onClick={() => onSuggestion(s)}
