@@ -1,19 +1,13 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import {
-  User, Briefcase, ShieldAlert, Flame, Wind, Gauge,
-  MapPin, Building2, Navigation, Newspaper, Activity, TrendingUp,
-} from "lucide-react"
-import type { LucideIcon } from "lucide-react"
-import Image from "next/image"
+import { User, Briefcase } from "lucide-react"
 import { TopBar } from "@/components/dashboard/top-bar"
 import { useSentinel } from "@/contexts/sentinel-context"
 import { MessageBubble, type Message } from "./message-bubble"
 import { ChatInput } from "./chat-input"
-import { cn } from "@/lib/utils"
-
 import { WelcomeSequence } from "./welcome-sequence"
+import { cn } from "@/lib/utils"
 import { CondorGuideAvatar } from "./condor-avatar"
 
 type ChatMode = 'citizen' | 'expert'
@@ -62,6 +56,23 @@ export function ChatPage() {
   }, [messages])
 
   useEffect(() => () => abortRef.current?.abort(), [])
+
+  const playVoice = async (text: string) => {
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+      if (res.ok) {
+        const blob = await res.blob()
+        const audio = new Audio(URL.createObjectURL(blob))
+        audio.play()
+      }
+    } catch (e) {
+      console.error('Error playing voice:', e)
+    }
+  }
 
   const sendMessage = async (content: string) => {
     abortRef.current?.abort()
@@ -138,7 +149,7 @@ export function ChatPage() {
     isStreaming && messages.length > 0 && messages[messages.length - 1].role === 'assistant'
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-[calc(100dvh-4rem)] md:h-screen flex flex-col bg-background overflow-hidden">
       <TopBar />
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 min-h-0">
@@ -188,7 +199,7 @@ export function ChatPage() {
                     )}
                   >
                     <Icon className="w-3 h-3" />
-                    {label}
+                    <span className="hidden sm:inline">{label}</span>
                   </button>
                 )
               })}
@@ -232,4 +243,3 @@ export function ChatPage() {
     </div>
   )
 }
-

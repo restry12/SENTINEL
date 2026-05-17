@@ -68,6 +68,13 @@ export interface SentinelUpdate {
   naturalRoutes?: NaturalRoutes
 }
 
+export interface PredictionResult {
+  riskScore: number
+  riskLevel: 'low' | 'medium' | 'high' | 'critical'
+  summary?: string
+  [key: string]: unknown
+}
+
 export interface AlertPayload {
   riskLevel: 'high' | 'critical'
   fires: FireData[]
@@ -107,6 +114,7 @@ export interface ExpansionData {
   expansion_12h: ExpansionPolygon
   velocidad_propagacion_kmh: number
   direccion_principal: string
+  direccion_principal_deg?: number
 }
 
 export interface PerFireExpansion {
@@ -174,6 +182,7 @@ export interface NaturalRoute {
   instrucciones: string
   estado: 'LIBRE' | 'CONGESTIONADA' | 'BLOQUEADA'
   prioridad: 1 | 2 | 3
+  bearing_deg?: number
 }
 
 export interface NaturalRoutes {

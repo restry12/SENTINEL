@@ -12,10 +12,10 @@ export function MetricCards() {
   const frp = m.frpMax
 
   return (
-    <div className="border-b border-border bg-background shrink-0 overflow-x-auto scrollbar-none">
-      <div className="flex gap-3 p-4 min-w-max">
+    <div className="border-b border-border bg-background shrink-0">
+      <div className="grid grid-cols-3 gap-2 p-3">
         {/* Risk Level Card */}
-        <div className="p-3 rounded-md border border-red/30 bg-[#1a0e0f] min-w-[140px] flex flex-col gap-2">
+        <div className="p-2.5 rounded-md border border-red/30 bg-[#1a0e0f] flex flex-col gap-1.5">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-red-soft/70">
             {tx.riskLevel}
           </div>
@@ -28,7 +28,7 @@ export function MetricCards() {
         </div>
 
         {/* AQI Card */}
-        <div className="sentinel-card p-3 min-w-[120px] flex flex-col gap-2">
+        <div className="sentinel-card p-2.5 flex flex-col gap-1.5">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
             {tx.airQuality}
           </div>
@@ -41,7 +41,7 @@ export function MetricCards() {
         </div>
 
         {/* FRP Card */}
-        <div className="sentinel-card p-3 min-w-[120px] flex flex-col gap-2">
+        <div className="sentinel-card p-2.5 flex flex-col gap-1.5">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
             {tx.firePower}
           </div>

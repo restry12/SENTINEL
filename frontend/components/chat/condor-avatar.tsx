@@ -60,26 +60,23 @@ export function CondorGuideAvatar({ state }: Props) {
   return (
     <div className="relative w-full h-full">
       <div className={cn("relative w-full h-full transition-transform duration-1000")}>
-        
-        {/* Atmosphere / Glows (Cian for NEWEN AI) */}
+
         <div className={cn(
           "absolute inset-0 rounded-full pointer-events-none transition-all duration-1000",
           "scale-[1.8] blur-2xl opacity-30",
           active ? (speaking ? "bg-cyan-400/40" : "bg-cyan-500/15") : "bg-cyan-500/5",
         )} />
 
-        {/* Avatar Container - Back to Circular with White Background */}
         <div className={cn(
           "relative w-full h-full rounded-full overflow-hidden border transition-all duration-700 bg-white",
-          active 
-            ? "border-cyan-400/30 shadow-[0_0_30px_rgba(34,211,238,0.2)]" 
+          active
+            ? "border-cyan-400/30 shadow-[0_0_30px_rgba(34,211,238,0.2)]"
             : "border-white/10 shadow-none"
         )}>
-          {/* Fallback Image */}
-          {(hasError) ? (
-            <img 
-              src="/condor.png" 
-              alt="Newen" 
+          {hasError ? (
+            <img
+              src="/condor.png"
+              alt="Newen"
               className="w-full h-full object-contain"
             />
           ) : (
@@ -93,13 +90,11 @@ export function CondorGuideAvatar({ state }: Props) {
             />
           )}
 
-          {/* Overlays for "Speaking" effect */}
           {speaking && (
             <div className="absolute inset-0 bg-cyan-400/5 mix-blend-overlay animate-pulse pointer-events-none" />
           )}
         </div>
-        
-        {/* Decorative Ring */}
+
         {active && (
           <div className="absolute inset-[-6px] rounded-full border border-cyan-500/10 animate-[spin_12s_linear_infinite]" />
         )}

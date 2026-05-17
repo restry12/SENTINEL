@@ -1,6 +1,15 @@
 import type { FireData, RouteData, NaturalRoutes, RoutesResult } from '@sentinel/types'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
+export function initialBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number) => d * Math.PI / 180
+  const dLon = toRad(lon2 - lon1)
+  const y = Math.sin(dLon) * Math.cos(toRad(lat2))
+  const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2))
+        - Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon)
+  return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360)
+}
+
 const EVACUATION_DESTINATIONS: Array<{ name: string; lat: number; lon: number }> = [
   { name: 'Temuco Centro', lat: -38.7359, lon: -72.5904 },
   { name: 'Angol', lat: -37.7972, lon: -72.7085 },
@@ -125,12 +134,22 @@ export async function calculateEvacuationRoutes(fires: FireData[]): Promise<Rout
 
   // ORS routes (geometry for map display, avoiding fire zone)
   const avoidPolygon = buildAvoidPolygon(fires)
+  const bearingMap = new Map<string, number>()
   const routes: RouteData[] = []
   if (apiKey) {
     for (const dest of EVACUATION_DESTINATIONS) {
       try {
         const route = await fetchOrsRoute(apiKey, avgLon, avgLat, dest.lon, dest.lat, avoidPolygon)
-        if (route) routes.push({ ...route, id: dest.name })
+        if (route) {
+          routes.push({ ...route, id: dest.name })
+          const coords = route.geometry.coordinates
+          if (coords.length >= 2) {
+            bearingMap.set(dest.name, initialBearing(
+              coords[0][1], coords[0][0],
+              coords[1][1], coords[1][0],
+            ))
+          }
+        }
       } catch (err) {
         console.warn(`[agent-routes] route to ${dest.name} failed:`, err)
       }
@@ -141,6 +160,23 @@ export async function calculateEvacuationRoutes(fires: FireData[]): Promise<Rout
   let naturalRoutes: NaturalRoutes | null = null
   try {
     naturalRoutes = await runA5(fires, routes)
+    if (naturalRoutes) {
+      for (const ruta of naturalRoutes.rutas) {
+        let bearing = bearingMap.get(ruta.destino) ?? bearingMap.get(ruta.nombre)
+        if (bearing === undefined) {
+          for (const [key, val] of bearingMap) {
+            if (
+              ruta.destino?.toLowerCase().includes(key.toLowerCase()) ||
+              ruta.nombre?.toLowerCase().includes(key.toLowerCase())
+            ) {
+              bearing = val
+              break
+            }
+          }
+        }
+        if (bearing !== undefined) ruta.bearing_deg = bearing
+      }
+    }
   } catch (err) {
     console.warn('[agent-routes] A5 LLM failed, returning ORS routes only:', err)
   }

@@ -36,6 +36,7 @@ interface PerFireExpansion {
 interface SentinelSnapshot {
   timestamp: string
   fires: FireData[]
+  weather?: { speed: number; deg: number; humidity: number; temp?: number }
   airQuality: { pm25: number; aqi: number; category: string }
   riskLevel: string
   riskAssessment?: { zona_afectada: string; resumen: string }
@@ -85,6 +86,7 @@ function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[
 - Si el usuario pregunta por un foco, región o métrica que no está en el contexto: responde "No tengo ese dato en vivo en este momento" y NO inventes nombres ni números.
 - Si la lista de FOCOS ACTIVOS está vacía o ausente: di explícitamente que no hay focos en los datos en vivo y ofrece información general sin valores específicos.
 - Está estrictamente prohibido inventar nombres de comunas, estados, ciudades o agencias que no estén en el contexto.
+- **CLIMA:** Los datos de viento, humedad y temperatura que aparecen en DATOS EN VIVO o CLIMA pertenecen ÚNICAMENTE a la zona de análisis (punto donde se disparó el sistema). NO corresponden a focos de otros países o regiones. Nunca atribuyas ese clima a un foco de otro país.
 
 ## ÁMBITO
 SENTINEL cubre incendios en América. Agencias por país (cita la del país donde está el foco que el usuario pregunta; si no estás seguro del país, no inventes):
@@ -101,34 +103,35 @@ Para otros países de América, usa "autoridades locales de emergencia" si no co
   if (mode === 'citizen') {
     prompt += `\n\n## TONO ACTUAL: CIUDADANO (modo por defecto)
 Hablas como vecino informado que ayuda a su comunidad. Reglas:
+- **EXTREMADAMENTE CONCISO:** Respuestas de máximo 2-3 oraciones breves. No te extiendas.
 - Frases cortas y cálidas. Empatía primero, datos después.
 - Nunca uses siglas técnicas sin traducirlas: AQI → "calidad del aire", PM2.5 → "partículas en el aire", FRP → "intensidad del fuego", MW/km² → omitir o traducir.
 - Si tienes que dar un número, acompáñalo de una analogía cotidiana (ej. "calidad del aire mala — parecido a estar al lado de un fumador").
 - Foco práctico: ¿qué hace la persona ahora? Cierra ventanas, mascarilla, evacuar, llamar a emergencias.
-- Tres viñetas máximo por respuesta cuando enumeres acciones.
+- Una o dos viñetas máximo por respuesta si es necesario enumerar.
 - Nada de jerga operacional ("nivel 2", "perímetro", "FRP máximo"). Si el usuario la pide explícita, ofrece traducir.
 
 EJEMPLOS:
 P: ¿Corro peligro?
-R: Hay un foco grande cerca de tu zona. No es emergencia inmediata, pero si ves humo, cierra ventanas y ten mascarilla a mano. Si tienes niños chicos o alguien con asma, mejor quédense adentro hoy.
+R: Hay un incendio activo cerca. Si ves humo, cierra ventanas y usa mascarilla. No es emergencia inmediata, pero mantente alerta.
 
 P: ¿Qué tan grave es la calidad del aire?
-R: Está mala. Es como estar al lado de alguien fumando todo el rato. Si haces deporte hoy, déjalo para mañana. Si tienes asma, no salgas a menos que sea necesario.`
+R: La calidad es mala, similar a estar cerca de un fumador. Evita el deporte al aire libre y mantén a niños dentro.`
   } else {
     prompt += `\n\n## TONO ACTUAL: EXPERTO
 Hablas como oficial de emergencias en briefing operacional. Reglas:
+- **BREVEDAD MÁXIMA:** Respuestas directas al punto. Sin saludos ni despedidas.
 - Conciso, técnico, sin rodeos.
 - Usa siglas y unidades directas: FRP (MW), AQI, PM2.5 (µg/m³), viento (km/h), hectáreas.
 - Cita ubicaciones por nombre + país desde FOCOS ACTIVOS.
-- Listas operacionales si ayudan (recursos, acciones, prioridades).
-- Sin pleonasmos, sin saludos.
+- Sin pleonasmos.
 
 EJEMPLOS:
 P: ¿Foco más peligroso?
-R: [Foco con mayor FRP de la lista FOCOS ACTIVOS] — propagación esperada según viento del contexto. Recursos recomendados: [del reporte si existe].
+R: Foco en [Ubicación] ([País]) con [X] MW. Riesgo de propagación por viento de [X] km/h.
 
 P: AQI actual.
-R: [valor numérico exacto] — [categoría]. Riesgo respiratorio [bajo/medio/alto].`
+R: [Valor] — [Categoría]. Riesgo respiratorio [nivel].`
   }
 
   if (snapshot) {
@@ -166,8 +169,19 @@ R: [valor numérico exacto] — [categoría]. Riesgo respiratorio [bajo/medio/al
     prompt += `- Nivel de riesgo: ${snapshot.riskLevel.toUpperCase()}\n`
 
     if (snapshot.riskAssessment) {
-      prompt += `- Zona afectada: ${snapshot.riskAssessment.zona_afectada}\n`
-      prompt += `- Evaluación: ${snapshot.riskAssessment.resumen}\n`
+      const zona = snapshot.riskAssessment.zona_afectada
+      prompt += `- Zona de análisis (punto donde se disparó el sistema): ${zona}\n`
+      prompt += `- Evaluación de riesgo (específica para ${zona}): ${snapshot.riskAssessment.resumen}\n`
+    }
+
+    if (snapshot.weather) {
+      const zona = snapshot.riskAssessment?.zona_afectada ?? 'zona de análisis'
+      const windKmh = (snapshot.weather.speed * 3.6).toFixed(1)
+      prompt += `\n## CLIMA EN ZONA DE ANÁLISIS (${zona})\n`
+      prompt += `⚠️ Estos datos climáticos son EXCLUSIVOS de ${zona}. NO aplican a focos en otros países o regiones.\n`
+      prompt += `- Viento: ${windKmh} km/h\n`
+      prompt += `- Humedad: ${snapshot.weather.humidity}%\n`
+      if (snapshot.weather.temp != null) prompt += `- Temperatura: ${snapshot.weather.temp}°C\n`
     }
 
     if (snapshot.report) {

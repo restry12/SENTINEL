@@ -117,6 +117,7 @@ export function MapboxPanel({
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const pulseRafRef = useRef<number | null>(null)
+  const lastUpdateRef = useRef<string>('')
   const { sentinelUpdate } = useSentinel()
   const { selectedFire, setSelectedFire, selectFireRef } = useFireSelection()
   const userCoords = useGeolocation()
@@ -147,6 +148,8 @@ export function MapboxPanel({
         'space-color': 'rgb(2, 2, 5)',
         'star-intensity': 0.9,
       })
+      // Reset cache so fire layers are always re-applied on new map instances.
+      lastUpdateRef.current = ''
       setMapLoaded(true)
     })
     
@@ -222,8 +225,15 @@ export function MapboxPanel({
     }
 
     const apply = () => {
-      cleanup()
       const fires = sentinelUpdate?.fires ?? []
+      
+      // Skip if data is identical to avoid flickering
+      const currentDataStr = JSON.stringify(fires)
+      if (currentDataStr === lastUpdateRef.current) return
+      lastUpdateRef.current = currentDataStr
+
+      cleanup()
+      if (fires.length === 0) return
 
       function openFire(
         lat: number, lon: number,

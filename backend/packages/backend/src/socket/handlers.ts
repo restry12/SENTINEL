@@ -57,6 +57,64 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
       })
     })
 
+    socket.on('trigger-citizen', (data: { lat?: number; lon?: number }) => {
+      const lastTrigger = socketLastTrigger.get(socket.id) ?? 0
+      const elapsed = Date.now() - lastTrigger
+      if (elapsed < SOCKET_TRIGGER_COOLDOWN_MS) {
+        const waitSec = Math.ceil((SOCKET_TRIGGER_COOLDOWN_MS - elapsed) / 1000)
+        socket.emit('status', {
+          state: 'error',
+          message: `Demasiadas peticiones. Espera ${waitSec}s.`,
+        } satisfies StatusPayload)
+        return
+      }
+
+      if (isLocked()) {
+        socket.emit('status', {
+          state: 'error',
+          message: 'Análisis en curso. Espera que termine antes de analizar tu zona.',
+        } satisfies StatusPayload)
+        return
+      }
+
+      const lat = typeof data.lat === 'number' && isFinite(data.lat) ? data.lat : undefined
+      const lon = typeof data.lon === 'number' && isFinite(data.lon) ? data.lon : undefined
+      if (!lat || !lon) {
+        socket.emit('status', { state: 'error', message: 'Coordenadas inválidas.' } satisfies StatusPayload)
+        return
+      }
+
+      socketLastTrigger.set(socket.id, Date.now())
+      socket.emit('status', { state: 'loading' } satisfies StatusPayload)
+
+      const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
+      if (citizenWebhookUrl) {
+        const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+        const webhookSecret = process.env.MAKE_CITIZEN_WEBHOOK_SECRET
+        if (webhookSecret) webhookHeaders['x-make-apikey'] = webhookSecret
+
+        fetch(citizenWebhookUrl, {
+          method: 'POST',
+          headers: webhookHeaders,
+          body: JSON.stringify({
+            lat, lon, socketId: socket.id,
+            west: Math.round((lon - 3) * 10) / 10,
+            south: Math.round((lat - 3) * 10) / 10,
+            east: Math.round((lon + 3) * 10) / 10,
+            north: Math.round((lat + 3) * 10) / 10,
+          }),
+        }).catch((err) => {
+          console.error('[trigger-citizen] Make.com webhook call failed:', err)
+          socket.emit('status', { state: 'error', message: 'No se pudo iniciar el análisis ciudadano.' } satisfies StatusPayload)
+        })
+      } else {
+        console.warn('[trigger-citizen] MAKE_CITIZEN_WEBHOOK_URL not set — running degraded analysis')
+        executeAndBroadcast(io, lat, lon, [], undefined, undefined, socket.id).catch((err) => {
+          console.error('[trigger-citizen] fallback analysis error:', err)
+        })
+      }
+    })
+
     socket.on('start-polling', (data: { intervalMs: number }) => {
       if (!data.intervalMs || data.intervalMs < MIN_POLL_INTERVAL_MS) {
         socket.emit('status', {
@@ -89,19 +147,20 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
 const DEFAULT_LAT = -38.5
 const DEFAULT_LON = -72.0
 
-export async function executeAndBroadcast(io: Server, lat?: number, lon?: number, firms?: unknown[], weather?: unknown, pm25?: number): Promise<void> {
+export async function executeAndBroadcast(io: Server, lat?: number, lon?: number, firms?: unknown[], weather?: unknown, pm25?: number, targetSocketId?: string): Promise<void> {
   if (!acquireLock()) {
     console.warn('[orchestrator] analysis already in progress — skipping duplicate trigger')
     return
   }
 
-  io.emit('status', { state: 'loading' } satisfies StatusPayload)
+  const emitter = targetSocketId ? io.to(targetSocketId) : io
+  emitter.emit('status', { state: 'loading' } satisfies StatusPayload)
 
   try {
     const update = await runAnalysis(lat, lon, firms, weather, pm25)
     setLastUpdate(update)
-    io.emit('update', update)
-    io.emit('status', { state: 'ok' } satisfies StatusPayload)
+    emitter.emit('update', update)
+    emitter.emit('status', { state: 'ok' } satisfies StatusPayload)
 
     let alertsSent = false
     if (update.riskLevel === 'high' || update.riskLevel === 'critical') {
@@ -110,7 +169,7 @@ export async function executeAndBroadcast(io: Server, lat?: number, lon?: number
         fires: update.fires,
         timestamp: update.timestamp,
       }
-      io.emit('alert', alert)
+      emitter.emit('alert', alert)
       const centLat = lat ?? DEFAULT_LAT
       const centLon = lon ?? DEFAULT_LON
       await triggerMakeWebhook(update as SentinelUpdate, centLat, centLon)
@@ -122,7 +181,7 @@ export async function executeAndBroadcast(io: Server, lat?: number, lon?: number
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[orchestrator] error:', message)
-    io.emit('status', { state: 'error', message } satisfies StatusPayload)
+    emitter.emit('status', { state: 'error', message } satisfies StatusPayload)
   } finally {
     releaseLock()
   }

@@ -215,6 +215,24 @@ export function useSocket() {
   const [connected, setConnected] = useState(false)
   const socketRef = useRef<Socket | null>(null)
 
+  const hydrate = useCallback(async (retries = 3): Promise<boolean> => {
+    try {
+      const r = await fetch("/api/last")
+      const d = await r.json()
+      if (d?.ok && d.update) {
+        setSentinelUpdate(d.update as SentinelUpdate)
+        cacheUpdate(d.update as SentinelUpdate)
+        setStatus({ state: "ok" })
+        return true
+      }
+    } catch {
+      if (retries > 0) {
+        setTimeout(() => hydrate(retries - 1), 2000)
+      }
+    }
+    return false
+  }, [])
+
   useEffect(() => {
     // 1. Instant paint from the browser's own cache of the last analysis.
     const cached = readCachedUpdate()
@@ -224,18 +242,7 @@ export function useSocket() {
     }
 
     // 2. Hydrate from the backend's last snapshot (covers a fresh browser).
-    fetch("/api/last")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d?.ok && d.update) {
-          setSentinelUpdate(d.update as SentinelUpdate)
-          cacheUpdate(d.update as SentinelUpdate)
-          setStatus({ state: "ok" })
-        }
-      })
-      .catch(() => {
-        /* backend unreachable — socket replay still covers it */
-      })
+    hydrate()
 
     const url = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000"
     const socket: Socket = io(url, { transports: ["websocket"] })
@@ -257,11 +264,24 @@ export function useSocket() {
       socket.disconnect()
       socketRef.current = null
     }
-  }, [])
+  }, [hydrate])
 
   const trigger = useCallback((lat?: number, lon?: number) => {
     socketRef.current?.emit("trigger", { lat, lon })
   }, [])
 
-  return { sentinelUpdate, status, connected, trigger }
+  const triggerCitizen = useCallback((lat: number, lon: number) => {
+    const socketId = socketRef.current?.id ?? null
+    const body: Record<string, unknown> = { lat, lon }
+    if (socketId) body.socketId = socketId
+    fetch('/api/trigger/citizen-init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch((err) => console.error('[triggerCitizen] HTTP trigger failed:', err))
+  }, [])
+
+  const refresh = useCallback(() => { hydrate() }, [hydrate])
+
+  return { sentinelUpdate, status, connected, trigger, triggerCitizen, refresh }
 }
