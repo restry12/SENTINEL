@@ -43,10 +43,6 @@ function AirQualityPageInner() {
     ]).then(([cData, geoData]: [AirDataFile, { features: GeoFeature[] }]) => {
       setCountryData(cData)
       setCityFeatures(geoData.features)
-      const worst = Object.entries(cData.countries).reduce((a, b) =>
-        b[1].avgAQI > a[1].avgAQI ? b : a
-      )
-      setSelectedCountry(worst[0])
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
