@@ -6,6 +6,8 @@ import { useSentinel } from '@/contexts/sentinel-context'
 import { useFireSelection, type FireIntensity } from '@/contexts/fire-selection-context'
 import { degToCompass } from '@/lib/utils'
 import { useGeolocation } from '@/hooks/use-geolocation'
+import type { FireRiskGrid, FireRiskCell } from '@/hooks/use-socket'
+import { cellPolygon } from '@/lib/risk-grid'
 
 function directionToDeg(dir: string): number | null {
   const map: Record<string, number> = {
@@ -104,12 +106,14 @@ const EXP_CONFIG: Record<ExpansionKey, {
 }
 
 
-export function MapboxPanel({ 
-  showHeatmap = false,
+export function MapboxPanel({
+  riskGrid,
+  onCellClick,
   activeExpansion,
   setActiveExpansion
-}: { 
-  showHeatmap?: boolean,
+}: {
+  riskGrid: FireRiskGrid | null,
+  onCellClick: (cell: FireRiskCell) => void,
   activeExpansion: ExpansionKey | null,
   setActiveExpansion: (k: ExpansionKey | null) => void
 }) {
@@ -120,6 +124,8 @@ export function MapboxPanel({
   const { sentinelUpdate } = useSentinel()
   const { selectedFire, setSelectedFire, selectFireRef } = useFireSelection()
   const userCoords = useGeolocation()
+  const onCellClickRef = useRef(onCellClick)
+  onCellClickRef.current = onCellClick
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -456,55 +462,101 @@ export function MapboxPanel({
     else map.once('style.load', apply)
   }, [sentinelUpdate])
 
+  // Grid source + fill/line layers — rebuilt whenever the grid changes.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapLoaded) return
 
     const apply = () => {
       if (!map.getStyle()) return
-      const heatId = 'prediction-heatmap'
-      const gridId = 'prediction-grid'
-      if (map.getLayer(heatId)) map.removeLayer(heatId)
-      if (map.getLayer(gridId)) map.removeLayer(gridId)
-      if (map.getSource(gridId)) map.removeSource(gridId)
+      const fillId = 'risk-grid-fill'
+      const lineId = 'risk-grid-line'
+      const srcId = 'risk-grid-src'
+      if (map.getLayer(fillId)) map.removeLayer(fillId)
+      if (map.getLayer(lineId)) map.removeLayer(lineId)
+      if (map.getSource(srcId)) map.removeSource(srcId)
 
-      const pred = sentinelUpdate?.prediction
-      if (!pred || !showHeatmap) return
+      if (!riskGrid) return
 
-      const features = pred.grid.map(c => ({
-        type: 'Feature',
-        properties: { risk: c.risk_score },
-        geometry: { type: 'Point', coordinates: [c.lon, c.lat] },
+      const features = riskGrid.cells.map(c => ({
+        type: 'Feature' as const,
+        properties: {
+          id: c.id,
+          category: c.category,
+          score: c.score,
+          fwi: c.factors.fwi,
+          historial: c.factors.historial,
+          terreno: c.factors.terreno,
+          zona: c.zona,
+          lat: c.lat,
+          lon: c.lon,
+          size: c.size,
+        },
+        geometry: { type: 'Polygon' as const, coordinates: cellPolygon(c) },
       }))
 
-      map.addSource(gridId, { type: 'geojson', data: { type: 'FeatureCollection', features } as any })
-
+      map.addSource(srcId, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features } as any,
+      })
       map.addLayer({
-        id: heatId,
-        type: 'heatmap',
-        source: gridId,
-        maxzoom: 12,
+        id: fillId, type: 'fill', source: srcId,
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'risk'], 0, 0, 1, 1],
-          'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 12, 3],
-          'heatmap-color': [
-            'interpolate', ['linear'], ['heatmap-density'],
-            0, 'rgba(0,0,0,0)',
-            0.2, 'rgba(34,197,94,0.3)',
-            0.4, 'rgba(234,179,8,0.4)',
-            0.6, 'rgba(249,115,22,0.5)',
-            0.8, 'rgba(239,68,68,0.6)',
-            1, 'rgba(220,38,38,0.7)',
+          'fill-color': [
+            'match', ['get', 'category'],
+            'bajo', '#22c55e',
+            'medio', '#eab308',
+            'alto', '#f97316',
+            'critico', '#ef4444',
+            '#22c55e',
           ],
-          'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 12, 20],
-          'heatmap-opacity': 0.6,
+          'fill-opacity': 0.35,
         },
+      })
+      map.addLayer({
+        id: lineId, type: 'line', source: srcId,
+        paint: { 'line-color': 'rgba(255,255,255,0.15)', 'line-width': 0.5 },
       })
     }
 
     if (map.isStyleLoaded()) apply()
     else map.once('style.load', apply)
-  }, [sentinelUpdate, showHeatmap, mapLoaded])
+  }, [riskGrid, mapLoaded])
+
+  // Grid interactivity — registered once for the fixed layer id.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapLoaded) return
+
+    const fillId = 'risk-grid-fill'
+    const onClick = (e: mapboxgl.MapLayerMouseEvent) => {
+      const f = e.features?.[0]
+      if (!f) return
+      const p = f.properties as any
+      onCellClickRef.current({
+        id: p.id,
+        lat: p.lat,
+        lon: p.lon,
+        size: p.size,
+        score: p.score,
+        category: p.category,
+        factors: { fwi: p.fwi, historial: p.historial, terreno: p.terreno },
+        zona: p.zona,
+      })
+    }
+    const onEnter = () => { map.getCanvas().style.cursor = 'pointer' }
+    const onLeave = () => { map.getCanvas().style.cursor = '' }
+
+    map.on('click', fillId, onClick)
+    map.on('mouseenter', fillId, onEnter)
+    map.on('mouseleave', fillId, onLeave)
+
+    return () => {
+      map.off('click', fillId, onClick)
+      map.off('mouseenter', fillId, onEnter)
+      map.off('mouseleave', fillId, onLeave)
+    }
+  }, [mapLoaded])
 
   useEffect(() => {
     const map = mapRef.current
