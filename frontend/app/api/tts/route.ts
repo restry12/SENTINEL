@@ -45,10 +45,29 @@ export async function POST(req: Request) {
     const groupId = process.env.MINIMAX_GROUP_ID || "";
     const url = `https://api.minimaxi.chat/v1/t2a_v2${groupId ? `?GroupId=${groupId}` : ''}`;
 
+    // Rotación de llaves para evitar el límite diario
+    const apiKeys = [
+      process.env.MINIMAX_API_KEY,
+      process.env.MINIMAX_API_KEY_1,
+      process.env.MINIMAX_API_KEY_2,
+      process.env.MINIMAX_API_KEY_3,
+      process.env.MINIMAX_API_KEY_4
+    ].filter(Boolean); // Solo deja las que no estén vacías
+
+    if (apiKeys.length === 0) {
+      return new Response(JSON.stringify({ error: "No MiniMax API keys configured" }), { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Elige una llave al azar
+    const randomKey = apiKeys[Math.floor(Math.random() * apiKeys.length)];
+
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.MINIMAX_API_KEY}`,
+        "Authorization": `Bearer ${randomKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
