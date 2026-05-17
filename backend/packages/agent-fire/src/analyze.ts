@@ -114,6 +114,18 @@ Calcula la expansión del incendio respetando las restricciones absolutas del co
   return parseJSON<PerFireExpansionFields>(raw, 'A2PerFire')
 }
 
+async function analyzePerFire(fire: FireData, weather: WeatherData): Promise<PerFireExpansion> {
+  const ctx = await runAContext(fire)
+  const exp = await runA2PerFire(fire, weather, ctx)
+  return {
+    lat: fire.lat,
+    lon: fire.lon,
+    frp: fire.frp,
+    ...exp,
+    regional_context: ctx,
+  }
+}
+
 // A1: Risk Evaluator
 async function runA1(
   nasaData: ReturnType<typeof toNasaData>,
@@ -178,41 +190,6 @@ function expansionToGeoJSON(expansion: ExpansionData): GeoJSONFeature {
   }
 }
 
-// Mathematical fire spread model (simplified Rothermel) — per fire, no LLM needed
-function computePerFireExpansions(fires: FireData[], weather: WeatherData): PerFireExpansion[] {
-  const windKmh = weather.speed * 3.6
-  const windDir = degreesToCardinal((weather.deg + 180) % 360) // spread direction (opposite to wind origin)
-  const top150 = [...fires].sort((a, b) => b.frp - a.frp).slice(0, 150)
-
-  return top150.map(fire => {
-    // Rate of spread varies by FRP intensity (hotter fires spread faster)
-    const frpFactor = 1 + (fire.frp / 500) * 0.3 // mild boost for intense fires
-    const ros_forward = (0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002) * frpFactor
-    const ros_backing = 0.3
-    const ros_flank = Math.sqrt(ros_forward * ros_backing)
-
-    function areaKm2(hours: number): number {
-      const df = ros_forward * hours
-      const db = ros_backing * hours
-      const dfl = Math.max(ros_flank * hours, 0.3)
-      const a = (df + db) / 2
-      const b = dfl
-      return Math.round(Math.PI * a * b * 100) / 100
-    }
-
-    return {
-      lat: fire.lat,
-      lon: fire.lon,
-      frp: fire.frp,
-      expansion_2h_km2: areaKm2(2),
-      expansion_6h_km2: areaKm2(6),
-      expansion_12h_km2: areaKm2(12),
-      velocidad_kmh: Math.round(ros_forward * 10) / 10,
-      direccion: windDir,
-    }
-  })
-}
-
 const EMPTY: FireAnalysis = {
   polygon: {
     type: 'Feature',
@@ -233,21 +210,34 @@ const EMPTY: FireAnalysis = {
 export async function analyzeFireExpansion(fires: FireData[], weather: WeatherData): Promise<FireAnalysis> {
   if (fires.length === 0) return EMPTY
 
-  // Per-fire mathematical expansion (always computed, no LLM dependency)
-  const perFireExpansions = computePerFireExpansions(fires, weather)
-
   const nasaData = toNasaData(fires)
   const climateData = toClimateData(weather)
   const center = centroid(fires)
 
-  // A1 first, then A2 uses A1 output + real coordinates (sequential by design)
-  const a1 = await runA1(nasaData, climateData)
-  const a2 = await runA2(a1, climateData, center)
+  // Top 50 fires by FRP — per-fire agents in parallel
+  const top50 = [...fires].sort((a, b) => b.frp - a.frp).slice(0, 50)
+  const [a1Result, perFireResults] = await Promise.all([
+    runA1(nasaData, climateData),
+    Promise.allSettled(top50.map(f => analyzePerFire(f, weather))),
+  ])
 
-  return {
-    polygon: expansionToGeoJSON(a2),
-    riskAssessment: a1,
-    expansion: a2,
-    perFireExpansions,
+  const perFireExpansions = perFireResults
+    .filter((r): r is PromiseFulfilledResult<PerFireExpansion> => r.status === 'fulfilled')
+    .map(r => r.value)
+
+  try {
+    const a2 = await runA2(a1Result, climateData, center)
+    return {
+      polygon: expansionToGeoJSON(a2),
+      riskAssessment: a1Result,
+      expansion: a2,
+      perFireExpansions,
+    }
+  } catch {
+    return {
+      ...EMPTY,
+      riskAssessment: a1Result,
+      perFireExpansions,
+    }
   }
 }
