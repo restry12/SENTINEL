@@ -5,7 +5,6 @@ import { MapPanel } from "@/components/dashboard/map-panel"
 import { AuthGuard } from "@/components/auth-guard"
 import { FireSelectionProvider, useFireSelection } from "@/contexts/fire-selection-context"
 import { TacticalNotification } from "@/components/dashboard/tactical-notification"
-import { MetricCards } from "@/components/dashboard/metric-cards"
 import { useSentinel } from "@/contexts/sentinel-context"
 import { useEffect, useState } from "react"
 
@@ -49,12 +48,6 @@ function DashboardContent() {
         {/* Tactical Alerts (Mobile/HUD Overlay) */}
         <TacticalNotification />
         
-        {/* Mobile Metric HUD - Only visible on small screens when no fire is selected */}
-        {!selectedFire && (
-          <div className="md:hidden absolute bottom-20 left-4 right-4 z-40 animate-in slide-in-from-bottom-4 duration-500 rounded-xl border border-white/10 shadow-2xl backdrop-blur-xl overflow-hidden">
-            <MetricCards />
-          </div>
-        )}
       </div>
     </div>
   )
