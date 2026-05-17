@@ -235,20 +235,6 @@ export function SentinelRadarMap({ user, tornado, shelter }: SentinelRadarMapPro
             },
           })
 
-          // ── Shelter Position ─────────────────────────────────────────────
-          map.addSource("pt-shelter", pointSource(shelter.lon, shelter.lat))
-          map.addLayer({
-            id: "pt-shelter",
-            type: "circle",
-            source: "pt-shelter",
-            paint: {
-              "circle-radius": 8,
-              "circle-color": COLORS.shelter,
-              "circle-stroke-width": 2,
-              "circle-stroke-color": "#ffffff",
-            },
-          })
-
           // Pulse animation loop
           const pulseStart = performance.now()
           const animatePulse = () => {
@@ -276,11 +262,6 @@ export function SentinelRadarMap({ user, tornado, shelter }: SentinelRadarMapPro
               offset: [0, -32],
             })
               .setLngLat([tornado.lon, tornado.lat])
-              .addTo(map),
-          )
-          markersRef.current.push(
-            new mapboxgl.Marker({ element: makeLabelEl("REFUGIO", COLORS.shelter), offset: [0, 20] })
-              .setLngLat([shelter.lon, shelter.lat])
               .addTo(map),
           )
         })
