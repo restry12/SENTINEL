@@ -98,10 +98,10 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
           headers: webhookHeaders,
           body: JSON.stringify({
             lat, lon, socketId: socket.id,
-            west: Math.round((lon - 3) * 10) / 10,
-            south: Math.round((lat - 3) * 10) / 10,
-            east: Math.round((lon + 3) * 10) / 10,
-            north: Math.round((lat + 3) * 10) / 10,
+            west:  Math.round((lon - 0.018) * 10000) / 10000,
+            south: Math.round((lat - 0.018) * 10000) / 10000,
+            east:  Math.round((lon + 0.018) * 10000) / 10000,
+            north: Math.round((lat + 0.018) * 10000) / 10000,
           }),
         }).catch((err) => {
           console.error('[trigger-citizen] Make.com webhook call failed:', err)

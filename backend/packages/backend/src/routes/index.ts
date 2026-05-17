@@ -222,10 +222,10 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
         body: JSON.stringify({
           lat, lon,
           ...(socketId ? { socketId } : {}),
-          west:  Math.round((lon - 3) * 10) / 10,
-          south: Math.round((lat - 3) * 10) / 10,
-          east:  Math.round((lon + 3) * 10) / 10,
-          north: Math.round((lat + 3) * 10) / 10,
+          west:  Math.round((lon - 0.018) * 10000) / 10000,
+          south: Math.round((lat - 0.018) * 10000) / 10000,
+          east:  Math.round((lon + 0.018) * 10000) / 10000,
+          north: Math.round((lat + 0.018) * 10000) / 10000,
         }),
       }).catch((err) => console.error('[citizen-init] webhook error:', err instanceof Error ? err.message : err))
     } else {
@@ -264,7 +264,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     // Exclude fires from unrelated regions — only keep fires within 300 km of the user.
     // The last analysis may cover a different area (e.g. southern Chile) if Make.com's
     // citizen webhook hasn't responded yet, which would produce nonsensical distances.
-    const MAX_FIRE_RADIUS_KM = 300
+    const MAX_FIRE_RADIUS_KM = 2
     const fires = allFires.filter((f) => {
       const dLat = (f.lat - userLat) * Math.PI / 180
       const dLon = (f.lon - userLon) * Math.PI / 180
