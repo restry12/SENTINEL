@@ -7,6 +7,28 @@ import { useFireSelection, type FireIntensity } from '@/contexts/fire-selection-
 import { degToCompass } from '@/lib/utils'
 import { useGeolocation } from '@/hooks/use-geolocation'
 
+function directionToDeg(dir: string): number | null {
+  const map: Record<string, number> = {
+    N: 0, NORTE: 0,
+    NNE: 22.5,
+    NE: 45, NORESTE: 45,
+    ENE: 67.5,
+    E: 90, ESTE: 90,
+    ESE: 112.5,
+    SE: 135, SURESTE: 135,
+    SSE: 157.5,
+    S: 180, SUR: 180,
+    SSO: 202.5, SSW: 202.5,
+    SO: 225, SUROESTE: 225, SW: 225,
+    OSO: 247.5, WSW: 247.5,
+    O: 270, OESTE: 270, W: 270,
+    ONO: 292.5, WNW: 292.5,
+    NO: 315, NOROESTE: 315, NW: 315,
+    NNO: 337.5, NNW: 337.5,
+  }
+  return map[dir.toUpperCase().trim()] ?? null
+}
+
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
   "pk.eyJ1IjoicmVzdHJ5IiwiYSI6ImNtcDdvb2Q2eDA0Y3UycnBzbzF2djZ0NDEifQ.-KHE5eGMYCwEPheVI8SdFg"
@@ -237,6 +259,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const map = mapRef.current
     if (!map || !userCoords) return
     const apply = () => {
+      if (!map.getStyle()) return
       const data = {
         type: 'Feature' as const,
         properties: {},
@@ -280,6 +303,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         cancelAnimationFrame(pulseRafRef.current)
         pulseRafRef.current = null
       }
+      if (!map.getStyle()) return
       [SELECTED, POINTS, 'fires-points-halo', CLUSTER_COUNT, CLUSTERS].forEach(id => {
         if (map.getLayer(id)) map.removeLayer(id)
       })
@@ -439,10 +463,21 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         const weather = props.weatherJson ? JSON.parse(props.weatherJson) : undefined
         const intensity: FireIntensity = props.frp >= 300 ? 'critical' : props.frp >= 100 ? 'high' : 'moderate'
 
+        // Per-fire wind — use fire's own weather if available, otherwise global
+        const fireWDeg   = weather?.deg   ?? wDeg
+        const fireWSpeed = weather?.speed ?? wSpeed
+        const fireSDeg   = (fireWDeg + 180) % 360
+        const fireSDirLabel = degToCompass(fireSDeg)
+        const fireWKmh   = Math.round(fireWSpeed * 3.6)
+        const fireA2  = computeFireSpreadArea(fireWSpeed, 2)
+        const fireA6  = computeFireSpreadArea(fireWSpeed, 6)
+        const fireA12 = computeFireSpreadArea(fireWSpeed, 12)
+
         const popupData: PopupData = {
           id: props.id, color, intensity: String(intensity),
           frp: props.frp, lat, lon,
-          sDirLabel, wKmh, a2, a6, a12,
+          sDirLabel: fireSDirLabel, wKmh: fireWKmh,
+          a2: fireA2, a6: fireA6, a12: fireA12,
           weather, pm25: props.pm25,
         }
 
@@ -464,8 +499,9 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
 
         setSelectedFire({
           id: props.id, lat, lon, frp: props.frp, brightness: props.brightness,
-          intensity, windImpactDir: sDirLabel, windKmh: wKmh,
-          expansion2h: a2, expansion6h: a6, expansion12h: a12,
+          intensity, windImpactDir: fireSDirLabel, windKmh: fireWKmh,
+          expansion2h: fireA2, expansion6h: fireA6, expansion12h: fireA12,
+          weather,
         })
         setActiveExpansion('2h')
 
@@ -491,7 +527,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
 
       // Pulse animation for unclustered individual fires
       const animate = () => {
-        if (!mapRef.current || !mapRef.current.getLayer('fires-points-halo')) return
+        if (!mapRef.current || !mapRef.current.getStyle() || !mapRef.current.getLayer('fires-points-halo')) return
         const t = (performance.now() / 1400) % 1
         const phase = (Math.sin(t * Math.PI * 2) + 1) / 2  // 0..1
         const radius = 8 + phase * 14
@@ -520,6 +556,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     if (!map || !sentinelUpdate) return
 
     const apply = () => {
+      if (!map.getStyle()) return
       const polyId = 'sentinel-polygon'
       if (map.getLayer(polyId + '-fill')) map.removeLayer(polyId + '-fill')
       if (map.getLayer(polyId + '-line')) map.removeLayer(polyId + '-line')
@@ -564,14 +601,15 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const EXP_SOURCE_IDS = ['exp-outer', 'exp-mid', 'exp-core', 'exp-arrow-src']
 
     const drawExpansion = () => {
+      if (!map.getStyle()) return
       EXP_LAYER_IDS.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) })
       EXP_SOURCE_IDS.forEach(id => { if (map.getSource(id)) map.removeSource(id) })
 
       if (!selectedFire || !activeExpansion) return
 
       const cfg = EXP_CONFIG[activeExpansion]
-      const windDeg = sentinelUpdate?.weather?.deg ?? 315
-      const windSpeedMs = sentinelUpdate?.weather?.speed ?? 6.7
+      const windDeg     = selectedFire?.weather?.deg   ?? sentinelUpdate?.weather?.deg   ?? 315
+      const windSpeedMs = selectedFire?.weather?.speed ?? sentinelUpdate?.weather?.speed ?? 6.7
       const exp = sentinelUpdate?.expansion
       const backendPoly = activeExpansion === '2h' ? exp?.expansion_2h
         : activeExpansion === '6h' ? exp?.expansion_6h
@@ -649,6 +687,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const PF_LINE = 'per-fire-exp-line'
 
     const drawPerFire = () => {
+      if (!map.getStyle()) return
       if (map.getLayer(PF_LINE)) map.removeLayer(PF_LINE)
       if (map.getLayer(PF_FILL)) map.removeLayer(PF_FILL)
       if (map.getSource(PF_SRC)) map.removeSource(PF_SRC)
@@ -657,14 +696,16 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
       const expansions = sentinelUpdate?.perFireExpansions ?? []
       if (expansions.length === 0) return
 
-      const windDeg = sentinelUpdate?.weather?.deg ?? 315
-      const windSpeedMs = sentinelUpdate?.weather?.speed ?? 6.7
+      const globalWindDeg   = sentinelUpdate?.weather?.deg   ?? 315
+      const globalWindSpeed = sentinelUpdate?.weather?.speed ?? 6.7
       const hours = EXP_CONFIG[activeExpansion].hours
 
-      // Generate ellipse polygon for each fire using its FRP-adjusted spread
       const features = expansions.map(pf => {
-        const frpFactor = 1 + (pf.frp / 500) * 0.3
-        return makeFireSpreadPolygon(pf.lat, pf.lon, windDeg, windSpeedMs * frpFactor, hours)
+        const spreadDeg   = directionToDeg(pf.direccion) ?? globalWindDeg
+        const pfWindDeg   = (spreadDeg + 180) % 360  // convert spread→origin for makeFireSpreadPolygon
+        const pfWindSpeed = pf.velocidad_kmh > 0 ? pf.velocidad_kmh / 3.6 : globalWindSpeed
+        const frpFactor   = 1 + (pf.frp / 500) * 0.3
+        return makeFireSpreadPolygon(pf.lat, pf.lon, pfWindDeg, pfWindSpeed * frpFactor, hours)
       })
 
       map.addSource(PF_SRC, {
@@ -704,6 +745,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const LINE = 'prediction-heatmap-line'
 
     const cleanup = () => {
+      if (!map.getStyle()) return
       if (map.getLayer(LINE)) map.removeLayer(LINE)
       if (map.getLayer(FILL)) map.removeLayer(FILL)
       if (map.getSource(SRC)) map.removeSource(SRC)
@@ -753,6 +795,11 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
 
     if (map.isStyleLoaded()) draw()
     else map.once('style.load', draw)
+
+    return () => {
+      map.off('style.load', draw)
+      cleanup()
+    }
   }, [showHeatmap, sentinelUpdate?.prediction])
 
   return (

@@ -16,6 +16,7 @@ export interface SelectedFireData {
   expansion2h?: { km2: number; ha: number }
   expansion6h?: { km2: number; ha: number }
   expansion12h?: { km2: number; ha: number }
+  weather?: { speed: number; deg: number; humidity: number; temp?: number }
 }
 
 interface FireSelectionContextValue {
