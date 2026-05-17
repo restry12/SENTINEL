@@ -5,6 +5,7 @@ import { AuthGuard } from "@/components/auth-guard"
 import { TopBar } from "@/components/dashboard/top-bar"
 import { GlacierLeftPanel } from "@/components/glaciares/glacier-left-panel"
 import { GlacierMap } from "@/components/glaciares/glacier-map"
+import { GlacierRightPanel } from "@/components/glaciares/glacier-right-panel"
 import type { GlacierInfo, GlacierAnalysis, AgentResponse } from "@sentinel/types"
 import { Snowflake, ChevronLeft, Loader2 } from "lucide-react"
 
@@ -107,47 +108,28 @@ function GlaciersPageInner() {
             )}
             
             {selectedGlacierId && (
-              <div className="pointer-events-auto bg-[#0a0b0e]/80 backdrop-blur-md border border-white/10 rounded p-4">
-                <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-4 flex items-center gap-2">
-                   {analyzing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Snowflake className="w-3 h-3 text-blue" />}
-                   Análisis de Retroceso
-                </div>
-                
+              <div className="pointer-events-auto">
                 {analyzing ? (
-                   <div className="py-8 text-center">
-                      <div className="text-[11px] text-text-muted font-bold animate-pulse">PROCESANDO DATOS SATELITALES...</div>
+                   <div className="bg-[#0a0b0e]/80 backdrop-blur-md border border-white/10 rounded p-4">
+                      <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-4 flex items-center gap-2">
+                         <Loader2 className="w-3 h-3 animate-spin" />
+                         Análisis de Retroceso
+                      </div>
+                      <div className="py-8 text-center">
+                         <div className="text-[11px] text-text-muted font-bold animate-pulse">PROCESANDO DATOS SATELITALES...</div>
+                      </div>
                    </div>
                 ) : analysisData ? (
-                   <div className="space-y-4">
-                      <div>
-                        <div className="text-[10px] text-text-muted uppercase font-bold mb-1">Estado Crítico</div>
-                        <div className={`text-xl font-black ${
-                          analysisData.riskCategory === 'CRITICO' ? 'text-red' : 
-                          analysisData.riskCategory === 'ALTO' ? 'text-orange' : 
-                          'text-blue'
-                        }`}>
-                          {analysisData.riskCategory}
-                        </div>
-                      </div>
-                      
-                      <div className="pt-4 border-t border-white/5">
-                        <div className="text-[10px] text-text-muted uppercase font-bold mb-2">Resumen de IA</div>
-                        <p className="text-[11px] text-text-2 leading-relaxed">
-                          {analysisData.llmAnalysis.summary}
-                        </p>
-                      </div>
-
-                      <div className="pt-4 border-t border-white/5">
-                        <div className="text-[10px] text-text-muted uppercase font-bold mb-2">Proyección</div>
-                        <div className="text-[13px] font-black text-white">
-                          {analysisData.prediction.estimated_years_to_critical ?? 'Indefinido'} años
-                          <span className="text-[10px] text-text-muted font-normal ml-2">para punto crítico</span>
-                        </div>
-                      </div>
-                   </div>
+                   <GlacierRightPanel data={analysisData} />
                 ) : (
-                  <div className="py-4 text-center text-[11px] text-text-muted italic">
-                    Selecciona un glaciar para ver el análisis detallado.
+                  <div className="bg-[#0a0b0e]/80 backdrop-blur-md border border-white/10 rounded p-4">
+                    <div className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-4 flex items-center gap-2">
+                       <Snowflake className="w-3 h-3 text-blue" />
+                       Análisis de Retroceso
+                    </div>
+                    <div className="py-4 text-center text-[11px] text-text-muted italic">
+                      Selecciona un glaciar para ver el análisis detallado.
+                    </div>
                   </div>
                 )}
               </div>
