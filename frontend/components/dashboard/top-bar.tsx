@@ -80,11 +80,12 @@ export function TopBar() {
             </div>
             
             <nav className="flex items-center gap-1">
-              {([
+              {[
                 { href: '/dashboard', label: tx.navDashboard },
                 { href: '/air',       label: tx.navAir },
+                { href: '/tornado',   label: tx.navTornado },
                 { href: '/news',      label: tx.navNews ?? 'Noticias' },
-              ] as const).map(({ href, label }) => (
+              ].map(({ href, label }) => (
                 <Link
                   key={href}
                   href={href}
