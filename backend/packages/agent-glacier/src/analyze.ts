@@ -1,16 +1,4 @@
-import 'dotenv/config'
-import { readFileSync } from 'fs'
-import { join } from 'path'
-import type { GlacierClimateData, GlacierMassData, GlacierInfo, GlacierAnalysis } from '@sentinel/types'
-import { calculateGlacierRisk, getRiskCategory } from './risk-calculator'
-import { callOpenRouter, parseJSON, MODELS } from './openrouter'
-
-const catalog: GlacierInfo[] = JSON.parse(
-  readFileSync(join(__dirname, '..', 'data', 'glaciers-catalog.json'), 'utf-8')
-)
-const copernicus: Record<string, GlacierMassData[]> = JSON.parse(
-  readFileSync(join(__dirname, '..', 'data', 'copernicus-processed.json'), 'utf-8')
-)
+import type { GlacierMassData } from '@sentinel/types'
 
 export function thermalBaseline(altitudeM: number): number {
   if (altitudeM > 4000) return -8
@@ -65,6 +53,3 @@ export function buildPrediction(
 
   return { trend, estimated_years_to_critical: years > 50 ? null : years }
 }
-
-// fetchGlacierClimate and buildGlacierAnalysis added in Task 4
-export { catalog, copernicus }

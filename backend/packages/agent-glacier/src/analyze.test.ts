@@ -71,4 +71,19 @@ describe('buildPrediction', () => {
     const { trend } = buildPrediction(history, 40)
     expect(trend).toContain('estable')
   })
+
+  it('returns numeric years estimate for accelerating glacier below critical threshold', () => {
+    const history = [
+      { year: 2020, mass_change_mmwe: -500 },
+      { year: 2021, mass_change_mmwe: -600 },
+      { year: 2022, mass_change_mmwe: -1000 },
+    ]
+    // avg = (-500 + -600 + -1000) / 3 = -700
+    // last = -1000, accelerating = true (last < avg)
+    // annualRate = |(-1000) - (-700)| = 300
+    // pointsToGo = 76 - 50 = 26
+    // years = round(26 / (300/100)) = round(26/3) = 9
+    const { estimated_years_to_critical } = buildPrediction(history, 50)
+    expect(estimated_years_to_critical).toBe(9)
+  })
 })
