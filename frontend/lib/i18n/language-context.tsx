@@ -12,15 +12,22 @@ type LanguageContextValue = {
 const LanguageContext = React.createContext<LanguageContextValue | null>(null)
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = React.useState<Lang>('es')
-
-  React.useEffect(() => {
-    const stored = localStorage.getItem('sentinel_lang')
-    if (stored === 'es' || stored === 'en') setLangState(stored)
-  }, [])
+  const [lang, setLangState] = React.useState<Lang>(() => {
+    try {
+      const stored = localStorage.getItem('sentinel_lang')
+      if (stored === 'es' || stored === 'en') return stored
+    } catch {
+      // localStorage unavailable (private browsing, etc.)
+    }
+    return 'es'
+  })
 
   const setLang = React.useCallback((next: Lang) => {
-    localStorage.setItem('sentinel_lang', next)
+    try {
+      localStorage.setItem('sentinel_lang', next)
+    } catch {
+      // localStorage unavailable — still update state
+    }
     setLangState(next)
   }, [])
 
