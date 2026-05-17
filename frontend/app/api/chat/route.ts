@@ -136,6 +136,26 @@ R: [valor numérico exacto] — [categoría]. Riesgo respiratorio [bajo/medio/al
       ? Math.max(...snapshot.fires.map(f => f.frp)).toFixed(1)
       : '0'
 
+    const perFire = snapshot.perFireExpansions ?? []
+    if (perFire.length > 0) {
+      const topByFrp = [...perFire]
+        .sort((a, b) => b.frp - a.frp)
+        .slice(0, 8)
+      prompt += `\n\n## FOCOS ACTIVOS (con ubicación verificada)\n`
+      topByFrp.forEach((f, i) => {
+        const ctx = f.regional_context
+        const loc = ctx
+          ? `${ctx.region_name}, ${ctx.country}`
+          : `lat ${f.lat.toFixed(2)}, lon ${f.lon.toFixed(2)} (ubicación sin confirmar)`
+        prompt += `${i + 1}. ${loc} — ${f.frp.toFixed(1)} MW (lat ${f.lat.toFixed(2)}, lon ${f.lon.toFixed(2)})\n`
+      })
+      if (perFire.length > 8) {
+        prompt += `(... y ${perFire.length - 8} focos más de menor intensidad, no listados)\n`
+      }
+    } else {
+      prompt += `\n\n## FOCOS ACTIVOS\nNo hay focos con ubicación verificada en este snapshot. Si el usuario pregunta por un foco específico, di que no tienes ese dato.\n`
+    }
+
     prompt += `\n\n## DATOS EN VIVO [${snapshot.timestamp}]\n`
     prompt += `- Focos activos: ${snapshot.fires.length}\n`
     prompt += `- FRP máximo: ${frpMax} MW\n`
