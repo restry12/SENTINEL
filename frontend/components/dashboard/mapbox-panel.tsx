@@ -118,8 +118,8 @@ export function MapboxPanel({
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/satellite-streets-v12',
-      center: [-71.90, -38.28],
-      zoom: 9,
+      center: [-80, -5],
+      zoom: 2.5,
       projection: 'globe' as any,
     })
     
