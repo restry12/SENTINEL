@@ -1,11 +1,22 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { TopBar } from '@/components/dashboard/top-bar'
 import { AuthGuard } from '@/components/auth-guard'
 import { useLang } from '@/contexts/language-context'
 import { ExternalLink, RefreshCw, Newspaper, AlertTriangle } from 'lucide-react'
 import type { NewsArticle, NewsResponse } from '@/app/api/news/route'
+
+function renderInline(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**'))
+      return <strong key={i} className="text-foreground font-bold">{part.slice(2, -2)}</strong>
+    if (part.startsWith('*') && part.endsWith('*'))
+      return <em key={i} className="text-orange/90 not-italic">{part.slice(1, -1)}</em>
+    return part
+  })
+}
 
 function RecapCard({ recap, loading }: { recap: string | null; loading: boolean }) {
   if (loading) {
@@ -21,16 +32,35 @@ function RecapCard({ recap, loading }: { recap: string | null; loading: boolean 
     )
   }
   if (!recap) return null
+
+  const items = recap
+    .split(/(?=\d+\.\s)/)
+    .map(s => s.replace(/^\d+\.\s*/, '').trim())
+    .filter(Boolean)
+
+  const isList = items.length > 1
+
   return (
     <div className="p-6 rounded-xl border border-orange/20 bg-[linear-gradient(180deg,rgba(255,126,21,0.06),rgba(255,126,21,0.02))] backdrop-blur-xl relative overflow-hidden">
       <div className="absolute top-0 left-0 w-16 h-[1px] bg-orange shadow-[0_0_8px_rgba(255,126,21,0.6)]" />
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-4">
         <div className="w-1.5 h-1.5 rounded-full bg-orange animate-pulse shadow-[0_0_8px_rgba(255,126,21,0.8)]" />
         <span className="text-[9px] font-black tracking-[0.25em] text-orange uppercase">
           Inteligencia SENTINEL · Mistral AI
         </span>
       </div>
-      <p className="text-[14px] leading-relaxed text-text-1">{recap}</p>
+      {isList ? (
+        <ul className="space-y-3">
+          {items.map((item, i) => (
+            <li key={i} className="flex gap-3 text-[13px] leading-relaxed text-text-muted">
+              <span className="shrink-0 w-5 h-5 mt-0.5 rounded-full bg-orange/10 border border-orange/20 flex items-center justify-center text-[9px] font-black text-orange">{i + 1}</span>
+              <span>{renderInline(item)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[14px] leading-relaxed text-text-muted">{renderInline(recap)}</p>
+      )}
     </div>
   )
 }
