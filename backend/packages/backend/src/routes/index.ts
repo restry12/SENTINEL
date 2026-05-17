@@ -193,6 +193,48 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     })
   })
 
+  // POST /api/trigger/citizen-init — called by the frontend to kick off the citizen flow.
+  // Accepts { lat, lon, socketId? } and fires the Make.com citizen webhook.
+  // Uses the same webhook + bbox logic as the trigger-citizen socket handler.
+  app.post('/api/trigger/citizen-init', triggerLimiter, (req, res) => {
+    if (isLocked()) {
+      res.status(429).json({ ok: false, error: 'Analysis in progress — try again shortly' })
+      return
+    }
+    const body = req.body as { lat?: unknown; lon?: unknown; socketId?: unknown }
+    const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
+    const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
+    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
+
+    if (lat === undefined || lon === undefined) {
+      res.status(400).json({ ok: false, error: 'lat and lon required' })
+      return
+    }
+
+    const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
+    if (citizenWebhookUrl) {
+      const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+      const secret = process.env.MAKE_CITIZEN_WEBHOOK_SECRET
+      if (secret) webhookHeaders['x-make-apikey'] = secret
+      fetch(citizenWebhookUrl, {
+        method: 'POST',
+        headers: webhookHeaders,
+        body: JSON.stringify({
+          lat, lon, socketId,
+          west:  Math.round((lon - 3) * 10) / 10,
+          south: Math.round((lat - 3) * 10) / 10,
+          east:  Math.round((lon + 3) * 10) / 10,
+          north: Math.round((lat + 3) * 10) / 10,
+        }),
+      }).catch((err) => console.error('[citizen-init] webhook error:', err instanceof Error ? err.message : err))
+    } else {
+      console.warn('[citizen-init] MAKE_CITIZEN_WEBHOOK_URL not set — running degraded analysis')
+      executeAndBroadcast(io, lat, lon, [], undefined, undefined, socketId).catch(console.error)
+    }
+
+    res.status(202).json({ ok: true, accepted: true })
+  })
+
   // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
   // Receives { runId, socketId, lat, lon, weather, pm25 }
   // runId references fires cached by /api/fires/filter; weather and pm25 at citizen's location

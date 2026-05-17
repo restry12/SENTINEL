@@ -271,7 +271,18 @@ export function useSocket() {
   }, [])
 
   const triggerCitizen = useCallback((lat: number, lon: number) => {
-    socketRef.current?.emit("trigger-citizen", { lat, lon })
+    // Use HTTP proxy (BACKEND_URL server-side) so the trigger works regardless
+    // of whether NEXT_PUBLIC_SOCKET_URL is set or the socket is connected.
+    // The socket is still used to receive the analysis result back.
+    fetch('/api/trigger/citizen-init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lon, socketId: socketRef.current?.id ?? null }),
+    }).catch((err) => {
+      console.error('[triggerCitizen] HTTP trigger failed:', err)
+      // Last resort: try direct socket emit
+      socketRef.current?.emit('trigger-citizen', { lat, lon })
+    })
   }, [])
 
   return { sentinelUpdate, status, connected, trigger, triggerCitizen }
