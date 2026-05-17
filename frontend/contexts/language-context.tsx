@@ -14,6 +14,7 @@ export const t = {
     navDashboard:    'PANEL',
     navAir:          'CALIDAD AIRE',
     navNews:         'NOTICIAS',
+    navChat:         'SENTINEL AI',
     airMonitor:      'MONITOR CALIDAD AIRE',
     // Login
     welcome:         'Bienvenido a SENTINEL',
@@ -157,6 +158,7 @@ export const t = {
     navDashboard:    'DASHBOARD',
     navAir:          'AIR QUALITY',
     navNews:         'NEWS',
+    navChat:         'SENTINEL AI',
     airMonitor:      'AIR QUALITY MONITOR',
     welcome:         'Welcome to SENTINEL',
     loginSub:        'Enter your credentials to access the central monitoring command.',
