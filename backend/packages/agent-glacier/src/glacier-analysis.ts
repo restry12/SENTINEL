@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import type { GlacierClimateData, GlacierMassData, GlacierInfo, GlacierAnalysis } from '@sentinel/types'
 import { calculateGlacierRisk, getRiskCategory } from './risk-calculator'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
@@ -14,7 +13,9 @@ export async function fetchGlacierClimate(
   if (!key) throw new Error('OPENWEATHER_API_KEY is not set')
 
   const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${key}&units=metric`
-  const res = await fetch(url)
+  const res = await fetch(url).catch((err: Error) => {
+    throw new Error(`OpenWeather network failure: ${err.message}`)
+  })
   if (!res.ok) throw new Error(`OpenWeather error: ${res.status}`)
 
   const json = await res.json() as {
@@ -22,6 +23,8 @@ export async function fetchGlacierClimate(
     rain?: { '1h'?: number }
     snow?: { '1h'?: number }
   }
+
+  if (!json.main) throw new Error('OpenWeather: unexpected response shape')
 
   const currentMonth = new Date().getMonth() + 1
   const temp_avg = Math.round(json.main.temp * 10) / 10
@@ -62,9 +65,10 @@ El JSON debe tener exactamente esta estructura:
 }`
 
   const user = `Glaciar: ${glacierInfo.name} (${glacierInfo.country}, ${glacierInfo.region})
+Fecha de análisis: ${new Date().toISOString().split('T')[0]}
 Coordenadas: lat ${glacierInfo.lat}, lon ${glacierInfo.lon}, altitud ${glacierInfo.altitude ?? 'desconocida'} m
 Área: ${glacierInfo.area_km2 ?? 'desconocida'} km²
-Historial de masa Copernicus (mmwe): ${JSON.stringify(massHistory)}
+Historial de masa Copernicus (mmwe): ${massHistory.length ? JSON.stringify(massHistory, null, 2) : 'Sin datos disponibles'}
 Clima actual: temp promedio ${climateData.temp_avg}°C, máxima ${climateData.temp_max}°C, precipitación ${climateData.precipitation_mm}mm, nieve ${climateData.snowfall_cm}cm, días sobre 0°C estimados ${climateData.days_above_zero}, anomalía térmica ${climateData.thermal_anomaly}°C
 Índice de vulnerabilidad: ${riskIndex}/100 (${riskCategory})
 Tendencia de retroceso: ${prediction.trend}
