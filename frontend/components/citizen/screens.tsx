@@ -108,6 +108,7 @@ interface ScreenLocatingProps {
 // phase: 0 = waiting for user tap, 1 = requesting GPS, 2 = done
 export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLocatingProps) {
   const [phase, setPhase] = useState(0)
+  const [geoError, setGeoError] = useState<string | null>(null)
   const doneRef = useRef(false)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
@@ -125,10 +126,12 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
 
   const requestGps = useCallback(() => {
     if (doneRef.current || phase !== 0) return
+    setGeoError(null)
     setPhase(1)
 
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      finish()
+      setGeoError('Tu navegador no soporta geolocalización.')
+      setPhase(0)
       return
     }
 
@@ -141,9 +144,19 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
         clearTimeout(safety)
         finish({ lat: pos.coords.latitude, lon: pos.coords.longitude })
       },
-      () => {
+      (err) => {
         clearTimeout(safety)
-        finish()
+        console.warn('[Sentinel GPS] error', err.code, err.message)
+        if (err.code === 1) {
+          // PERMISSION_DENIED — let user fix it, don't auto-advance
+          setGeoError('Permiso de ubicación bloqueado. Actívalo en los ajustes de tu navegador y vuelve a intentarlo.')
+          setPhase(0)
+          doneRef.current = false
+        } else {
+          // POSITION_UNAVAILABLE or TIMEOUT — fall through to mock
+          setGeoError('No se pudo obtener tu posición. Continuando con datos de ejemplo.')
+          finish()
+        }
       },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
     )
@@ -202,6 +215,15 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
 
         {phase === 0 ? (
           <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {geoError && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)',
+                fontSize: 12, color: 'var(--critical)', lineHeight: 1.45, textAlign: 'center',
+              }}>
+                {geoError}
+              </div>
+            )}
             <button
               onClick={requestGps}
               style={{
@@ -219,7 +241,7 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
                 <line x1="1" y1="11" x2="4" y2="11" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round" />
                 <line x1="18" y1="11" x2="21" y2="11" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round" />
               </svg>
-              Activar ubicación GPS
+              {geoError?.includes('bloqueado') ? 'Reintentar' : 'Activar ubicación GPS'}
             </button>
             <button
               onClick={() => finish()}
