@@ -96,7 +96,13 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
         fetch(citizenWebhookUrl, {
           method: 'POST',
           headers: webhookHeaders,
-          body: JSON.stringify({ lat, lon, socketId: socket.id }),
+          body: JSON.stringify({
+            lat, lon, socketId: socket.id,
+            west: Math.round((lon - 3) * 10) / 10,
+            south: Math.round((lat - 3) * 10) / 10,
+            east: Math.round((lon + 3) * 10) / 10,
+            north: Math.round((lat + 3) * 10) / 10,
+          }),
         }).catch((err) => {
           console.error('[trigger-citizen] Make.com webhook call failed:', err)
           socket.emit('status', { state: 'error', message: 'No se pudo iniciar el análisis ciudadano.' } satisfies StatusPayload)
