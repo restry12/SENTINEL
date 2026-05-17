@@ -73,10 +73,18 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
       const lat = typeof data.lat === 'number' && isFinite(data.lat) ? data.lat : undefined
       const lon = typeof data.lon === 'number' && isFinite(data.lon) ? data.lon : undefined
 
-      if (!lat || !lon) {
+      if (lat === undefined || lon === undefined) {
         socket.emit('status', {
           state: 'error',
           message: 'Coordenadas inválidas. Se requiere lat y lon.',
+        } satisfies StatusPayload)
+        return
+      }
+
+      if (isLocked()) {
+        socket.emit('status', {
+          state: 'error',
+          message: 'Análisis en curso. Espera que termine antes de analizar tu zona.',
         } satisfies StatusPayload)
         return
       }
