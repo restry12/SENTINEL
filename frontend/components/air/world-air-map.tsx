@@ -122,14 +122,25 @@ export function WorldAirMap({ countryData, selectedCountry, onCountrySelect }: P
 
       const map = new mapboxgl.Map({
         container: el,
-        style:  "mapbox://styles/mapbox/dark-v11",
+        style:  "mapbox://styles/mapbox/satellite-streets-v12",
         center: [15, 15],
         zoom:   1.8,
         minZoom: 1,
         maxZoom: 14,
+        projection: "globe" as never,
         attributionControl: false,
       })
       mapRef.current = map
+
+      map.on("style.load", () => {
+        map.setFog({
+          "color":          "rgba(56, 189, 248, 0.15)",
+          "high-color":     "rgba(10, 11, 14, 0.8)",
+          "horizon-blend":  0.2,
+          "space-color":    "rgb(2, 2, 5)",
+          "star-intensity": 0.9,
+        } as never)
+      })
 
       map.on("load", () => {
         if (cancelled) return
@@ -138,8 +149,8 @@ export function WorldAirMap({ countryData, selectedCountry, onCountrySelect }: P
         map.getStyle().layers?.forEach((layer) => {
           if (layer.type !== "symbol") return
           try { map.setPaintProperty(layer.id, "text-color", "#ffffff") } catch { /* skip */ }
-          try { map.setPaintProperty(layer.id, "text-halo-color", "rgba(0,0,0,0.65)") } catch { /* skip */ }
-          try { map.setPaintProperty(layer.id, "text-halo-width", 1.2) } catch { /* skip */ }
+          try { map.setPaintProperty(layer.id, "text-halo-color", "rgba(0,0,0,0.75)") } catch { /* skip */ }
+          try { map.setPaintProperty(layer.id, "text-halo-width", 1.5) } catch { /* skip */ }
         })
 
         // ── Country boundaries source ──
