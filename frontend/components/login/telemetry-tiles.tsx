@@ -1,19 +1,21 @@
-import styles from '@/app/login/login.module.css';
+'use client'
+
+import { useLang } from '@/lib/i18n/language-context'
 
 interface TileProps {
-  label: string;
-  value: string;
-  unit?: string;
-  delta: string;
-  deltaType?: 'default' | 'warn' | 'crit';
-  sparklinePoints: string;
-  sparklineColor: string;
+  label: string
+  value: string
+  unit?: string
+  delta: string
+  deltaType?: 'default' | 'warn' | 'crit'
+  sparklinePoints: string
+  sparklineColor: string
 }
 
 const Tile = ({ label, value, unit, delta, deltaType = 'default', sparklinePoints, sparklineColor }: TileProps) => {
-  let deltaColor = 'text-green-soft';
-  if (deltaType === 'warn') deltaColor = 'text-orange-soft';
-  if (deltaType === 'crit') deltaColor = 'text-red-soft';
+  let deltaColor = 'text-green-soft'
+  if (deltaType === 'warn') deltaColor = 'text-orange-soft'
+  if (deltaType === 'crit') deltaColor = 'text-red-soft'
 
   return (
     <div className="p-4 bg-surface/60 border border-white/5 rounded-xl backdrop-blur-xl shadow-lg relative overflow-hidden group hover:border-white/10 transition-all duration-300">
@@ -30,14 +32,15 @@ const Tile = ({ label, value, unit, delta, deltaType = 'default', sparklinePoint
         <polyline points={sparklinePoints} stroke={sparklineColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </div>
-  );
-};
+  )
+}
 
 export function TelemetryTiles() {
+  const { t } = useLang()
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
       <Tile
-        label="HOTSPOTS · 24H"
+        label={t('tileHotspots')}
         value="2,412"
         delta="▲ 312 / HR"
         deltaType="crit"
@@ -45,21 +48,21 @@ export function TelemetryTiles() {
         sparklineColor="#ff3333"
       />
       <Tile
-        label="GLOBAL COVERAGE"
+        label={t('tileCoverage')}
         value="98.4%"
         delta="▲ STABLE · 4 SAT"
         sparklinePoints="0,12 10,11 20,12 30,11 40,11 50,10 60,10"
         sparklineColor="#10b981"
       />
       <Tile
-        label="ALERTS DISPATCHED"
+        label={t('tileAlerts')}
         value="18,906"
         delta="▲ +6.1% TODAY"
         sparklinePoints="0,13 10,11 20,10 30,9 40,7 50,6 60,4"
         sparklineColor="#38bdf8"
       />
       <Tile
-        label="FIRMS LATENCY"
+        label={t('tileLatency')}
         value="3.4"
         unit="MIN"
         delta="▼ -12% OPTIMIZED"
@@ -68,5 +71,5 @@ export function TelemetryTiles() {
         sparklineColor="#ff7e15"
       />
     </div>
-  );
+  )
 }
