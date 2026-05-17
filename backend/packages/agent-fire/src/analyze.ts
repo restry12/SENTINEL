@@ -112,9 +112,9 @@ function expansionToGeoJSON(expansion: ExpansionData): GeoJSONFeature {
 function computePerFireExpansions(fires: FireData[], weather: WeatherData): PerFireExpansion[] {
   const windKmh = weather.speed * 3.6
   const windDir = degreesToCardinal((weather.deg + 180) % 360) // spread direction (opposite to wind origin)
-  const top50 = [...fires].sort((a, b) => b.frp - a.frp).slice(0, 50)
+  const top150 = [...fires].sort((a, b) => b.frp - a.frp).slice(0, 150)
 
-  return top50.map(fire => {
+  return top150.map(fire => {
     // Rate of spread varies by FRP intensity (hotter fires spread faster)
     const frpFactor = 1 + (fire.frp / 500) * 0.3 // mild boost for intense fires
     const ros_forward = (0.5 + windKmh * 0.15 + windKmh * windKmh * 0.002) * frpFactor

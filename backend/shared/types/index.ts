@@ -110,7 +110,6 @@ export interface ExpansionData {
   direccion_principal: string
 }
 
-// Per-fire expansion (mathematical model, no LLM)
 export interface PerFireExpansion {
   lat: number
   lon: number
@@ -127,7 +126,7 @@ export interface FireAnalysis {
   polygon: GeoJSONFeature        // expansion_2h wrapped as GeoJSONFeature for map display
   riskAssessment: RiskAssessment
   expansion: ExpansionData
-  perFireExpansions: PerFireExpansion[]  // per-fire mathematical expansion (top 50)
+  perFireExpansions: PerFireExpansion[]
 }
 
 export interface AirAlert {
