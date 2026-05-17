@@ -1,0 +1,190 @@
+<h2>Vista FIRE — Propuesta de Layout</h2>
+<p class="subtitle">Estructura general: 3 columnas con selector de modo superior y lista de focos integrada</p>
+
+<div class="mockup">
+  <div class="mockup-header">Layout Completo — Desktop</div>
+  <div class="mockup-body" style="padding:0;background:#080c14;min-height:500px;display:flex;flex-direction:column;">
+
+    <!-- Top Bar -->
+    <div style="height:48px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;padding:0 16px;background:rgba(255,255,255,0.02);">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 8px #ef4444;"></div>
+        <span style="font-size:11px;font-weight:900;letter-spacing:0.2em;color:#fff;">SENTINEL</span>
+      </div>
+      <div style="flex:1;display:flex;justify-content:center;gap:4px;">
+        <div style="padding:6px 16px;border-radius:6px;background:rgba(255,126,21,0.15);border:1px solid rgba(255,126,21,0.3);font-size:10px;font-weight:800;color:#ff7e15;letter-spacing:0.15em;">FUEGO ACTUAL</div>
+        <div style="padding:6px 16px;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:0.15em;">ZONAS DE RIESGO</div>
+      </div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.4);font-family:monospace;">16:42:08 UTC</div>
+    </div>
+
+    <!-- Main Content -->
+    <div style="flex:1;display:grid;grid-template-columns:300px 1fr 320px;min-height:0;">
+
+      <!-- LEFT PANEL -->
+      <div style="border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;overflow:hidden;">
+
+        <!-- Fire List Header -->
+        <div style="padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:rgba(255,255,255,0.4);">FOCOS ACTIVOS</span>
+          <span style="font-size:12px;font-weight:900;color:#ff7e15;">12</span>
+        </div>
+
+        <!-- Fire List -->
+        <div style="flex:1;overflow-y:auto;padding:8px;">
+          <!-- Selected fire -->
+          <div style="padding:12px;border-radius:10px;border:1px solid rgba(239,68,68,0.4);background:rgba(239,68,68,0.08);margin-bottom:6px;cursor:pointer;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:11px;font-weight:900;color:#fff;letter-spacing:0.1em;">FIRE-001</span>
+              <span style="font-size:8px;font-weight:800;color:#ef4444;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);padding:2px 6px;border-radius:4px;letter-spacing:0.1em;">CRÍTICO</span>
+            </div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.5);">-38.28° / -71.90° · <span style="color:#ef4444;font-weight:700;">312 MW</span></div>
+          </div>
+          <!-- Unselected fires -->
+          <div style="padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);margin-bottom:6px;cursor:pointer;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:0.1em;">FIRE-002</span>
+              <span style="font-size:8px;font-weight:800;color:#f97316;background:rgba(249,115,22,0.12);border:1px solid rgba(249,115,22,0.25);padding:2px 6px;border-radius:4px;letter-spacing:0.1em;">ALTO</span>
+            </div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.35);">-38.12° / -71.45° · <span style="color:#f97316;font-weight:700;">187 MW</span></div>
+          </div>
+          <div style="padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);margin-bottom:6px;cursor:pointer;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:0.1em;">FIRE-003</span>
+              <span style="font-size:8px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);padding:2px 6px;border-radius:4px;letter-spacing:0.1em;">MODERADO</span>
+            </div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.35);">-38.55° / -72.10° · <span style="color:#fbbf24;font-weight:700;">64 MW</span></div>
+          </div>
+          <div style="padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);margin-bottom:6px;cursor:pointer;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:11px;font-weight:800;color:rgba(255,255,255,0.7);letter-spacing:0.1em;">FIRE-004</span>
+              <span style="font-size:8px;font-weight:800;color:#fbbf24;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);padding:2px 6px;border-radius:4px;letter-spacing:0.1em;">MODERADO</span>
+            </div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.35);">-38.80° / -72.30° · <span style="color:#fbbf24;font-weight:700;">42 MW</span></div>
+          </div>
+        </div>
+
+        <!-- Selected Fire Summary -->
+        <div style="border-top:1px solid rgba(255,255,255,0.06);padding:14px 16px;background:rgba(255,255,255,0.015);">
+          <div style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:10px;">RESUMEN DEL FOCO</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;">
+              <div style="font-size:8px;color:rgba(255,255,255,0.3);letter-spacing:0.15em;margin-bottom:3px;">FRP</div>
+              <div style="font-size:16px;font-weight:900;color:#ff7e15;">312<span style="font-size:9px;color:rgba(255,255,255,0.3);margin-left:2px;">MW</span></div>
+            </div>
+            <div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;">
+              <div style="font-size:8px;color:rgba(255,255,255,0.3);letter-spacing:0.15em;margin-bottom:3px;">VIENTO</div>
+              <div style="font-size:16px;font-weight:900;color:#38bdf8;">24<span style="font-size:9px;color:rgba(255,255,255,0.3);margin-left:2px;">km/h SE</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CENTER: MAP -->
+      <div style="position:relative;background:#0a0b0e;display:flex;flex-direction:column;">
+        <!-- Expansion Control (on top of map) -->
+        <div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:4px;padding:4px;background:rgba(10,11,14,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:10px;backdrop-filter:blur(12px);">
+          <div style="padding:8px 16px;border-radius:7px;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);font-size:11px;font-weight:900;color:#ef4444;letter-spacing:0.1em;">2H</div>
+          <div style="padding:8px 16px;border-radius:7px;background:rgba(255,255,255,0.03);font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);letter-spacing:0.1em;">6H</div>
+          <div style="padding:8px 16px;border-radius:7px;background:rgba(255,255,255,0.03);font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);letter-spacing:0.1em;">12H</div>
+        </div>
+
+        <!-- Map placeholder -->
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 45% 55%, rgba(239,68,68,0.06) 0%, transparent 50%);">
+          <div style="text-align:center;">
+            <div style="width:120px;height:120px;border-radius:50%;border:2px dashed rgba(239,68,68,0.3);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;position:relative;">
+              <div style="width:60px;height:60px;border-radius:50%;border:1px solid rgba(239,68,68,0.5);background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;">
+                <div style="width:12px;height:12px;border-radius:50%;background:#ef4444;box-shadow:0 0 15px #ef4444;"></div>
+              </div>
+              <div style="position:absolute;top:-8px;right:20px;font-size:8px;color:rgba(255,255,255,0.3);background:rgba(10,11,14,0.8);padding:2px 5px;border-radius:3px;">2H</div>
+            </div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.2);letter-spacing:0.15em;">MAPA SATELITAL + POLÍGONO DE EXPANSIÓN</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div style="border-left:1px solid rgba(255,255,255,0.06);padding:16px;overflow-y:auto;">
+        <div style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:16px;">INTELIGENCIA OPERATIVA</div>
+
+        <!-- Expansion Impact -->
+        <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:8px;">IMPACTO EN 2H</div>
+          <div style="display:flex;align-items:baseline;gap:8px;">
+            <span style="font-size:24px;font-weight:900;color:#fff;">47.3</span>
+            <span style="font-size:11px;color:rgba(255,255,255,0.4);">km²</span>
+            <span style="font-size:10px;color:rgba(255,255,255,0.25);margin-left:auto;">4,730 ha</span>
+          </div>
+        </div>
+
+        <!-- Infrastructure -->
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:10px;">INFRAESTRUCTURA CERCANA</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:rgba(255,255,255,0.7);">🏥 Hospital Regional</span>
+              <span style="font-size:10px;color:rgba(255,255,255,0.35);">3.2 km</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:rgba(255,255,255,0.7);">🏫 Escuela Básica N°4</span>
+              <span style="font-size:10px;color:rgba(255,255,255,0.35);">5.1 km</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Priority Zones -->
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:10px;">ZONAS PRIORITARIAS</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <span style="padding:4px 8px;border-radius:5px;border:1px solid rgba(56,189,248,0.3);background:rgba(56,189,248,0.08);font-size:10px;color:#38bdf8;font-weight:700;">Sector Norte</span>
+            <span style="padding:4px 8px;border-radius:5px;border:1px solid rgba(56,189,248,0.3);background:rgba(56,189,248,0.08);font-size:10px;color:#38bdf8;font-weight:700;">Villarrica</span>
+            <span style="padding:4px 8px;border-radius:5px;border:1px solid rgba(56,189,248,0.3);background:rgba(56,189,248,0.08);font-size:10px;color:#38bdf8;font-weight:700;">Ruta 5 Sur</span>
+          </div>
+        </div>
+
+        <!-- Recommendations -->
+        <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:14px;margin-bottom:12px;">
+          <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:10px;">RECOMENDACIONES</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:start;gap:8px;">
+              <div style="width:5px;height:5px;border-radius:50%;background:#ff7e15;margin-top:5px;flex-shrink:0;box-shadow:0 0 6px rgba(255,126,21,0.6);"></div>
+              <span style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.4;">Evacuar sector norte inmediatamente</span>
+            </div>
+            <div style="display:flex;align-items:start;gap:8px;">
+              <div style="width:5px;height:5px;border-radius:50%;background:#ff7e15;margin-top:5px;flex-shrink:0;box-shadow:0 0 6px rgba(255,126,21,0.6);"></div>
+              <span style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.4;">Desplegar 3 brigadas forestales</span>
+            </div>
+            <div style="display:flex;align-items:start;gap:8px;">
+              <div style="width:5px;height:5px;border-radius:50%;background:#ff7e15;margin-top:5px;flex-shrink:0;box-shadow:0 0 6px rgba(255,126,21,0.6);"></div>
+              <span style="font-size:11px;color:rgba(255,255,255,0.6);line-height:1.4;">Activar alerta SAE comunal</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Best Route -->
+        <div style="background:linear-gradient(180deg,rgba(52,211,153,0.08),transparent);border:1px solid rgba(52,211,153,0.2);border-radius:10px;padding:14px;">
+          <div style="font-size:8px;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:10px;">RUTA SEGURA MÁS CERCANA</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:12px;font-weight:800;color:rgba(255,255,255,0.8);">Ruta 5 → Temuco</span>
+            <span style="font-size:9px;font-weight:800;color:#34d399;background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.3);padding:2px 6px;border-radius:4px;">LIBRE</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);">
+            <span style="font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:0.15em;">TIEMPO EST.</span>
+            <span style="font-size:12px;font-weight:900;color:#fff;">25 MIN</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:24px;padding:16px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+  <h3 style="margin-bottom:12px;">Puntos clave del diseño:</h3>
+  <ul style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.8;list-style:none;padding:0;">
+    <li>▸ <strong style="color:#fff;">Selector de modo</strong> arriba al centro (Fuego Actual / Zonas de Riesgo)</li>
+    <li>▸ <strong style="color:#fff;">Panel izq</strong> = lista de focos (scrolleable) + resumen del seleccionado abajo</li>
+    <li>▸ <strong style="color:#fff;">Control 2H/6H/12H</strong> flotante sobre el mapa (no en barra lateral)</li>
+    <li>▸ <strong style="color:#fff;">Panel der</strong> = inteligencia operativa que cambia según foco + rango seleccionado</li>
+    <li>▸ <strong style="color:#fff;">Mapa limpio</strong> — sin barras invasivas, solo polígonos y marcadores</li>
+  </ul>
+</div>

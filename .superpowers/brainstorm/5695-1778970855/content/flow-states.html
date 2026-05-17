@@ -1,0 +1,120 @@
+<h2>Flujo UX y Estados de la Vista FIRE</h2>
+<p class="subtitle">Cómo se comporta la interfaz en cada escenario</p>
+
+<div class="mockup">
+  <div class="mockup-header">Flujo de Interacción</div>
+  <div class="mockup-body" style="padding:24px;background:#080c14;">
+
+    <!-- Flow diagram -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+      <!-- Step 1 -->
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#ef4444;flex-shrink:0;">1</div>
+        <div style="flex:1;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+          <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:4px;">Usuario entra a /dashboard</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);">Modo "Fuego Actual" activo por defecto. Se cargan los focos del último SentinelUpdate.</div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#ef4444;flex-shrink:0;">2</div>
+        <div style="flex:1;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+          <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:4px;">Auto-selección del foco más crítico</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);">Se ordena por FRP desc → el primero queda seleccionado. Mapa centra en él. Paneles muestran su info. Control 2H activo por defecto.</div>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#38bdf8;flex-shrink:0;">3</div>
+        <div style="flex:1;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+          <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:4px;">Usuario selecciona otro foco (lista o mapa)</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);">Mapa flyTo al nuevo foco. Ambos paneles se actualizan. Se mantiene el rango temporal actual (2H/6H/12H). Polígono de expansión se redibuja.</div>
+        </div>
+      </div>
+
+      <!-- Step 4 -->
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#38bdf8;flex-shrink:0;">4</div>
+        <div style="flex:1;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+          <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:4px;">Usuario cambia rango temporal (2H → 6H → 12H)</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);">Polígono del mapa se actualiza (más grande). Panel derecho cambia métricas de impacto. Panel izquierdo no cambia (mismos datos del foco).</div>
+        </div>
+      </div>
+
+      <!-- Step 5 -->
+      <div style="display:flex;align-items:center;gap:16px;">
+        <div style="width:36px;height:36px;border-radius:50%;background:rgba(52,211,153,0.15);border:1px solid rgba(52,211,153,0.4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#34d399;flex-shrink:0;">5</div>
+        <div style="flex:1;padding:14px 18px;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+          <div style="font-size:12px;font-weight:800;color:#fff;margin-bottom:4px;">Llega un nuevo SentinelUpdate por Socket</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.45);">Lista de focos se actualiza. Si el foco seleccionado sigue existiendo, se mantiene. Si no, se auto-selecciona el más crítico del nuevo set.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- States -->
+<div style="margin-top:24px;">
+  <h3>5 Estados de la Interfaz</h3>
+</div>
+
+<div class="mockup">
+  <div class="mockup-header">Estados</div>
+  <div class="mockup-body" style="padding:20px;background:#080c14;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+      <div style="padding:14px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;background:rgba(255,255,255,0.02);">
+        <div style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:8px;">ESTADO 1: CARGANDO</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5;">
+          • Skeleton en lista izquierda (3 items pulsando)<br>
+          • Mapa sin marcadores<br>
+          • Panel derecho con placeholders<br>
+          • Control 2H/6H/12H oculto
+        </div>
+      </div>
+
+      <div style="padding:14px;border:1px solid rgba(239,68,68,0.2);border-radius:10px;background:rgba(239,68,68,0.03);">
+        <div style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:#ef4444;margin-bottom:8px;">ESTADO 2: FOCO AUTO-SELECCIONADO</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5;">
+          • Foco más crítico resaltado en lista<br>
+          • Mapa centrado en él + polígono 2H<br>
+          • Paneles llenos con su data<br>
+          • Control 2H activo
+        </div>
+      </div>
+
+      <div style="padding:14px;border:1px solid rgba(56,189,248,0.2);border-radius:10px;background:rgba(56,189,248,0.03);">
+        <div style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:#38bdf8;margin-bottom:8px;">ESTADO 3: CAMBIO DE FOCO</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5;">
+          • Transición fluida (flyTo 1.2s)<br>
+          • Nuevo foco highlighted<br>
+          • Paneles actualizan sin flash<br>
+          • Rango temporal se mantiene
+        </div>
+      </div>
+
+      <div style="padding:14px;border:1px solid rgba(255,255,255,0.08);border-radius:10px;background:rgba(255,255,255,0.02);">
+        <div style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:rgba(255,255,255,0.3);margin-bottom:8px;">ESTADO 4: SIN FOCOS</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5;">
+          • Lista vacía con mensaje "No hay focos activos"<br>
+          • Mapa en vista general<br>
+          • Control 2H/6H/12H oculto<br>
+          • Panel der: "Sin datos de riesgo"
+        </div>
+      </div>
+
+      <div style="padding:14px;border:1px solid rgba(251,191,36,0.2);border-radius:10px;background:rgba(251,191,36,0.03);grid-column:span 2;">
+        <div style="font-size:9px;font-weight:800;letter-spacing:0.2em;color:#fbbf24;margin-bottom:8px;">ESTADO 5: DATOS INSUFICIENTES</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5;">
+          • Hay focos pero falta info de agentes (expansión, rutas, reporte)<br>
+          • Panel izq muestra FRP/coords (siempre disponible)<br>
+          • Panel der: secciones sin datos muestran "—" o se ocultan (no errores feos)<br>
+          • Control 2H/6H/12H visible pero con fallback a cálculo local si no hay datos del backend
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

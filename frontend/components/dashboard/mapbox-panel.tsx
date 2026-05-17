@@ -6,6 +6,9 @@ import { useSentinel } from '@/contexts/sentinel-context'
 import { useFireSelection, type FireIntensity } from '@/contexts/fire-selection-context'
 import { degToCompass } from '@/lib/utils'
 import { useGeolocation } from '@/hooks/use-geolocation'
+import { AirRiskLayer } from './air-risk-layer'
+import { AirRiskPanel } from './air-risk-panel'
+import type { AirRiskCell, AirRiskTimeSlot } from '@/types/air-risk'
 
 const TOKEN =
   process.env.NEXT_PUBLIC_MAPBOX_TOKEN ??
@@ -207,6 +210,18 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
   const { selectedFire, setSelectedFire } = useFireSelection()
   const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
   const userCoords = useGeolocation()
+  const [showAirRisk, setShowAirRisk] = useState(false)
+  const [airTimeSlot, setAirTimeSlot] = useState<AirRiskTimeSlot>('now')
+  const [selectedAirCell, setSelectedAirCell] = useState<AirRiskCell | null>(null)
+  const [mapReady, setMapReady] = useState(false)
+
+  // Sync selected cell when timeSlot changes
+  useEffect(() => {
+    if (!selectedAirCell || !sentinelUpdate?.airRiskGrid) return
+    const grid = sentinelUpdate.airRiskGrid[airTimeSlot] ?? []
+    const updated = grid.find(c => c.id === selectedAirCell.id)
+    if (updated) setSelectedAirCell(updated)
+  }, [airTimeSlot, sentinelUpdate?.airRiskGrid])
 
   // Init map
   useEffect(() => {
@@ -228,6 +243,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         'star-intensity': 0.9,
       })
     })
+    map.on('load', () => { setMapReady(true) })
     mapRef.current = map
     return () => { map.remove(); mapRef.current = null }
   }, [])
@@ -759,6 +775,36 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     <div className="absolute inset-0 w-full h-full">
       <div ref={mapContainerRef} className="absolute inset-0 w-full h-full" />
 
+      {/* Air Risk toggle button */}
+      <button
+        onClick={() => { setShowAirRisk(v => !v); if (!showAirRisk) { setSelectedAirCell(null); setAirTimeSlot('now') } }}
+        className={`absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wider transition-all duration-200 border backdrop-blur-xl shadow-lg ${
+          showAirRisk
+            ? 'bg-white/15 border-white/20 text-white'
+            : 'bg-black/60 border-white/10 text-white/60 hover:text-white hover:border-white/20'
+        }`}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+        </svg>
+        Air Risk
+      </button>
+
+      {/* Air Risk Layer (map polygons + timeline) */}
+      <AirRiskLayer
+        map={mapReady ? mapRef.current : null}
+        visible={showAirRisk}
+        timeSlot={airTimeSlot}
+        onTimeSlotChange={setAirTimeSlot}
+        onCellSelect={setSelectedAirCell}
+      />
+
+      {/* Air Risk Detail Panel */}
+      <AirRiskPanel
+        cell={selectedAirCell}
+        visible={showAirRisk}
+        timeSlot={airTimeSlot}
+      />
     </div>
   )
 }

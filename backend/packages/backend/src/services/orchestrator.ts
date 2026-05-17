@@ -165,10 +165,12 @@ export async function runAnalysis(
       ? fireSettled.value.data
       : null
 
-  const airAlerts =
+  const airRaw =
     airAgentSettled.status === 'fulfilled' && airAgentSettled.value.success
       ? airAgentSettled.value.data
       : null
+  const airAlerts = airRaw ? { alertas: (airRaw as any).alertas, resumen_general: (airRaw as any).resumen_general } : null
+  const airRiskGrid = (airRaw as any)?.airRiskGrid ?? null
 
   const routesResult =
     routesSettled.status === 'fulfilled' && routesSettled.value.success
@@ -214,6 +216,7 @@ export async function runAnalysis(
     expansion: fireAnalysis?.expansion,
     perFireExpansions: fireAnalysis?.perFireExpansions ?? [],
     airAlerts: airAlerts ?? undefined,
+    airRiskGrid: airRiskGrid ?? undefined,
     report,
     naturalRoutes: routesResult?.naturalRoutes ?? undefined,
     prediction: predictionResult ?? undefined,
