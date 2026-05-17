@@ -197,6 +197,7 @@ export async function runAnalysis(
     riskLevel,
     riskAssessment: fireAnalysis?.riskAssessment,
     expansion: fireAnalysis?.expansion,
+    perFireExpansions: fireAnalysis?.perFireExpansions,
     airAlerts: airAlerts ?? undefined,
     report,
     naturalRoutes: routesResult?.naturalRoutes ?? undefined,
