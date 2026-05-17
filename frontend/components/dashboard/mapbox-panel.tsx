@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useSentinel } from '@/contexts/sentinel-context'
-import { useFireSelection, type SelectedFireData, type FireIntensity } from '@/contexts/fire-selection-context'
+import { useFireSelection, type FireIntensity } from '@/contexts/fire-selection-context'
 import { degToCompass } from '@/lib/utils'
 import { useGeolocation } from '@/hooks/use-geolocation'
 
@@ -198,15 +198,15 @@ function buildPopupHTML(d: PopupData, active: ExpansionKey | null): string {
   `
 }
 
-interface MarkerEntry { marker: mapboxgl.Marker; popup: mapboxgl.Popup; data: PopupData }
-
 export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<MarkerEntry[]>([])
+  const pulseRafRef = useRef<number | null>(null)
+  const currentPopupRef = useRef<{ popup: mapboxgl.Popup; data: PopupData } | null>(null)
   const { sentinelUpdate } = useSentinel()
   const { selectedFire, setSelectedFire } = useFireSelection()
   const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
+  const userCoords = useGeolocation()
 
   // Init map
   useEffect(() => {
@@ -264,22 +264,28 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     else map.once('style.load', apply)
   }, [userCoords])
 
-  // Fire markers
+  // Fire markers — native Mapbox layer (GPU rendered) + clustering for perf with 4k+ points
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-    markersRef.current.forEach(e => e.marker.remove())
 
-    const fires = sentinelUpdate
-      ? sentinelUpdate.fires.map((f, i) => ({
-          id: `FIRE-${String(i + 1).padStart(3, '0')}`,
-          lat: f.lat, lon: f.lon, frp: f.frp,
-          brightness: f.brightness,
-          intensity: sentinelUpdate.riskLevel,
-          weather: f.weather,
-          pm25: f.pm25,
-        }))
-      : []
+    const SRC = 'fires-src'
+    const CLUSTERS = 'fires-clusters'
+    const CLUSTER_COUNT = 'fires-cluster-count'
+    const POINTS = 'fires-points'
+    const SELECTED = 'fires-selected'
+
+    const cleanup = () => {
+      if (pulseRafRef.current !== null) {
+        cancelAnimationFrame(pulseRafRef.current)
+        pulseRafRef.current = null
+      }
+      [SELECTED, POINTS, 'fires-points-halo', CLUSTER_COUNT, CLUSTERS].forEach(id => {
+        if (map.getLayer(id)) map.removeLayer(id)
+      })
+      if (map.getSource(SRC)) map.removeSource(SRC)
+      if (map.getSource('fires-selected-src')) map.removeSource('fires-selected-src')
+    }
 
     const wDeg   = sentinelUpdate?.weather?.deg   ?? 315
     const wSpeed = sentinelUpdate?.weather?.speed ?? 6.7
@@ -290,105 +296,223 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
     const a6  = computeFireSpreadArea(wSpeed, 6)
     const a12 = computeFireSpreadArea(wSpeed, 12)
 
-    markersRef.current = fires.map(inc => {
-      const el = document.createElement('div')
-      el.className = 'relative flex items-center justify-center cursor-pointer group'
-      el.style.width = '32px'
-      el.style.height = '32px'
+    const apply = () => {
+      cleanup()
+      const fires = sentinelUpdate?.fires ?? []
+      if (fires.length === 0) return
 
-      const isCritical = inc.intensity === 'critical' || inc.frp >= 300
-      const color = isCritical ? '#ef4444' : '#f97316'
+      const features = fires.map((f, i) => ({
+        type: 'Feature' as const,
+        properties: {
+          id: `FIRE-${String(i + 1).padStart(3, '0')}`,
+          frp: f.frp,
+          brightness: f.brightness,
+          critical: (sentinelUpdate?.riskLevel === 'critical' || f.frp >= 300) ? 1 : 0,
+          weatherJson: f.weather ? JSON.stringify(f.weather) : '',
+          pm25: f.pm25 ?? null,
+        },
+        geometry: { type: 'Point' as const, coordinates: [f.lon, f.lat] },
+      }))
 
-      const glow = document.createElement('div')
-      glow.className = 'absolute inset-0 rounded-full blur-xl opacity-20'
-      glow.style.backgroundColor = color
-      el.appendChild(glow)
+      map.addSource(SRC, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features } as any,
+        cluster: true,
+        clusterMaxZoom: 9,
+        clusterRadius: 40,
+      })
 
-      const ring1 = document.createElement('div')
-      ring1.className = 'absolute inset-0 rounded-full border border-current opacity-60'
-      ring1.style.color = color
-      ring1.style.animation = 'pulse-ring 3s ease-out infinite'
-      el.appendChild(ring1)
+      // Empty source for the highlighted/selected fire (single animated dot)
+      map.addSource('fires-selected-src', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] } as any,
+      })
 
-      const ring2 = document.createElement('div')
-      ring2.className = 'absolute inset-0 rounded-full border border-current opacity-40'
-      ring2.style.color = color
-      ring2.style.animation = 'pulse-ring 3s ease-out 1.5s infinite'
-      el.appendChild(ring2)
+      // Cluster bubbles
+      map.addLayer({
+        id: CLUSTERS, type: 'circle', source: SRC,
+        filter: ['has', 'point_count'],
+        paint: {
+          'circle-color': [
+            'step', ['get', 'point_count'],
+            '#fb923c', 50,
+            '#f97316', 200,
+            '#ef4444',
+          ],
+          'circle-radius': [
+            'step', ['get', 'point_count'],
+            14, 50, 20, 200, 26,
+          ],
+          'circle-opacity': 0.75,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': 'rgba(255,255,255,0.35)',
+        },
+      })
 
-      const core = document.createElement('div')
-      core.className = 'w-3 h-3 rounded-full z-10 flex items-center justify-center relative'
-      core.style.backgroundColor = color
-      core.style.boxShadow = `0 0 15px ${color}, inset 0 0 5px white`
-      const flicker = document.createElement('div')
-      flicker.className = 'absolute inset-0 rounded-full bg-white opacity-40'
-      flicker.style.animation = 'flicker 0.15s ease-in-out infinite alternate'
-      core.appendChild(flicker)
-      el.appendChild(core)
+      map.addLayer({
+        id: CLUSTER_COUNT, type: 'symbol', source: SRC,
+        filter: ['has', 'point_count'],
+        layout: {
+          'text-field': ['get', 'point_count_abbreviated'],
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-size': 12,
+        },
+        paint: { 'text-color': '#fff' },
+      })
 
-      const popupData: PopupData = {
-        id: inc.id, color, intensity: String(inc.intensity),
-        frp: inc.frp, lat: inc.lat, lon: inc.lon,
-        sDirLabel, wKmh, a2, a6, a12,
-        weather: (inc as any).weather,
-        pm25: (inc as any).pm25,
-      }
+      // Pulsing halo behind individual (unclustered) dots
+      map.addLayer({
+        id: 'fires-points-halo', type: 'circle', source: SRC,
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color': [
+            'case', ['==', ['get', 'critical'], 1], '#ef4444', '#f97316',
+          ],
+          'circle-radius': 10,
+          'circle-opacity': 0.35,
+          'circle-blur': 0.6,
+        },
+      })
 
-      const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '320px' })
-        .setHTML(buildPopupHTML(popupData, null))
+      // Individual fires — static red dots, zoom-responsive size
+      map.addLayer({
+        id: POINTS, type: 'circle', source: SRC,
+        filter: ['!', ['has', 'point_count']],
+        paint: {
+          'circle-color': [
+            'case', ['==', ['get', 'critical'], 1], '#ef4444', '#f97316',
+          ],
+          'circle-radius': [
+            'interpolate', ['linear'], ['zoom'],
+            5, 2.5,
+            8, 4,
+            12, 7,
+            16, 10,
+          ],
+          'circle-opacity': 0.85,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': 'rgba(255,255,255,0.55)',
+          'circle-stroke-opacity': [
+            'interpolate', ['linear'], ['zoom'], 5, 0, 9, 0.8,
+          ],
+        },
+      })
 
-      // Delegated listener — survives setHTML updates
-      popup.on('open', () => {
-        popup.getElement()?.addEventListener('click', (e) => {
-          const btn = (e.target as HTMLElement).closest('[data-sentinel-key]')
+      // Selected fire — bigger pulsing ring (single feature, animation is cheap)
+      map.addLayer({
+        id: SELECTED, type: 'circle', source: 'fires-selected-src',
+        paint: {
+          'circle-color': '#ef4444',
+          'circle-radius': 14,
+          'circle-opacity': 0.25,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ef4444',
+          'circle-stroke-opacity': 1,
+        },
+      })
+
+      // Hover cursor
+      map.on('mouseenter', POINTS,   () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', POINTS,   () => { map.getCanvas().style.cursor = '' })
+      map.on('mouseenter', CLUSTERS, () => { map.getCanvas().style.cursor = 'pointer' })
+      map.on('mouseleave', CLUSTERS, () => { map.getCanvas().style.cursor = '' })
+
+      // Click a cluster → zoom in
+      map.on('click', CLUSTERS, (e) => {
+        const feat = e.features?.[0]
+        if (!feat) return
+        const clusterId = (feat.properties as any).cluster_id
+        const src = map.getSource(SRC) as mapboxgl.GeoJSONSource
+        ;(src.getClusterExpansionZoom as any)(clusterId, (err: any, zoom: number) => {
+          if (err) return
+          map.easeTo({ center: (feat.geometry as any).coordinates, zoom, duration: 700 })
+        })
+      })
+
+      // Click a fire → flyTo + popup + selectedFire context
+      map.on('click', POINTS, (e) => {
+        const feat = e.features?.[0]
+        if (!feat) return
+        const props = feat.properties as any
+        const [lon, lat] = (feat.geometry as any).coordinates as [number, number]
+        const color = props.critical === 1 ? '#ef4444' : '#f97316'
+        const weather = props.weatherJson ? JSON.parse(props.weatherJson) : undefined
+        const intensity: FireIntensity = props.frp >= 300 ? 'critical' : props.frp >= 100 ? 'high' : 'moderate'
+
+        const popupData: PopupData = {
+          id: props.id, color, intensity: String(intensity),
+          frp: props.frp, lat, lon,
+          sDirLabel, wKmh, a2, a6, a12,
+          weather, pm25: props.pm25,
+        }
+
+        currentPopupRef.current?.popup.remove()
+
+        const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '320px' })
+          .setLngLat([lon, lat])
+          .setHTML(buildPopupHTML(popupData, '2h'))
+          .addTo(map)
+
+        popup.getElement()?.addEventListener('click', (ev) => {
+          const btn = (ev.target as HTMLElement).closest('[data-sentinel-key]')
           if (!btn) return
           const key = btn.getAttribute('data-sentinel-key') as ExpansionKey
           setActiveExpansion(prev => prev === key ? null : key)
         })
-      })
 
-      el.addEventListener('click', () => {
-        map.flyTo({ center: [inc.lon, inc.lat], zoom: 12, duration: 1200, essential: true })
-        const intensity: FireIntensity = inc.frp >= 300 ? 'critical' : inc.frp >= 100 ? 'high' : 'moderate'
-        const fireData: SelectedFireData = {
-          id: inc.id,
-          lat: inc.lat,
-          lon: inc.lon,
-          frp: inc.frp,
-          brightness: inc.brightness,
-          intensity,
-          windImpactDir: sDirLabel,
-          windKmh: wKmh,
-          expansion2h: a2,
-          expansion6h: a6,
-          expansion12h: a12,
-        }
-        setSelectedFire(fireData)
+        currentPopupRef.current = { popup, data: popupData }
+
+        setSelectedFire({
+          id: props.id, lat, lon, frp: props.frp, brightness: props.brightness,
+          intensity, windImpactDir: sDirLabel, windKmh: wKmh,
+          expansion2h: a2, expansion6h: a6, expansion12h: a12,
+        })
         setActiveExpansion('2h')
+
+        // Highlight selected dot
+        const sel = map.getSource('fires-selected-src') as mapboxgl.GeoJSONSource
+        sel.setData({
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature', properties: {},
+            geometry: { type: 'Point', coordinates: [lon, lat] },
+          }],
+        } as any)
+
+        map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 11), duration: 1100, essential: true })
       })
 
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([inc.lon, inc.lat])
-        .setPopup(popup)
-        .addTo(map)
+      // Pan to the average centroid only on first load
+      if (fires.length > 0 && map.getZoom() < 6) {
+        const avgLon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
+        const avgLat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
+        map.easeTo({ center: [avgLon, avgLat], duration: 1200 })
+      }
 
-      return { marker, popup, data: popupData }
-    })
-
-    if (fires.length > 0) {
-      const avgLon = fires.reduce((s, f) => s + f.lon, 0) / fires.length
-      const avgLat = fires.reduce((s, f) => s + f.lat, 0) / fires.length
-      map.easeTo({ center: [avgLon, avgLat], duration: 1200 })
+      // Pulse animation for unclustered individual fires
+      const animate = () => {
+        if (!mapRef.current || !mapRef.current.getLayer('fires-points-halo')) return
+        const t = (performance.now() / 1400) % 1
+        const phase = (Math.sin(t * Math.PI * 2) + 1) / 2  // 0..1
+        const radius = 8 + phase * 14
+        const opacity = 0.45 - phase * 0.4
+        mapRef.current.setPaintProperty('fires-points-halo', 'circle-radius', radius)
+        mapRef.current.setPaintProperty('fires-points-halo', 'circle-opacity', opacity)
+        pulseRafRef.current = requestAnimationFrame(animate)
+      }
+      pulseRafRef.current = requestAnimationFrame(animate)
     }
-  }, [sentinelUpdate])
+
+    if (map.isStyleLoaded()) apply()
+    else map.once('style.load', apply)
+  }, [sentinelUpdate, setSelectedFire])
 
   // Update open popup HTML whenever active expansion changes
   useEffect(() => {
-    if (!selectedFire) return
-    const entry = markersRef.current.find(e => e.data.id === selectedFire.id)
-    if (!entry) return
-    entry.popup.setHTML(buildPopupHTML(entry.data, activeExpansion))
-  }, [activeExpansion, selectedFire])
+    const current = currentPopupRef.current
+    if (!current) return
+    current.popup.setHTML(buildPopupHTML(current.data, activeExpansion))
+  }, [activeExpansion])
 
   // Fire perimeter + evacuation routes from backend
   useEffect(() => {
