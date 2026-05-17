@@ -226,7 +226,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
   const pulseRafRef = useRef<number | null>(null)
   const currentPopupRef = useRef<{ popup: mapboxgl.Popup; data: PopupData } | null>(null)
   const { sentinelUpdate } = useSentinel()
-  const { selectedFire, setSelectedFire } = useFireSelection()
+  const { selectedFire, setSelectedFire, selectFireRef } = useFireSelection()
   const [activeExpansion, setActiveExpansion] = useState<ExpansionKey | null>(null)
   const userCoords = useGeolocation()
 
@@ -453,17 +453,16 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         })
       })
 
-      // Click a fire → flyTo + popup + selectedFire context
-      map.on('click', POINTS, (e) => {
-        const feat = e.features?.[0]
-        if (!feat) return
-        const props = feat.properties as any
-        const [lon, lat] = (feat.geometry as any).coordinates as [number, number]
-        const color = props.critical === 1 ? '#ef4444' : '#f97316'
-        const weather = props.weatherJson ? JSON.parse(props.weatherJson) : undefined
-        const intensity: FireIntensity = props.frp >= 300 ? 'critical' : props.frp >= 100 ? 'high' : 'moderate'
+      // Shared handler — called from map click AND from HotspotSearch
+      function openFire(
+        lat: number, lon: number,
+        id: string, frp: number, brightness: number,
+        weatherJson: string, pm25: number | null,
+      ) {
+        const color = frp >= 300 ? '#ef4444' : '#f97316'
+        const weather = weatherJson ? JSON.parse(weatherJson) : undefined
+        const intensity: FireIntensity = frp >= 300 ? 'critical' : frp >= 100 ? 'high' : 'moderate'
 
-        // Per-fire wind — use fire's own weather if available, otherwise global
         const fireWDeg   = weather?.deg   ?? wDeg
         const fireWSpeed = weather?.speed ?? wSpeed
         const fireSDeg   = (fireWDeg + 180) % 360
@@ -474,11 +473,11 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         const fireA12 = computeFireSpreadArea(fireWSpeed, 12)
 
         const popupData: PopupData = {
-          id: props.id, color, intensity: String(intensity),
-          frp: props.frp, lat, lon,
+          id, color, intensity: String(intensity),
+          frp, lat, lon,
           sDirLabel: fireSDirLabel, wKmh: fireWKmh,
           a2: fireA2, a6: fireA6, a12: fireA12,
-          weather, pm25: props.pm25,
+          weather, pm25,
         }
 
         currentPopupRef.current?.popup.remove()
@@ -486,7 +485,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         const popup = new mapboxgl.Popup({ offset: 16, closeButton: false, anchor: 'bottom', maxWidth: '320px' })
           .setLngLat([lon, lat])
           .setHTML(buildPopupHTML(popupData, '2h'))
-          .addTo(map)
+          .addTo(map!)
 
         popup.getElement()?.addEventListener('click', (ev) => {
           const btn = (ev.target as HTMLElement).closest('[data-sentinel-key]')
@@ -498,24 +497,37 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         currentPopupRef.current = { popup, data: popupData }
 
         setSelectedFire({
-          id: props.id, lat, lon, frp: props.frp, brightness: props.brightness,
+          id, lat, lon, frp, brightness,
           intensity, windImpactDir: fireSDirLabel, windKmh: fireWKmh,
           expansion2h: fireA2, expansion6h: fireA6, expansion12h: fireA12,
           weather,
         })
         setActiveExpansion('2h')
 
-        // Highlight selected dot
-        const sel = map.getSource('fires-selected-src') as mapboxgl.GeoJSONSource
-        sel.setData({
+        const sel = map!.getSource('fires-selected-src') as mapboxgl.GeoJSONSource
+        sel?.setData({
           type: 'FeatureCollection',
-          features: [{
-            type: 'Feature', properties: {},
-            geometry: { type: 'Point', coordinates: [lon, lat] },
-          }],
+          features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [lon, lat] } }],
         } as any)
 
-        map.flyTo({ center: [lon, lat], zoom: Math.max(map.getZoom(), 11), duration: 1100, essential: true })
+        map!.flyTo({ center: [lon, lat], zoom: Math.max(map!.getZoom(), 11), duration: 1100, essential: true })
+      }
+
+      // Register for HotspotSearch — updated each time fires reload
+      selectFireRef.current = (idx, allFires) => {
+        const f = allFires[idx]
+        if (!f) return
+        const id = `FIRE-${String(idx + 1).padStart(3, '0')}`
+        openFire(f.lat, f.lon, id, f.frp, f.brightness, f.weather ? JSON.stringify(f.weather) : '', f.pm25 ?? null)
+      }
+
+      // Click a fire → flyTo + popup + selectedFire context
+      map.on('click', POINTS, (e) => {
+        const feat = e.features?.[0]
+        if (!feat) return
+        const props = feat.properties as any
+        const [lon, lat] = (feat.geometry as any).coordinates as [number, number]
+        openFire(lat, lon, props.id, props.frp, props.brightness, props.weatherJson ?? '', props.pm25 ?? null)
       })
 
       // Pan to the average centroid only on first load
