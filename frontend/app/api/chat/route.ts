@@ -1,0 +1,173 @@
+import { NextRequest } from 'next/server'
+
+// Edge runtime — supports long-running streaming responses and avoids
+// the 10s serverless timeout on Vercel Hobby. Compatible: only uses
+// fetch, Web Streams, and process.env (all available on Edge).
+export const runtime = 'edge'
+
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY ?? ''
+
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+interface FireData {
+  lat: number
+  lon: number
+  frp: number
+  brightness: number
+  timestamp: string
+}
+
+interface SentinelSnapshot {
+  timestamp: string
+  fires: FireData[]
+  airQuality: { pm25: number; aqi: number; category: string }
+  riskLevel: string
+  riskAssessment?: { zona_afectada: string; resumen: string }
+  report?: {
+    nivel_emergencia: string
+    poblacion_en_riesgo_estimada: number
+    resumen_ejecutivo: string
+    acciones_inmediatas: string[]
+    zonas_evacuacion_prioritaria: string[]
+  }
+  naturalRoutes?: {
+    punto_encuentro_principal: string
+    rutas: Array<{ nombre: string; estado: string; distancia_km: number }>
+  }
+  prediction?: {
+    analisis_6h: string
+    analisis_24h: string
+    analisis_72h: string
+    confianza: string
+  }
+}
+
+interface NewsArticle {
+  title: string
+  snippet?: string
+  source: string
+  publishedAt: string
+}
+
+interface ChatRequest {
+  message: string
+  history: ChatMessage[]
+  sentinelSnapshot: SentinelSnapshot | null
+  newsArticles: NewsArticle[]
+}
+
+function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[]): string {
+  let prompt = `Eres SENTINEL AI, analista operacional del sistema SENTINEL de monitoreo de incendios forestales en Chile. Respondes exclusivamente en español. Tono: directo, técnico, conciso — como un oficial de emergencias. Sin saludos innecesarios. Sin rodeos. Usa listas cuando ayudan a la claridad.`
+
+  if (snapshot) {
+    const frpMax = snapshot.fires.length > 0
+      ? Math.max(...snapshot.fires.map(f => f.frp)).toFixed(1)
+      : '0'
+
+    prompt += `\n\n## DATOS EN VIVO [${snapshot.timestamp}]\n`
+    prompt += `- Focos activos: ${snapshot.fires.length}\n`
+    prompt += `- FRP máximo: ${frpMax} MW\n`
+    prompt += `- AQI: ${snapshot.airQuality.aqi} — ${snapshot.airQuality.category}\n`
+    prompt += `- PM2.5: ${snapshot.airQuality.pm25} µg/m³\n`
+    prompt += `- Nivel de riesgo: ${snapshot.riskLevel.toUpperCase()}\n`
+
+    if (snapshot.riskAssessment) {
+      prompt += `- Zona afectada: ${snapshot.riskAssessment.zona_afectada}\n`
+      prompt += `- Evaluación: ${snapshot.riskAssessment.resumen}\n`
+    }
+
+    if (snapshot.report) {
+      prompt += `\n## REPORTE DE AUTORIDAD\n`
+      prompt += `- Nivel emergencia: ${snapshot.report.nivel_emergencia}\n`
+      prompt += `- Población en riesgo: ${snapshot.report.poblacion_en_riesgo_estimada?.toLocaleString('es-CL')}\n`
+      prompt += `- Resumen ejecutivo: ${snapshot.report.resumen_ejecutivo}\n`
+      if (snapshot.report.acciones_inmediatas?.length) {
+        prompt += `- Acciones inmediatas: ${snapshot.report.acciones_inmediatas.join(' | ')}\n`
+      }
+      if (snapshot.report.zonas_evacuacion_prioritaria?.length) {
+        prompt += `- Zonas evacuación: ${snapshot.report.zonas_evacuacion_prioritaria.join(', ')}\n`
+      }
+    }
+
+    if (snapshot.naturalRoutes) {
+      prompt += `\n## RUTAS DE EVACUACIÓN\n`
+      prompt += `- Punto de encuentro: ${snapshot.naturalRoutes.punto_encuentro_principal}\n`
+      snapshot.naturalRoutes.rutas.slice(0, 4).forEach(r => {
+        prompt += `- ${r.nombre}: ${r.estado} (${r.distancia_km} km)\n`
+      })
+    }
+
+    if (snapshot.prediction) {
+      prompt += `\n## PREDICCIÓN DE RIESGO\n`
+      prompt += `- 6h: ${snapshot.prediction.analisis_6h}\n`
+      prompt += `- 24h: ${snapshot.prediction.analisis_24h}\n`
+      prompt += `- 72h: ${snapshot.prediction.analisis_72h}\n`
+      prompt += `- Confianza: ${snapshot.prediction.confianza}\n`
+    }
+  } else {
+    prompt += `\n\n## DATOS EN VIVO\nNo hay datos en vivo disponibles. Responde con tu conocimiento general sobre incendios forestales, protocolos de evacuación y calidad del aire.`
+  }
+
+  if (news.length > 0) {
+    prompt += `\n\n## NOTICIAS RECIENTES (Chile)\n`
+    news.slice(0, 8).forEach((n, i) => {
+      prompt += `${i + 1}. [${n.source}] ${n.title}${n.snippet ? ` — ${n.snippet}` : ''}\n`
+    })
+  }
+
+  return prompt
+}
+
+export async function POST(req: NextRequest): Promise<Response> {
+  try {
+    const body: ChatRequest = await req.json()
+    const { message, history, sentinelSnapshot, newsArticles } = body
+
+    if (!message?.trim()) {
+      return new Response(JSON.stringify({ error: 'message required' }), { status: 400 })
+    }
+
+    const systemPrompt = buildSystemPrompt(sentinelSnapshot, newsArticles ?? [])
+
+    const messages: ChatMessage[] = [
+      ...history,
+      { role: 'user', content: message },
+    ]
+
+    const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://sentinel.vercel.app',
+        'X-Title': 'SENTINEL',
+      },
+      body: JSON.stringify({
+        model: 'mistralai/mistral-large',
+        messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        temperature: 0.3,
+        stream: true,
+      }),
+    })
+
+    if (!upstream.ok) {
+      const err = await upstream.text()
+      console.error('OpenRouter error:', err)
+      return new Response(JSON.stringify({ error: 'upstream error' }), { status: 502 })
+    }
+
+    return new Response(upstream.body, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'X-Accel-Buffering': 'no',
+      },
+    })
+  } catch (err) {
+    console.error('Chat route error:', err)
+    return new Response(JSON.stringify({ error: 'internal error' }), { status: 500 })
+  }
+}
