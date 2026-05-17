@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { NewsArticle, NewsResponse } from './types'
 
 export const runtime = 'nodejs'
 
@@ -8,21 +9,6 @@ const RSS_QUERIES = [
   'incendio+forestal+Chile',
   'contaminaci%C3%B3n+aire+Chile',
 ]
-
-export interface NewsArticle {
-  title: string
-  source: string
-  publishedAt: string
-  url: string
-  snippet: string
-}
-
-export interface NewsResponse {
-  recap: string | null
-  articles: NewsArticle[]
-  cachedAt: string
-  error?: string
-}
 
 function extractTag(xml: string, tag: string): string {
   const cdataRe = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, 'i')
