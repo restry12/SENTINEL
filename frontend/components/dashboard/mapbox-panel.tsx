@@ -225,6 +225,8 @@ export function MapboxPanel({
   const mapRef = useRef<mapboxgl.Map | null>(null)
   const [mapLoaded, setMapLoaded] = useState(false)
   const pulseRafRef = useRef<number | null>(null)
+  const activeExpansionRef = useRef<ExpansionKey | null>(activeExpansion)
+  useEffect(() => { activeExpansionRef.current = activeExpansion }, [activeExpansion])
   const currentPopupRef = useRef<{ popup: mapboxgl.Popup; data: PopupData } | null>(null)
   const { sentinelUpdate } = useSentinel()
   const { selectedFire, setSelectedFire, selectFireRef } = useFireSelection()
@@ -378,7 +380,7 @@ export function MapboxPanel({
           const btn = (ev.target as HTMLElement).closest('[data-sentinel-key]')
           if (!btn) return
           const key = btn.getAttribute('data-sentinel-key') as ExpansionKey
-          setActiveExpansion(prev => prev === key ? null : key)
+          setActiveExpansion(activeExpansionRef.current === key ? null : key)
         })
 
         currentPopupRef.current = { popup, data: popupData }

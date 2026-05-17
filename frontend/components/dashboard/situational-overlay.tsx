@@ -68,7 +68,7 @@ export function SituationalOverlay() {
               </div>
               <div className="flex justify-between items-center pt-2 border-t border-white/5">
                 <span className="text-[9px] font-bold text-text-muted uppercase tracking-widest">{tx.estTravel}</span>
-                <span className="text-xs font-bold text-white num">{primaryRoute.tiempo_estimated_min ?? primaryRoute.tiempo_estimado_min} MIN</span>
+                <span className="text-xs font-bold text-white num">{primaryRoute.tiempo_estimado_min} MIN</span>
               </div>
             </div>
           </CollapsibleWidget>
