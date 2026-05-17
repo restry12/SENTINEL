@@ -1,7 +1,7 @@
 "use client"
 
 import { useLang } from "@/contexts/language-context"
-import { useFireSelection, type FireArea } from "@/contexts/fire-selection-context"
+import { useFireSelection } from "@/contexts/fire-selection-context"
 import { useSentinel } from "@/contexts/sentinel-context"
 import { Flame, Wind, Droplets, Map as MapIcon, ChevronRight } from "lucide-react"
 
