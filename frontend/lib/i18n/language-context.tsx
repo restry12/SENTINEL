@@ -12,28 +12,38 @@ type LanguageContextValue = {
 const LanguageContext = React.createContext<LanguageContextValue | null>(null)
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = React.useState<Lang>(() => {
+  const [lang, setLangState] = React.useState<Lang>('es')
+  const [isHydrated, setIsHydrated] = React.useState(false)
+
+  React.useEffect(() => {
     try {
       const stored = localStorage.getItem('sentinel_lang')
-      if (stored === 'es' || stored === 'en') return stored
+      if (stored === 'es' || stored === 'en') {
+        setLangState(stored)
+      }
     } catch {
-      // localStorage unavailable (private browsing, etc.)
+      // localStorage unavailable
     }
-    return 'es'
-  })
+    setIsHydrated(true)
+  }, [])
 
   const setLang = React.useCallback((next: Lang) => {
     try {
       localStorage.setItem('sentinel_lang', next)
     } catch {
-      // localStorage unavailable — still update state
+      // localStorage unavailable
     }
     setLangState(next)
   }, [])
 
   const t = React.useCallback(
-    (key: TranslationKey): string => translations[lang][key],
-    [lang]
+    (key: TranslationKey): string => {
+      // During hydration, we MUST use the same language as the server ('es')
+      // to avoid hydration mismatch errors. After hydration, we can use the stored lang.
+      const activeLang = isHydrated ? lang : 'es'
+      return translations[activeLang][key]
+    },
+    [lang, isHydrated]
   )
 
   return (
