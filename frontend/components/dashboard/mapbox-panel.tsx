@@ -309,6 +309,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
       })
       if (map.getSource(SRC)) map.removeSource(SRC)
       if (map.getSource('fires-selected-src')) map.removeSource('fires-selected-src')
+      selectFireRef.current = null
     }
 
     const wDeg   = sentinelUpdate?.weather?.deg   ?? 315
@@ -458,8 +459,9 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         lat: number, lon: number,
         id: string, frp: number, brightness: number,
         weatherJson: string, pm25: number | null,
+        critical: boolean,
       ) {
-        const color = frp >= 300 ? '#ef4444' : '#f97316'
+        const color = critical ? '#ef4444' : '#f97316'
         const weather = weatherJson ? JSON.parse(weatherJson) : undefined
         const intensity: FireIntensity = frp >= 300 ? 'critical' : frp >= 100 ? 'high' : 'moderate'
 
@@ -518,7 +520,8 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         const f = allFires[idx]
         if (!f) return
         const id = `FIRE-${String(idx + 1).padStart(3, '0')}`
-        openFire(f.lat, f.lon, id, f.frp, f.brightness, f.weather ? JSON.stringify(f.weather) : '', f.pm25 ?? null)
+        const isCritical = (sentinelUpdate?.riskLevel === 'critical') || f.frp >= 300
+        openFire(f.lat, f.lon, id, f.frp, f.brightness, f.weather ? JSON.stringify(f.weather) : '', f.pm25 ?? null, isCritical)
       }
 
       // Click a fire → flyTo + popup + selectedFire context
@@ -527,7 +530,7 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
         if (!feat) return
         const props = feat.properties as any
         const [lon, lat] = (feat.geometry as any).coordinates as [number, number]
-        openFire(lat, lon, props.id, props.frp, props.brightness, props.weatherJson ?? '', props.pm25 ?? null)
+        openFire(lat, lon, props.id, props.frp, props.brightness, props.weatherJson ?? '', props.pm25 ?? null, props.critical === 1)
       })
 
       // Pan to the average centroid only on first load
