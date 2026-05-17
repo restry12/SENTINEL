@@ -696,7 +696,8 @@ export function MapboxPanel({ showHeatmap = false }: { showHeatmap?: boolean }) 
       const hours = EXP_CONFIG[activeExpansion].hours
 
       const features = expansions.map(pf => {
-        const pfWindDeg   = directionToDeg(pf.direccion) ?? globalWindDeg
+        const spreadDeg   = directionToDeg(pf.direccion) ?? globalWindDeg
+        const pfWindDeg   = (spreadDeg + 180) % 360  // convert spread→origin for makeFireSpreadPolygon
         const pfWindSpeed = pf.velocidad_kmh > 0 ? pf.velocidad_kmh / 3.6 : globalWindSpeed
         const frpFactor   = 1 + (pf.frp / 500) * 0.3
         return makeFireSpreadPolygon(pf.lat, pf.lon, pfWindDeg, pfWindSpeed * frpFactor, hours)
