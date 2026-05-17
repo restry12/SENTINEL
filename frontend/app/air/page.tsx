@@ -90,7 +90,7 @@ function AirPageInner() {
           <div className="flex-1 overflow-y-auto pr-3 scrollbar-none pointer-events-auto flex flex-col gap-3 pb-4">
             
             {/* AQI Primary Widget */}
-            <div className="w-full bg-[#0a0b0e/90] backdrop-blur-xl border border-white/20 rounded-lg p-5 shadow-2xl relative overflow-hidden group">
+            <div className="w-full bg-[#0f172a] backdrop-blur-xl border border-white/20 rounded-lg p-5 shadow-2xl relative overflow-hidden group">
                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                  <Activity className="w-12 h-12 text-blue-soft" />
                </div>

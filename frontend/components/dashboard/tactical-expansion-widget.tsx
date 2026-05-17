@@ -33,7 +33,7 @@ export function TacticalExpansionWidget({ activeExpansion, onExpansionChange }: 
 
   return (
     <div className="absolute top-24 right-6 z-40 w-72 pointer-events-none flex flex-col gap-3">
-      <div className={`pointer-events-auto p-5 bg-[#0a0b0e/95] backdrop-blur-2xl border ${borderColor} rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in slide-in-from-right-8 duration-500`}>
+      <div className={`pointer-events-auto p-5 bg-[#0f172a] backdrop-blur-2xl border ${borderColor} rounded-lg shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in slide-in-from-right-8 duration-500`}>
         
         {/* Header */}
         <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/10">

@@ -41,7 +41,7 @@ export function FireDetailOverlay() {
     <div className="absolute top-24 bottom-8 left-6 z-40 w-80 pointer-events-none flex flex-col">
       <div className="flex-1 overflow-y-auto pr-3 scrollbar-none pointer-events-auto flex flex-col gap-3 pb-4">
         {/* Main ID & Close Widget */}
-        <div className="w-full bg-[#0a0b0e/90] backdrop-blur-xl border border-white/20 rounded-lg p-4 shadow-2xl relative group">
+        <div className="w-full bg-[#0f172a] backdrop-blur-xl border border-white/20 rounded-lg p-4 shadow-2xl relative group">
           <button
             onClick={() => setSelectedFire(null)}
             className="absolute top-3 right-3 p-1.5 hover:bg-white/10 rounded-full transition-colors text-text-muted hover:text-white"

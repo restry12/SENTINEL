@@ -15,7 +15,7 @@ export function CollapsibleWidget({ title, icon, children, defaultOpen = true, c
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
-    <div className={`w-72 bg-[#0a0b0e/80] backdrop-blur-md border border-white/10 rounded-lg overflow-hidden shadow-2xl transition-all duration-300 pointer-events-auto shrink-0 ${className}`}>
+    <div className={`w-72 bg-[#0f172a] backdrop-blur-md border border-white/10 rounded-lg overflow-hidden shadow-2xl transition-all duration-300 pointer-events-auto shrink-0 ${className}`}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-3 py-2.5 flex items-center justify-between bg-white/5 hover:bg-white/10 transition-colors"

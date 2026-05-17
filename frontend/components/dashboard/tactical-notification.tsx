@@ -30,7 +30,7 @@ export function TacticalNotification() {
 
   return (
     <div className="fixed bottom-32 left-4 right-4 z-[100] md:hidden">
-      <div className="relative p-4 bg-[#0a0b0e/95] backdrop-blur-2xl border border-blue/40 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_20px_rgba(56,189,248,0.2)] animate-in slide-in-from-bottom-8 duration-500">
+      <div className="relative p-4 bg-[#0f172a] backdrop-blur-2xl border border-blue/40 rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.5),0_0_20px_rgba(56,189,248,0.2)] animate-in slide-in-from-bottom-8 duration-500">
         <button 
           onClick={() => setIsVisible(false)}
           className="absolute top-2 right-2 p-1 text-text-muted hover:text-white"
