@@ -227,7 +227,7 @@ export function MapboxPanel({
   const pulseRafRef = useRef<number | null>(null)
   const currentPopupRef = useRef<{ popup: mapboxgl.Popup; data: PopupData } | null>(null)
   const { sentinelUpdate } = useSentinel()
-  const { setSelectedFire, selectFireRef } = useFireSelection()
+  const { selectedFire, setSelectedFire, selectFireRef } = useFireSelection()
   const userCoords = useGeolocation()
 
   useEffect(() => {
