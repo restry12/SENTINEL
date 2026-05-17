@@ -277,6 +277,8 @@ export function useSocket() {
   }, [])
 
   const triggerCitizen = useCallback((lat: number, lon: number) => {
+    setCitizenRoutes(null)
+
     const socketId = socketRef.current?.id ?? null
     const body: Record<string, unknown> = { lat, lon }
     if (socketId) body.socketId = socketId
@@ -293,6 +295,8 @@ export function useSocket() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userLat: lat, userLon: lon, socketId }),
       }).catch((err) => console.error('[triggerCitizen] citizen-routes failed:', err))
+    } else {
+      console.warn('[triggerCitizen] no socketId — citizen-routes request skipped')
     }
   }, [])
 
