@@ -150,7 +150,7 @@ export function ChatPage() {
     isStreaming && messages.length > 0 && messages[messages.length - 1].role === 'assistant'
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-[calc(100dvh-4rem)] md:h-screen flex flex-col bg-background overflow-hidden">
       <TopBar />
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-4 min-h-0">
