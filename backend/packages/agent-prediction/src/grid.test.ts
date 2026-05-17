@@ -63,3 +63,41 @@ describe('computeHistorial', () => {
     expect(neighbour).toBeLessThan(centre)
   })
 })
+
+import { buildFireRiskGrid } from './grid'
+import type { FireData } from '@sentinel/types'
+
+describe('buildFireRiskGrid', () => {
+  it('builds a grid of cells with valid 0-100 scores and categories', async () => {
+    const weather: WeatherData = { speed: 10, deg: 0, humidity: 30, temp: 30 }
+    const fires: FireData[] = [
+      { lat: -38.4, lon: -72.1, frp: 120, brightness: 330, timestamp: '2026-05-17T00:00:00Z' },
+    ]
+    const grid = await buildFireRiskGrid(weather, fires)
+    expect(grid.cells.length).toBeGreaterThan(1500)
+    for (const c of grid.cells.slice(0, 100)) {
+      expect(c.score).toBeGreaterThanOrEqual(0)
+      expect(c.score).toBeLessThanOrEqual(100)
+      expect(['bajo', 'medio', 'alto', 'critico']).toContain(c.category)
+      expect(c.size).toBe(0.25)
+    }
+    expect(grid.bbox.latMin).toBe(-56)
+    expect(grid.weather_point).toEqual({ lat: -38.4, lon: -72.1 })
+  })
+
+  it('cells near a live fire score higher than far-away cells', async () => {
+    const weather: WeatherData = { speed: 5, deg: 0, humidity: 50, temp: 20 }
+    const fires: FireData[] = [
+      { lat: -38.4, lon: -72.1, frp: 200, brightness: 340, timestamp: '2026-05-17T00:00:00Z' },
+    ]
+    const grid = await buildFireRiskGrid(weather, fires)
+    // Cell whose centre is closest to the fire, vs a far Atacama cell.
+    const fireCell = grid.cells.reduce((best, c) => {
+      const d = Math.hypot(c.lat + 0.125 - -38.4, c.lon + 0.125 - -72.1)
+      const bd = Math.hypot(best.lat + 0.125 - -38.4, best.lon + 0.125 - -72.1)
+      return d < bd ? c : best
+    })
+    const desertCell = grid.cells.find(c => c.lat > -25)!
+    expect(fireCell.factors.historial).toBeGreaterThan(desertCell.factors.historial)
+  })
+})
