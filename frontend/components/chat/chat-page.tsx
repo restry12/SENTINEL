@@ -14,27 +14,51 @@ const SUGGESTIONS = [
   "¿Cuáles son las rutas de evacuación activas?",
 ]
 
+// crypto.randomUUID requires a secure context (HTTPS/localhost) and is missing
+// on older mobile Safari. Fall back to a timestamp+random ID so dev on a LAN IP
+// or older browsers still work.
+function makeId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 export function ChatPage() {
   const { sentinelUpdate } = useSentinel()
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [newsArticles, setNewsArticles] = useState<Array<{ title: string; snippet?: string; source: string; publishedAt: string }>>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  // Tracks the in-flight fetch so we can abort on unmount or when the user
+  // clears the conversation mid-stream — avoids "setState on unmounted"
+  // warnings and stops wasting OpenRouter tokens.
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
-    fetch('/api/news')
+    const ctrl = new AbortController()
+    fetch('/api/news', { signal: ctrl.signal })
       .then(r => r.json())
       .then(d => setNewsArticles(d.articles ?? []))
       .catch(() => {})
+    return () => ctrl.abort()
   }, [])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Abort any in-flight chat stream when the component unmounts.
+  useEffect(() => () => abortRef.current?.abort(), [])
+
   const sendMessage = async (content: string) => {
+    // Cancel any prior in-flight stream before starting a new one.
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     const userMsg: Message = {
-      id: crypto.randomUUID(),
+      id: makeId(),
       role: 'user',
       content,
       timestamp: new Date(),
@@ -44,7 +68,7 @@ export function ChatPage() {
     setMessages(prev => [...prev, userMsg])
     setIsStreaming(true)
 
-    const assistantId = crypto.randomUUID()
+    const assistantId = makeId()
     setMessages(prev => [
       ...prev,
       { id: assistantId, role: 'assistant', content: '', timestamp: new Date() },
@@ -60,6 +84,7 @@ export function ChatPage() {
           sentinelSnapshot: sentinelUpdate,
           newsArticles,
         }),
+        signal: controller.signal,
       })
 
       if (!res.ok || !res.body) {
@@ -100,20 +125,30 @@ export function ChatPage() {
           }
         }
       }
-    } catch {
-      setMessages(prev =>
-        prev.map(m =>
-          m.id === assistantId
-            ? { ...m, content: 'Error al conectar con SENTINEL AI. Verifique la conexión.' }
-            : m
+    } catch (err) {
+      // AbortError = intentional cancel (unmount / clear / new send). Leave
+      // any partial text in place and don't surface a fake error to the user.
+      if ((err as { name?: string })?.name !== 'AbortError') {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? { ...m, content: 'Error al conectar con SENTINEL AI. Verifique la conexión.' }
+              : m
+          )
         )
-      )
+      }
     } finally {
-      setIsStreaming(false)
+      if (abortRef.current === controller) {
+        abortRef.current = null
+        setIsStreaming(false)
+      }
     }
   }
 
-  const clearHistory = () => setMessages([])
+  const clearHistory = () => {
+    abortRef.current?.abort()
+    setMessages([])
+  }
 
   const hasLiveData = !!sentinelUpdate
   const hasNews = newsArticles.length > 0
