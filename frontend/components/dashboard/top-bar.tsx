@@ -6,6 +6,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLang } from "@/contexts/language-context"
 import { useSentinel } from "@/contexts/sentinel-context"
+import { HotspotSearch } from "@/components/dashboard/hotspot-search"
 
 export function TopBar() {
   const pathname = usePathname()
@@ -79,6 +80,9 @@ export function TopBar() {
             <div className={`w-2 h-2 rounded-full shadow-[0_0_12px_rgba(255,51,51,1)] ${connected ? "bg-red animate-pulse" : "bg-text-muted"}`} />
             <span className="text-[11px] font-black tracking-[0.2em] uppercase whitespace-nowrap">{statusLabel}</span>
           </div>
+
+
+          <HotspotSearch />
 
           <div className="hidden lg:flex items-center gap-3 px-4 py-2 bg-surface/60 border border-white/5 rounded-lg text-[11px] font-bold tracking-[0.15em] text-text-dim backdrop-blur-md">
             <span>{tx.hotspots}</span>
