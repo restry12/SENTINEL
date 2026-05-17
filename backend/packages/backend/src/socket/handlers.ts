@@ -91,7 +91,7 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
       if (citizenWebhookUrl) {
         const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
         const webhookSecret = process.env.MAKE_CITIZEN_WEBHOOK_SECRET
-        if (webhookSecret) webhookHeaders['Authorization'] = webhookSecret
+        if (webhookSecret) webhookHeaders['x-make-apikey'] = webhookSecret
 
         fetch(citizenWebhookUrl, {
           method: 'POST',
