@@ -122,6 +122,11 @@ function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
+  if (!OPENROUTER_KEY) {
+    console.error('OPENROUTER_API_KEY is not set')
+    return new Response(JSON.stringify({ error: 'service not configured' }), { status: 500 })
+  }
+
   try {
     const body: ChatRequest = await req.json()
     const { message, history, sentinelSnapshot, newsArticles } = body
@@ -132,11 +137,16 @@ export async function POST(req: NextRequest): Promise<Response> {
 
     const systemPrompt = buildSystemPrompt(sentinelSnapshot, newsArticles ?? [])
 
+    // Cap history to last 20 messages to avoid runaway token cost from a buggy / hostile client.
+    const safeHistory = (history ?? []).slice(-20)
+
     const messages: ChatMessage[] = [
-      ...history,
+      ...safeHistory,
       { role: 'user', content: message },
     ]
 
+    // Forward client cancellation + 60s hard timeout so a hanging OpenRouter call
+    // doesn't keep burning tokens after the user closes the tab.
     const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -151,6 +161,7 @@ export async function POST(req: NextRequest): Promise<Response> {
         temperature: 0.3,
         stream: true,
       }),
+      signal: AbortSignal.any([req.signal, AbortSignal.timeout(60_000)]),
     })
 
     if (!upstream.ok) {
