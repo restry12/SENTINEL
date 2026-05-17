@@ -667,7 +667,7 @@ function NewsContent() {
 export default function NewsPage() {
   return (
     <AuthGuard>
-      <div className="h-screen flex flex-col bg-[#04050a] text-foreground overflow-hidden">
+      <div className="h-[calc(100dvh-4rem)] md:h-screen flex flex-col bg-[#04050a] text-foreground overflow-hidden">
         <TopBar />
         <NewsContent />
       </div>

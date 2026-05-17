@@ -51,7 +51,7 @@ function DashboardContent() {
         
         {/* Mobile Metric HUD - Only visible on small screens when no fire is selected */}
         {!selectedFire && (
-          <div className="md:hidden absolute bottom-6 left-4 right-4 z-40 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="md:hidden absolute bottom-20 left-4 right-4 z-40 animate-in slide-in-from-bottom-4 duration-500">
             <MetricCards />
           </div>
         )}
