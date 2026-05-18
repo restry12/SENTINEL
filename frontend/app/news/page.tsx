@@ -178,29 +178,34 @@ function NewsFilters({ activeFilter, setFilter, searchQuery, setSearch }: {
   )
 }
 
-function isFire(title: string) {
+function getArticleCategory(title: string): 'fire' | 'air' | 'water' | 'earth' | 'general' {
   const t = title.toLowerCase()
-  return t.includes('incendio') || t.includes('fuego') || t.includes('quema')
+  if (t.includes('incendio') || t.includes('fuego') || t.includes('quema') || t.includes('fire') || t.includes('calor'))
+    return 'fire'
+  if (t.includes('contaminaci') || t.includes('calidad') || t.includes('aire') || t.includes('smog') || t.includes('air') || t.includes('particul'))
+    return 'air'
+  if (t.includes('lluvia') || t.includes('inundaci') || t.includes('agua') || t.includes('flood') || t.includes('rain') || t.includes('storm'))
+    return 'water'
+  if (t.includes('sismo') || t.includes('terremoto') || t.includes('earthquake') || t.includes('volc'))
+    return 'earth'
+  return 'general'
 }
 
-function articleColor(title: string): string {
-  const t = title.toLowerCase()
-  if (t.includes('incendio') || t.includes('fuego') || t.includes('quema'))
-    return "linear-gradient(135deg, #7f1d1d 0%, #3f0a0a 100%)"
-  if (t.includes('contaminaci') || t.includes('calidad') || t.includes('aire') || t.includes('smog'))
-    return "linear-gradient(135deg, #14532d 0%, #052e10 100%)"
-  if (t.includes('lluvia') || t.includes('inundaci') || t.includes('agua'))
-    return "linear-gradient(135deg, #1e3a5f 0%, #0a1a30 100%)"
-  if (t.includes('sismo') || t.includes('terremoto'))
-    return "linear-gradient(135deg, #4a3000 0%, #1c1000 100%)"
-  return "linear-gradient(135deg, #1e293b 0%, #0a0f1a 100%)"
+const CATEGORY_CONFIG = {
+  fire: { keywords: 'forest,fire,emergency', color: 'from-red-950/80 to-black', accent: 'text-red-500' },
+  air: { keywords: 'city,smog,pollution,air', color: 'from-green-950/80 to-black', accent: 'text-green-500' },
+  water: { keywords: 'flood,storm,ocean,rain', color: 'from-blue-950/80 to-black', accent: 'text-blue-500' },
+  earth: { keywords: 'earthquake,volcano,nature,mountain', color: 'from-orange-950/80 to-black', accent: 'text-orange-500' },
+  general: { keywords: 'news,world,technology', color: 'from-slate-900/80 to-black', accent: 'text-slate-500' }
 }
 
 function ArticleImagePlaceholder({ title, className = "" }: { title: string; className?: string }) {
+  const category = getArticleCategory(title)
+  const config = CATEGORY_CONFIG[category]
+  
   return (
     <div
-      className={`w-full h-full ${className}`}
-      style={{ background: articleColor(title) }}
+      className={`w-full h-full bg-gradient-to-br ${config.color} ${className}`}
     />
   )
 }
@@ -209,7 +214,8 @@ function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: bo
   if (loading) return <div className="w-full h-80 rounded-2xl border border-white/5 bg-surface/30 animate-pulse" />
   if (!article) return null
 
-  const variant = article.title.toLowerCase().includes('incendio') ? 'orange' : 'blue'
+  const category = getArticleCategory(article.title)
+  const variant = category === 'fire' ? 'orange' : (category === 'water' ? 'blue' : 'default')
 
   return (
     <div className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0b0e/40] backdrop-blur-2xl transition-all duration-500 hover:border-orange/30">
@@ -296,7 +302,7 @@ function ArticleCard({ article }: { article: NewsArticle }) {
 
       <div className="flex flex-col p-6 flex-1">
       <div className="flex items-start justify-between gap-4 mb-5">
-        <Badge variant={isFire(article.title) ? 'orange' : 'default'}>{article.source}</Badge>
+        <Badge variant={getArticleCategory(article.title) === 'fire' ? 'orange' : 'default'}>{article.source}</Badge>
         <div className="flex items-center gap-1.5 text-[9px] font-bold text-text-dim uppercase tracking-wider">
           <Clock className="w-3 h-3" />
           {formatRelativeTime(article.publishedAt)}
@@ -479,8 +485,8 @@ function NewsContent() {
                            a.snippet.toLowerCase().includes(search.toLowerCase())
       
       if (filter === 'Todo') return matchesSearch
-      if (filter === 'Incendios') return matchesSearch && (a.title.toLowerCase().includes('incendio') || a.title.toLowerCase().includes('fuego'))
-      if (filter === 'Calidad del aire') return matchesSearch && (a.title.toLowerCase().includes('aire') || a.title.toLowerCase().includes('contaminación') || a.title.toLowerCase().includes('calidad'))
+      if (filter === 'Incendios') return matchesSearch && getArticleCategory(a.title) === 'fire'
+      if (filter === 'Calidad del aire') return matchesSearch && getArticleCategory(a.title) === 'air'
       if (filter === 'Chile') return matchesSearch && a.title.toLowerCase().includes('chile')
       return matchesSearch
     })
