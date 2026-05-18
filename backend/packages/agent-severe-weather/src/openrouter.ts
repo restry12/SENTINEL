@@ -84,7 +84,8 @@ Rules:
 - Prioritize human safety.
 - Keep citizen_alert_160_chars under 160 characters.
 - If there are active official alerts (Tornado Warning, Tornado Watch, etc.), give them highest priority in your summary.
-- If there are no active alerts and risk is LOW, keep the response proportionally calm.`
+- If there are no active alerts and risk is LOW, keep the response proportionally calm.
+- IMPORTANT: All text values in your JSON response MUST be written in Spanish (es-ES). This includes risk_summary, technical_explanation, citizen_alert_160_chars, municipal_briefing, recommended_actions, shelter_guidance, and uncertainty_note.`
 
 export interface MistralAnalysisInput {
   location: { lat: number; lon: number }
