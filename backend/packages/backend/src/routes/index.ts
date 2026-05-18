@@ -279,7 +279,9 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     if (citizenWebhookUrl) {
       const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
       const secret = process.env.MAKE_CITIZEN_WEBHOOK_SECRET
-      if (secret) webhookHeaders['x-make-apikey'] = secret
+      if (secret) {
+        webhookHeaders['x-make-apikey'] = secret
+      }
       fetch(citizenWebhookUrl, {
         method: 'POST',
         headers: webhookHeaders,
@@ -292,7 +294,8 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
           north: Math.round((lat + 0.018) * 10000) / 10000,
         }),
       }).catch((err) => console.error('[citizen-init] webhook error:', err instanceof Error ? err.message : err))
-    } else {
+    }
+ else {
       // Without Make.com we have no local fires — the citizen flow needs fresh NASA data.
       // Log and no-op; the frontend /api/citizen-routes endpoint handles stale-fire filtering.
       console.warn('[citizen-init] MAKE_CITIZEN_WEBHOOK_URL not set — citizen analysis unavailable')

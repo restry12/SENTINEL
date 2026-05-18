@@ -31,7 +31,10 @@ function nearestFireKm(
   return Math.min(...fires.map((f) => haversineKm(userLoc.lat, userLoc.lon, f.lat, f.lon)))
 }
 
-const CITIZEN_ALERT_RADIUS_KM = 0.8
+const CITIZEN_ALERT_RADIUS_KM = 3.0
+
+// TEMP: Mock fire for testing (disabled for production)
+const INJECT_TEST_FIRE = false 
 
 function compassToDeg(s: string): number {
   const map: Record<string, number> = {
@@ -49,66 +52,74 @@ function buildScene(
   u: SentinelUpdate | null,
   citizenRoutes: NaturalRoutes | null = null,
 ): CitizenData {
-  const riskLevel = (u?.riskLevel as ScreenRisk) ?? CITIZEN_MOCK.riskLevel
+  const riskLevel = (u?.riskLevel as ScreenRisk) ?? 'low'
   const user = userLoc
     ? { ...CITIZEN_MOCK.user, lat: userLoc.lat, lon: userLoc.lon }
     : CITIZEN_MOCK.user
 
   if (!u) {
-    const dLat = userLoc ? userLoc.lat - CITIZEN_MOCK.user.lat : 0
-    const dLon = userLoc ? userLoc.lon - CITIZEN_MOCK.user.lon : 0
     return {
       ...CITIZEN_MOCK,
       riskLevel,
       user,
-      fires: CITIZEN_MOCK.fires.map((f) => ({ ...f, lat: f.lat + dLat, lon: f.lon + dLon })),
+      fires: [], // No mock fires by default
+      naturalRoutes: [],
     }
   }
 
-  // Real fires — compute distance from user's actual position
-  const fires = u.fires.length > 0
-    ? u.fires.slice(0, 5).map((f, i) => ({
-        id: `F-${String(i + 1).padStart(4, '0')}`,
-        lat: f.lat,
-        lon: f.lon,
-        frp: f.frp,
-        dist_km: userLoc ? haversineKm(userLoc.lat, userLoc.lon, f.lat, f.lon) : 0,
-      }))
-    : CITIZEN_MOCK.fires
+  // Real fires — empty if none found
+  let fires = u.fires.map((f, i) => ({
+    id: `F-${String(i + 1).padStart(4, '0')}`,
+    lat: f.lat,
+    lon: f.lon,
+    frp: f.frp,
+    dist_km: userLoc ? haversineKm(userLoc.lat, userLoc.lon, f.lat, f.lon) : 0,
+  }))
 
-  // Real escape routes from the routes agent
+  if (INJECT_TEST_FIRE && userLoc) {
+    // Inject a fire 0.5km to the North
+    const testFire = {
+      id: 'F-TEST',
+      lat: userLoc.lat + 0.0045, // approx 0.5km
+      lon: userLoc.lon,
+      frp: 50.0,
+      dist_km: 0.5
+    }
+    fires = [testFire, ...fires]
+  }
+
+  // Real escape routes
   const backendRoutes = citizenRoutes?.rutas ?? u?.naturalRoutes?.rutas ?? []
-  const naturalRoutes: NaturalRoute[] = backendRoutes.length > 0
-    ? backendRoutes.map((r, i) => ({
-        id: `R-${String(i + 1).padStart(2, '0')}`,
-        label: r.nombre,
-        destino: r.destino,
-        distancia_km: r.distancia_km,
-        bearing_deg: r.bearing_deg ?? u.weather?.deg ?? 0,
-        eta_min: r.tiempo_estimado_min,
-        estado: r.estado,
-        instrucciones: r.instrucciones ? [r.instrucciones] : undefined,
-      }))
-    : CITIZEN_MOCK.naturalRoutes
+  const naturalRoutes: NaturalRoute[] = backendRoutes.map((r, i) => ({
+    id: `R-${String(i + 1).padStart(2, '0')}`,
+    label: r.nombre,
+    destino: r.destino,
+    distancia_km: r.distancia_km,
+    bearing_deg: r.bearing_deg ?? u.weather?.deg ?? 0,
+    eta_min: r.tiempo_estimado_min,
+    estado: r.estado,
+    instrucciones: r.instrucciones ? [r.instrucciones] : undefined,
+  }))
 
   // Real expansion data
   const expansion = u.expansion
     ? {
         direccion_principal_deg: compassToDeg(u.expansion.direccion_principal),
         velocidad_propagacion_kmh: u.expansion.velocidad_propagacion_kmh,
-        eta_min: CITIZEN_MOCK.expansion.eta_min,
+        eta_min: 0,
       }
-    : CITIZEN_MOCK.expansion
+    : { direccion_principal_deg: 0, velocidad_propagacion_kmh: 0, eta_min: 0 }
 
-  // Real weather
-  const weather = u.weather
+  // Real weather — prioritize local weather from the routes agent
+  const rawWeather = citizenRoutes?.weather ?? u?.weather
+  const weather = rawWeather
     ? {
-        wind_speed_kmh: Math.round(u.weather.speed * 3.6),
-        wind_dir_deg: u.weather.deg,
-        humidity_pct: u.weather.humidity,
-        temp_c: u.weather.temp ?? CITIZEN_MOCK.weather.temp_c,
+        wind_speed_kmh: Math.round((rawWeather.speed ?? 0) * 3.6),
+        wind_dir_deg: rawWeather.deg ?? 0,
+        humidity_pct: rawWeather.humidity ?? 0,
+        temp_c: rawWeather.temp ?? 20,
       }
-    : CITIZEN_MOCK.weather
+    : { wind_speed_kmh: 0, wind_dir_deg: 0, humidity_pct: 0, temp_c: 20 }
 
   return { riskLevel, user, fires, naturalRoutes, expansion, weather }
 }
@@ -129,25 +140,31 @@ export function CitizenApp() {
       if (!connected) {
         console.warn('[CitizenApp] socket not connected — trigger-citizen not sent')
       }
-      if (sentinelUpdate && sentinelUpdate.fires.length > 0) {
-        const nearest = nearestFireKm(coords, sentinelUpdate.fires)
-        setScreen(nearest <= CITIZEN_ALERT_RADIUS_KM ? 'alert' : 'safe')
-      } else {
-        setScreen('alert')
-      }
+      
+      // Screen decision will be handled by the useEffect below
     } else {
-      setScreen('alert')
+      setScreen('safe')
     }
-  }, [triggerCitizen, connected, sentinelUpdate])
+  }, [triggerCitizen, connected])
 
   useEffect(() => {
-    if (screen !== 'alert' && screen !== 'safe') return
-    if (!userLoc || !sentinelUpdate || sentinelUpdate.fires.length === 0) return
-    const nearest = nearestFireKm(userLoc, sentinelUpdate.fires)
-    setScreen(nearest <= CITIZEN_ALERT_RADIUS_KM ? 'alert' : 'safe')
-  }, [sentinelUpdate, userLoc, screen])
+    if (screen !== 'alert' && screen !== 'safe' && screen !== 'locating') return
+    if (!userLoc) return
+    
+    const nearest = nearestFireKm(userLoc, data.fires)
+    const nextScreen = nearest <= CITIZEN_ALERT_RADIUS_KM ? 'alert' : 'safe'
+    if (nextScreen !== screen) setScreen(nextScreen)
+  }, [data.fires, userLoc, screen])
 
-  const route = data.naturalRoutes[0] ?? CITIZEN_MOCK.naturalRoutes[0]
+  const route = data.naturalRoutes[0] ?? {
+    id: 'R-00',
+    label: 'Calculando ruta...',
+    destino: 'Esperando datos del sistema',
+    distancia_km: 0,
+    bearing_deg: 0,
+    eta_min: 0,
+    estado: 'LIBRE'
+  }
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#0a0a0a', position: 'relative', overflow: 'hidden' }}>
@@ -164,6 +181,7 @@ export function CitizenApp() {
           user={data.user}
           fires={data.fires}
           expansion={data.expansion}
+          weather={data.weather}
           onCompass={() => setScreen('compass')}
           onTrapped={() => setScreen('trapped_confirm')}
         />
@@ -183,6 +201,7 @@ export function CitizenApp() {
       )}
       {screen === 'trapped_live' && (
         <ScreenTrappedLive
+          user={data.user}
           onRecall={() => setScreen('alert')}
         />
       )}
