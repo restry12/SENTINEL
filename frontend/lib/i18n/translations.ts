@@ -63,7 +63,7 @@ export const translations = {
     registerConfirmPlaceholder: 'Repetir clave',
     registerButton: 'Crear Cuenta Operativa',
     registerSuccessTitle: 'Cuenta creada',
-    registerSuccessDesc: 'Cuenta registrada. Inicie sesión para continuar.',
+    registerSuccessDesc: 'Cuenta registrada. Iniciando sesión automáticamente...',
     registerErrorTitle: 'Error de registro',
     registerErrorDesc: 'No se pudo crear la cuenta.',
     registerConnErrorTitle: 'Error de conexión',
