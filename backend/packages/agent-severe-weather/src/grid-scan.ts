@@ -31,7 +31,7 @@ export interface GridScanResult {
 
 // ─── Cache ──────────────────────────────────────────────────────────────────
 
-const GRID_CACHE_TTL_MS = 60 * 60 * 1000  // 1 hour
+const GRID_CACHE_TTL_MS = 6 * 60 * 60 * 1000  // 6 hours
 
 let gridCache: { result: GridScanResult; fetchedAt: number } | null = null
 let isScanning = false
