@@ -1,91 +1,101 @@
-'use client'
+"use client";
 
-import type { Glacier } from '@/lib/glacier-types'
+import type { Glacier } from "@/lib/glacier-types";
 
 const RISK_COLOR: Record<string, string> = {
-  'Crítico':    '#ff3333',
-  'Riesgo Alto':'#f97316',
-  'Observación':'#38bdf8',
-  'Estable':    '#10b981',
-}
+  Critico: "#ff3b3b",
+  "Riesgo Alto": "#ff8a2a",
+  Observacion: "#46b8ff",
+  Estable: "#1dd38a",
+};
 
 interface Props {
-  glaciers: Glacier[]
-  selected: Glacier | null
-  onSelect: (g: Glacier) => void
-  onAnalyze: (g: Glacier) => void
-  onOpenDetail: (g: Glacier) => void
+  glaciers: Glacier[];
+  selected: Glacier | null;
+  onSelect: (glacier: Glacier) => void;
+  onAnalyze: (glacier: Glacier) => void;
+  onOpenDetail: (glacier: Glacier) => void;
 }
 
 export function GlacierCards({ glaciers, selected, onSelect, onAnalyze, onOpenDetail }: Props) {
   return (
-    <div className="bg-[#0a0d14]/80 backdrop-blur border border-white/8 rounded-lg overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/8">
-        <span className="text-[9px] font-bold tracking-widest text-white/40 uppercase">Glaciares monitoreados</span>
-        <span className="text-[9px] font-mono text-white/30">{glaciers.length} ACTIVOS · CHILE</span>
+    <div className="rounded-lg border border-white/10 bg-[#0a0d14]/88 backdrop-blur-xl shadow-2xl overflow-hidden">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-white/45">Glaciares en vista</span>
+        <span className="text-[9px] font-mono text-white/35">{glaciers.length} REGISTROS</span>
       </div>
-      <div className="flex gap-3 overflow-x-auto p-3 scrollbar-none">
-        {glaciers.map(g => {
-          const color = RISK_COLOR[g.cat]
-          const isSelected = selected?.id === g.id
+
+      <div className="flex gap-2.5 overflow-x-auto p-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {glaciers.map((glacier, index) => {
+          const color = RISK_COLOR[glacier.cat] ?? "#46b8ff";
+          const isSelected = selected?.glimsId === glacier.glimsId;
+
           return (
             <div
-              key={g.id}
-              onClick={() => onSelect(g)}
-              className={`shrink-0 w-48 rounded-lg border p-3 cursor-pointer transition-all duration-200 ${
-                isSelected ? 'border-white/20 bg-white/5' : 'border-white/8 bg-white/2 hover:bg-white/5 hover:border-white/15'
+              key={`${glacier.glimsId}-${glacier.lat.toFixed(4)}-${glacier.lon.toFixed(4)}-${index}`}
+              onClick={() => onSelect(glacier)}
+              className={`shrink-0 w-52 rounded-lg border p-2.5 cursor-pointer transition-all duration-200 ${
+                isSelected
+                  ? "border-cyan-300/35 bg-cyan-500/8"
+                  : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.05]"
               }`}
             >
-              <div className="flex items-start justify-between gap-1 mb-2">
+              <div className="mb-2 flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold text-white truncate">{g.name}</p>
-                  <p className="text-[8px] font-mono text-white/40 truncate">{g.region.toUpperCase()}</p>
+                  <p className="truncate text-[10px] font-bold text-white">{glacier.name}</p>
+                  <p className="truncate text-[8px] font-mono text-white/40">{glacier.glimsId}</p>
                 </div>
-                <span className="shrink-0 text-[8px] font-black px-1.5 py-0.5 rounded uppercase"
-                  style={{ backgroundColor: `${color}22`, color, border: `1px solid ${color}44` }}>
-                  {g.cat === 'Riesgo Alto' ? 'ALTO' : g.cat.toUpperCase()}
+                <span
+                  className="shrink-0 rounded border px-1.5 py-0.5 text-[8px] font-black uppercase"
+                  style={{ color, borderColor: `${color}66`, backgroundColor: `${color}18` }}
+                >
+                  {glacier.cat === "Riesgo Alto" ? "ALTO" : glacier.cat.toUpperCase()}
                 </span>
               </div>
 
-              <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-2xl font-black tabular-nums" style={{ color, textShadow: `0 0 12px ${color}44` }}>{g.riesgo}</span>
-                <span className="text-[9px] font-mono text-white/30">/100</span>
-                <span className="ml-auto text-[9px] font-mono" style={{ color: '#ff3333' }}>{g.deltaShort}</span>
-              </div>
-
-              <div className="flex items-end gap-px h-6 mb-2">
-                {g.riskHistory.slice(-12).map((v, i) => (
-                  <div key={i} className="flex-1 rounded-sm"
-                    style={{ height: `${(v / 100) * 100}%`, backgroundColor: color, opacity: 0.3 + (i / 12) * 0.7 }} />
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 gap-1 mb-2">
+              <div className="mb-2 grid grid-cols-2 gap-2">
                 <div>
-                  <p className="text-[7px] font-bold text-white/30 uppercase">Tendencia</p>
-                  <p className="text-[8px] text-white/60 leading-tight">{g.trend}</p>
+                  <p className="text-[7px] uppercase text-white/35">Area</p>
+                  <p className="text-[10px] font-semibold text-white">{glacier.area.toFixed(2)} km2</p>
                 </div>
                 <div>
-                  <p className="text-[7px] font-bold text-white/30 uppercase">Δ/año</p>
-                  <p className="text-[8px] font-mono text-white/60">{g.deltaYear}</p>
+                  <p className="text-[7px] uppercase text-white/35">Riesgo</p>
+                  <p className="text-[10px] font-semibold" style={{ color }}>
+                    {glacier.riesgo}/100
+                  </p>
                 </div>
               </div>
 
-              <div className="flex gap-1 pt-2 border-t border-white/5">
-                <button onClick={e => { e.stopPropagation(); onOpenDetail(g) }}
-                  className="flex-1 py-1 rounded text-[8px] font-black tracking-wider text-white/40 border border-white/10 hover:bg-white/5 hover:text-white/70 uppercase transition-colors">
-                  DETALLE
+              <div className="mb-2">
+                <p className="text-[7px] uppercase text-white/35">Fecha observacion</p>
+                <p className="truncate text-[9px] font-mono text-white/65">{glacier.srcDate ?? "N/D"}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1 border-t border-white/10 pt-2">
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenDetail(glacier);
+                  }}
+                  className="rounded border border-white/15 py-1 text-[8px] font-black uppercase tracking-wider text-white/60 hover:bg-white/5"
+                >
+                  Detalle
                 </button>
-                <button onClick={e => { e.stopPropagation(); onAnalyze(g) }}
-                  className="flex-1 py-1 rounded text-[8px] font-black tracking-wider uppercase transition-colors"
-                  style={{ backgroundColor: `${color}18`, color, border: `1px solid ${color}44` }}>
-                  ANALIZAR →
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onAnalyze(glacier);
+                  }}
+                  className="rounded border py-1 text-[8px] font-black uppercase tracking-wider"
+                  style={{ color, borderColor: `${color}66`, backgroundColor: `${color}1a` }}
+                >
+                  Analizar
                 </button>
               </div>
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }

@@ -1,79 +1,114 @@
-'use client'
+"use client";
 
-import dynamic from 'next/dynamic'
-import { useState } from 'react'
-import { AuthGuard } from '@/components/auth-guard'
-import { TopBar } from '@/components/dashboard/top-bar'
-import { GlacierRiskPanel } from '@/components/glaciares/glacier-risk-panel'
-import { GlacierAIPanel } from '@/components/glaciares/glacier-ai-panel'
-import { GlacierKPIBar } from '@/components/glaciares/glacier-kpi-bar'
-import { GlacierCards } from '@/components/glaciares/glacier-cards'
-import { GlacierDetailDrawer } from '@/components/glaciares/glacier-detail-drawer'
-import { useGlaciers } from '@/hooks/use-glaciers'
-import type { Glacier } from '@/lib/glacier-types'
+import dynamic from "next/dynamic";
+import { useState } from "react";
+import { AuthGuard } from "@/components/auth-guard";
+import { TopBar } from "@/components/dashboard/top-bar";
+import { GlacierKPIBar } from "@/components/glaciares/glacier-kpi-bar";
+import { GlacierCards } from "@/components/glaciares/glacier-cards";
+import { GlacierDetailDrawer } from "@/components/glaciares/glacier-detail-drawer";
+import { MobileDrawer } from "@/components/ui/mobile-drawer";
+import { useGlaciers } from "@/hooks/use-glaciers";
+import type { Glacier } from "@/lib/glacier-types";
 
-const GlacierMap = dynamic(
-  () => import('@/components/glaciares/glacier-map').then(m => m.GlacierMap),
-  { ssr: false, loading: () => <div className="absolute inset-0 bg-background" /> }
-)
+const GlacierMap = dynamic(() => import("@/components/glaciares/glacier-map").then((mod) => mod.GlacierMap), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0 bg-background" />,
+});
 
 export default function GlaciersPage() {
-  return <AuthGuard><GlaciersPageInner /></AuthGuard>
+  return (
+    <AuthGuard>
+      <GlaciersPageInner />
+    </AuthGuard>
+  );
 }
 
 function GlaciersPageInner() {
-  const { glaciers, loading, selected, analyzing, selectGlacier, analyzeGlacier } = useGlaciers()
-  const [detailGlacier, setDetailGlacier] = useState<Glacier | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  const {
+    glaciers,
+    loading,
+    error,
+    source,
+    selected,
+    analyzing,
+    detailLoading,
+    updateViewport,
+    selectGlacier,
+    analyzeGlacier,
+  } = useGlaciers();
 
-  const handleOpenDetail = (g: Glacier) => {
-    setDetailGlacier(g)
-    setDrawerOpen(true)
-  }
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [detailGlacier, setDetailGlacier] = useState<Glacier | null>(null);
+
+  const handleSelectGlacier = (glacier: Glacier) => {
+    setDetailGlacier(glacier);
+    setDrawerOpen(true);
+    void selectGlacier(glacier);
+  };
+
+  const handleOpenDetail = (glacier: Glacier) => {
+    setDetailGlacier(glacier);
+    setDrawerOpen(true);
+    void selectGlacier(glacier);
+  };
 
   return (
     <div className="h-[calc(100dvh-4rem)] md:h-screen w-screen flex flex-col bg-background overflow-hidden">
       <TopBar />
-      <main className="flex-1 relative overflow-hidden">
-
+      <main className="relative flex-1 overflow-hidden">
         {loading && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur">
-            <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-2 border-blue border-t-transparent rounded-full animate-spin" />
-              <p className="text-[10px] font-mono text-white/40 tracking-widest">CARGANDO DATOS GLIMS…</p>
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/65 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-8 w-8 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
+              <p className="text-[10px] font-mono tracking-widest text-white/50">CARGANDO GLIMS...</p>
             </div>
           </div>
         )}
 
-        <GlacierMap glaciers={glaciers} selected={selected} onSelect={selectGlacier} />
+        {error && !loading && (
+          <div className="absolute left-1/2 top-20 z-50 w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-red-400/25 bg-[#0a0d14]/95 px-4 py-3 text-center backdrop-blur">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-red-300">Error cargando glaciares</p>
+            <p className="mt-1 text-[10px] font-mono text-white/55">{error}</p>
+          </div>
+        )}
 
-        <div className="hidden md:block">
-          <GlacierRiskPanel glacier={selected} />
-        </div>
+        <GlacierMap
+          glaciers={glaciers}
+          selected={selected}
+          source={source}
+          onSelect={handleSelectGlacier}
+          onViewportChange={updateViewport}
+        />
 
-        <div className="hidden md:flex absolute bottom-4 left-[calc(288px+32px)] right-[calc(288px+32px)] z-40 flex-col gap-2">
+        <div className="hidden md:block absolute left-5 bottom-5 z-40 w-[30rem] max-w-[calc(100vw-2.5rem)]">
           <GlacierKPIBar glaciers={glaciers} />
-          {glaciers.length > 0 && (
-            <GlacierCards
-              glaciers={glaciers}
-              selected={selected}
-              onSelect={selectGlacier}
-              onAnalyze={analyzeGlacier}
-              onOpenDetail={handleOpenDetail}
-            />
-          )}
-        </div>
-
-        <div className="hidden md:block">
-          <GlacierAIPanel glacier={selected} analyzing={analyzing} onAnalyze={analyzeGlacier} />
         </div>
 
         <GlacierDetailDrawer
-          glacier={detailGlacier}
+          glacier={selected ?? detailGlacier}
           open={drawerOpen}
           onClose={() => setDrawerOpen(false)}
+          analyzing={analyzing}
+          detailLoading={detailLoading}
+          onAnalyze={analyzeGlacier}
         />
+
+        <MobileDrawer title="Glaciares del mundo" triggerLabel="Ver glaciares">
+          <div className="space-y-4">
+            <GlacierKPIBar glaciers={glaciers} />
+            <GlacierCards
+              glaciers={glaciers.slice(0, 120)}
+              selected={selected}
+              onSelect={handleSelectGlacier}
+              onAnalyze={(glacier) => {
+                void analyzeGlacier(glacier);
+              }}
+              onOpenDetail={handleOpenDetail}
+            />
+          </div>
+        </MobileDrawer>
       </main>
     </div>
-  )
+  );
 }

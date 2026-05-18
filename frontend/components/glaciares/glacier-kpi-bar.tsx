@@ -1,66 +1,57 @@
-'use client'
+"use client";
 
-import type { Glacier } from '@/lib/glacier-types'
-
-function MiniSpark({ values, color }: { values: number[]; color: string }) {
-  const w = 72, h = 18
-  const max = Math.max(...values), min = Math.min(...values)
-  const range = max - min || 1
-  const step = w / (values.length - 1)
-  const path = values
-    .map((v, i) => `${i === 0 ? 'M' : 'L'} ${(i * step).toFixed(1)} ${(h - ((v - min) / range) * h).toFixed(1)}`)
-    .join(' ')
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="opacity-70">
-      <path d={path} stroke={color} strokeWidth="1.3" fill="none" />
-    </svg>
-  )
-}
+import type { Glacier } from "@/lib/glacier-types";
 
 interface Props {
-  glaciers: Glacier[]
+  glaciers: Glacier[];
+}
+
+function formatDate(value: string | undefined): string {
+  if (!value) return "N/D";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return date.toISOString().slice(0, 10);
 }
 
 export function GlacierKPIBar({ glaciers }: Props) {
-  if (glaciers.length === 0) return null
+  if (glaciers.length === 0) return null;
 
-  const critCount = glaciers.filter(g => g.cat === 'Crítico').length
-  const retreatCount = glaciers.filter(g => g.trend.includes('Retroceso')).length
-  const avgTemp = (glaciers.reduce((s, g) => s + g.tempAnomaly, 0) / glaciers.length).toFixed(1)
-  const maxMass = glaciers.reduce((prev, g) => {
-    const last = g.massHistory.at(-1) ?? 0
-    return last < (prev.massHistory.at(-1) ?? 0) ? g : prev
-  })
+  const avgArea = glaciers.reduce((sum, glacier) => sum + glacier.area, 0) / glaciers.length;
+  const largest = glaciers.reduce((current, glacier) => (glacier.area > current.area ? glacier : current), glaciers[0]);
+  const criticalCount = glaciers.filter((glacier) => glacier.cat === "Critico").length;
+  const inNorthernHemisphere = glaciers.filter((glacier) => glacier.lat >= 0).length;
+  const inSouthernHemisphere = glaciers.length - inNorthernHemisphere;
 
-  const tempSeries = glaciers.slice(0,7).map(g => g.tempAnomaly)
-  const retreatSeries = [15, 18, 22, 25, 27, 30, retreatCount]
-  const massSeries = glaciers.slice(0,7).map(g => Math.abs(g.massHistory.at(-1) ?? 0.3))
+  const latestDate = glaciers
+    .map((glacier) => glacier.srcDate)
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
 
-  const timeStr = new Date().toISOString().slice(11, 16)
+  const blocks = [
+    { label: "Monitoreados", value: String(glaciers.length), unit: "en vista", color: "#46b8ff" },
+    { label: "Area promedio", value: avgArea.toFixed(2), unit: "km2", color: "#8be2ff" },
+    { label: "Mayor glaciar", value: largest.area.toFixed(1), unit: "km2", color: "#1dd38a" },
+    { label: "Criticos", value: String(criticalCount), unit: "riesgo alto", color: "#ff5a5a" },
+    { label: "Norte / Sur", value: `${inNorthernHemisphere}/${inSouthernHemisphere}`, unit: "hemisferio", color: "#ff9a3d" },
+    { label: "Ultima observacion", value: formatDate(latestDate), unit: "GLIMS", color: "#d0d7e5" },
+  ];
 
   return (
-    <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 px-0 pb-2">
-      {[
-        { icon: '◆', label: 'Monitoreados', value: String(glaciers.length), unit: 'ACTIVOS', spark: retreatSeries, color: '#38bdf8', valueColor: undefined },
-        { icon: '▼', label: 'En Retroceso', value: String(retreatCount), unit: `${Math.round(retreatCount/glaciers.length*100)}%`, spark: retreatSeries, color: '#ff3333', valueColor: '#ff3333' },
-        { icon: '≈', label: 'Riesgo Hídrico', value: critCount > 0 ? 'ALTO' : 'MEDIO', unit: `${critCount} cuencas críticas`, spark: null, color: '#f97316', valueColor: '#f97316' },
-        { icon: '↑', label: 'Temp. +anomalía', value: `+${avgTemp}`, unit: '°C', spark: tempSeries, color: '#f97316', valueColor: '#f97316' },
-        { icon: '∂', label: 'Variación masa', value: maxMass.masaVar.split(' ')[0], unit: 'm EH/año', spark: massSeries, color: '#ff3333', valueColor: '#ff3333' },
-        { icon: '○', label: 'Actualización', value: timeStr, unit: 'UTC −3', sub: 'GLIMS · ERA5 · WGMS', spark: null, color: '#10b981', valueColor: '#10b981' },
-      ].map(({ icon, label, value, unit, spark, color, valueColor, sub }) => (
-        <div key={label} className="bg-[#0a0d14]/80 backdrop-blur border border-white/8 rounded-lg p-3 flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px]" style={{ color }}>{icon}</span>
-            <span className="text-[8px] font-bold uppercase tracking-widest text-white/40 truncate">{label}</span>
+    <div className="grid grid-cols-3 gap-2 lg:grid-cols-6">
+      {blocks.map((block) => (
+        <div
+          key={block.label}
+          className="min-w-0 rounded-lg border border-white/10 bg-[#0a0d14]/88 p-2.5 shadow-2xl backdrop-blur-xl"
+        >
+          <p className="truncate text-[8px] font-bold uppercase tracking-widest text-white/40">{block.label}</p>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="truncate text-[1.05rem] font-black leading-none" style={{ color: block.color }}>
+              {block.value}
+            </span>
+            <span className="truncate text-[8px] font-mono text-white/35">{block.unit}</span>
           </div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-black tabular-nums leading-none" style={{ color: valueColor ?? '#f0f2f5' }}>{value}</span>
-            <span className="text-[9px] font-mono text-white/30 truncate">{unit}</span>
-          </div>
-          {spark && <MiniSpark values={spark} color={color} />}
-          {'sub' in { sub } && sub && <span className="text-[8px] font-mono text-white/25 truncate">{sub}</span>}
         </div>
       ))}
     </div>
-  )
+  );
 }

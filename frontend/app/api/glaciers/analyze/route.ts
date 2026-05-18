@@ -1,88 +1,111 @@
-import { NextRequest } from 'next/server'
-import type { Glacier, GlacierAI } from '@/lib/glacier-types'
+import { NextRequest } from "next/server";
+import type { Glacier, GlacierAI } from "@/lib/glacier-types";
 
-export const runtime = 'edge'
+export const runtime = "edge";
 
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY ?? ''
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY ?? "";
 
-function buildPrompt(g: Glacier): string {
-  return `Eres el sistema de inteligencia glaciológica de SENTINEL, plataforma de monitoreo ambiental de Chile.
+function buildPrompt(glacier: Glacier): string {
+  const anomalyLabel = Number.isFinite(glacier.tempAnomaly)
+    ? `${glacier.tempAnomaly > 0 ? "+" : ""}${glacier.tempAnomaly.toFixed(2)} C`
+    : "N/D";
 
-Datos reales del glaciar:
-- Nombre: ${g.name}
-- Región: ${g.region}
-- Coordenadas: ${g.lat.toFixed(4)}°S, ${Math.abs(g.lon).toFixed(4)}°W
-- Área actual: ${g.area} km²
-- Cuenca: ${g.cuenca}
-- Anomalía de temperatura: +${g.tempAnomaly}°C sobre baseline ERA5
-- Balance de masa reciente: ${g.masaVar}
-- Tendencia: ${g.trend}
-- Variación de superficie: ${g.deltaShort} (${g.deltaYear})
-- Índice de riesgo calculado: ${g.riesgo}/100 (${g.cat})
-- Población dependiente: ${g.poblacion}
+  return `Eres el sistema de inteligencia glaciologica de SENTINEL.
 
-Genera un análisis JSON con exactamente este formato, sin texto extra:
+Usa SOLO los datos entregados:
+- Nombre: ${glacier.name}
+- GLIMS ID: ${glacier.glimsId}
+- Coordenadas: ${glacier.lat.toFixed(4)}, ${glacier.lon.toFixed(4)}
+- Area GLIMS: ${glacier.area.toFixed(3)} km2
+- Fecha de observacion: ${glacier.srcDate ?? "N/D"}
+- Anomalia termica (Open-Meteo): ${anomalyLabel}
+- Riesgo operativo: ${glacier.riesgo}/100 (${glacier.cat})
+- Tendencia: ${glacier.trend}
+
+Devuelve SOLO JSON valido, sin markdown, con este formato exacto:
 {
-  "diag": "2-3 oraciones de diagnóstico técnico basadas en los datos reales",
-  "urgency": "CRÍTICA" | "ALTA" | "MEDIA" | "BAJA",
-  "impact": "1-2 oraciones sobre impacto hídrico concreto para la cuenca y población",
-  "recT": "Recomendación técnica de monitoreo o medición específica",
-  "recR": "Recomendación de acción institucional o territorial"
+  "diag": "2-3 oraciones tecnicas, concretas y sin inventar datos no provistos",
+  "urgency": "CRITICA" | "ALTA" | "MEDIA" | "BAJA",
+  "impact": "1-2 oraciones sobre impacto hidrico potencial",
+  "recT": "recomendacion tecnica de monitoreo",
+  "recR": "recomendacion territorial/institucional"
+}`;
 }
 
-Responde SOLO con el JSON. Sin markdown, sin explicaciones.`
+function parseAI(content: string): GlacierAI {
+  const block = content.match(/\{[\s\S]*\}/)?.[0] ?? content;
+  const parsed = JSON.parse(block) as Partial<GlacierAI>;
+
+  const urgency =
+    parsed.urgency === "CRITICA" || parsed.urgency === "ALTA" || parsed.urgency === "MEDIA" || parsed.urgency === "BAJA"
+      ? parsed.urgency
+      : "MEDIA";
+
+  return {
+    diag: parsed.diag?.trim() || "Sin diagnostico",
+    urgency,
+    impact: parsed.impact?.trim() || "Sin evaluacion de impacto",
+    recT: parsed.recT?.trim() || "Sin recomendacion tecnica",
+    recR: parsed.recR?.trim() || "Sin recomendacion territorial",
+  };
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { glacier } = await req.json() as { glacier: Glacier }
+    const body = (await req.json()) as { glacier?: Glacier };
+    const glacier = body.glacier ?? null;
 
     if (!glacier?.id) {
-      return new Response(JSON.stringify({ error: 'glacier required' }), { status: 400 })
+      return new Response(JSON.stringify({ error: "glacier required" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     if (!OPENROUTER_KEY) {
-      const fallback: GlacierAI = {
-        diag: `${glacier.name} registra una anomalía térmica de +${glacier.tempAnomaly}°C sobre el baseline ERA5. La variación de masa de ${glacier.masaVar} indica ${glacier.trend.toLowerCase()} en la última década.`,
-        urgency: glacier.riesgo >= 76 ? 'CRÍTICA' : glacier.riesgo >= 51 ? 'ALTA' : glacier.riesgo >= 26 ? 'MEDIA' : 'BAJA',
-        impact: `La cuenca ${glacier.cuenca} muestra dependencia hídrica de ${glacier.poblacion}. El retroceso glaciar reduce la regulación estacional del caudal.`,
-        recT: 'Implementar monitoreo satelital mensual con imágenes Sentinel-2. Instalar estación nivometeorológica en la zona de acumulación.',
-        recR: 'Coordinar con DGA y gobierno regional para actualizar el inventario de glaciares y revisar concesiones de agua en la cuenca.',
-      }
-      return new Response(JSON.stringify(fallback), {
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return new Response(JSON.stringify({ error: "OPENROUTER_API_KEY required for real AI analysis" }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
+    const upstream = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
       headers: {
         Authorization: `Bearer ${OPENROUTER_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://sentinel.vercel.app',
-        'X-Title': 'SENTINEL Glaciares',
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://sentinel.vercel.app",
+        "X-Title": "SENTINEL Glaciares",
       },
       body: JSON.stringify({
-        model: 'mistralai/mistral-large',
-        messages: [{ role: 'user', content: buildPrompt(glacier) }],
-        temperature: 0.3,
+        model: "mistralai/mistral-large",
+        messages: [{ role: "user", content: buildPrompt(glacier) }],
+        temperature: 0.2,
         stream: false,
       }),
       signal: AbortSignal.timeout(20_000),
-    })
+    });
 
-    if (!upstream.ok) throw new Error(`OpenRouter ${upstream.status}`)
+    if (!upstream.ok) throw new Error(`OpenRouter ${upstream.status}`);
 
-    const json = await upstream.json() as { choices: { message: { content: string } }[] }
-    const content = json.choices[0]?.message?.content ?? '{}'
-    const match = content.match(/\{[\s\S]*\}/)
-    const ai = JSON.parse(match?.[0] ?? content) as GlacierAI
+    const payload = (await upstream.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const content = payload.choices?.[0]?.message?.content ?? "{}";
+    const ai = parseAI(content);
 
     return new Response(JSON.stringify(ai), {
-      headers: { 'Content-Type': 'application/json' },
-    })
-  } catch (err) {
-    console.error('[/api/glaciers/analyze]', err)
-    return new Response(JSON.stringify({ error: 'analysis failed' }), { status: 500 })
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("[/api/glaciers/analyze]", error);
+    return new Response(
+      JSON.stringify({
+        error: "real AI analysis failed",
+        detail: error instanceof Error ? error.message : String(error),
+      }),
+      {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 }
