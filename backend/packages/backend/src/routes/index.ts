@@ -8,6 +8,7 @@ import { parseFirmsCSV } from '../utils/parseFirmsCSV'
 import { dedupeFires } from '../utils/dedupeFires'
 import { mapRawFiresToFireData } from '../utils/mapRawFires'
 import { storeRun, getRun } from '../services/run-cache'
+import { triggerCitizenProximityAlert } from '../services/alert'
 import { mergeEnriched } from '../utils/mergeEnriched'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
@@ -23,7 +24,7 @@ const ENRICH_LIMIT = 50
 // citizen-init creates the entry with socketId; citizen-filter adds the nearby fires.
 // citizen callback reads both and cleans up. Concurrent users never collide.
 const CITIZEN_SESSION_TTL_MS = 10 * 60 * 1000
-const citizenSessions = new Map<string, { socketId?: string; fires?: FireData[]; createdAt: number }>()
+const citizenSessions = new Map<string, { socketId?: string; fires?: FireData[]; phone?: string; createdAt: number }>()
 
 function sweep(): void {
   const now = Date.now()
@@ -32,13 +33,13 @@ function sweep(): void {
   }
 }
 
-function setCitizenSession(sessionId: string, patch: { socketId?: string; fires?: FireData[] }): void {
+function setCitizenSession(sessionId: string, patch: { socketId?: string; fires?: FireData[]; phone?: string }): void {
   sweep()
   const existing = citizenSessions.get(sessionId)
   citizenSessions.set(sessionId, { ...existing, ...patch, createdAt: existing?.createdAt ?? Date.now() })
 }
 
-function popCitizenSession(sessionId: string): { socketId?: string; fires?: FireData[] } | undefined {
+function popCitizenSession(sessionId: string): { socketId?: string; fires?: FireData[]; phone?: string } | undefined {
   const entry = citizenSessions.get(sessionId)
   if (!entry) return undefined
   if (Date.now() - entry.createdAt > CITIZEN_SESSION_TTL_MS) {
@@ -262,10 +263,11 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       res.status(429).json({ ok: false, error: 'Analysis in progress — try again shortly' })
       return
     }
-    const body = req.body as { lat?: unknown; lon?: unknown; socketId?: unknown }
+    const body = req.body as { lat?: unknown; lon?: unknown; socketId?: unknown; phone?: unknown }
     const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
     const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
+    const phone = typeof body.phone === 'string' && body.phone.startsWith('+') ? body.phone : undefined
 
     if (lat === undefined || lon === undefined) {
       res.status(400).json({ ok: false, error: 'lat and lon required' })
@@ -273,7 +275,7 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
 
     const citizenSessionId = randomUUID()
-    setCitizenSession(citizenSessionId, { socketId: socketId ?? undefined })
+    setCitizenSession(citizenSessionId, { socketId, phone })
 
     const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
     if (citizenWebhookUrl) {
@@ -391,11 +393,33 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     const session = citizenSessionId ? popCitizenSession(citizenSessionId) : undefined
     const socketId = session?.socketId
     const nearbyFires = session?.fires ?? []
+    const userPhone = session?.phone
 
     res.status(202).json({ ok: true, accepted: true, fires: nearbyFires.length })
 
     if (!lat || !lon || nearbyFires.length === 0) {
       return
+    }
+
+    // SMS proximity alert — find the most dangerous fire within 1 km and notify the user
+    if (userPhone) {
+      const candidates = nearbyFires
+        .map(f => {
+          const dLat = (f.lat - lat) * Math.PI / 180
+          const dLon = (f.lon - lon) * Math.PI / 180
+          const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat * Math.PI / 180) * Math.cos(f.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+          return { fire: f, km: 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) }
+        })
+        .filter(x => x.km <= 1)
+        .sort((a, b) => b.fire.frp - a.fire.frp)
+
+      if (candidates.length > 0) {
+        const { fire, km } = candidates[0]
+        triggerCitizenProximityAlert(userPhone, fire, km, lat, lon).catch(err =>
+          console.error('[trigger/citizen] SMS alert error:', err instanceof Error ? err.message : err)
+        )
+      }
     }
 
     const agentRoutesUrlCitizen = process.env.AGENT_ROUTES_URL
