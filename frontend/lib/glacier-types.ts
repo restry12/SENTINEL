@@ -1,10 +1,25 @@
 export type RiskCat = "Critico" | "Riesgo Alto" | "Observacion" | "Estable";
 export type UrgencyLevel = "CRITICA" | "ALTA" | "MEDIA" | "BAJA";
+export type Trajectory = "Crecimiento" | "Estable" | "Retroceso lento" | "Retroceso acelerado" | "Colapso";
 
 export interface InfraItem {
   t: string;
   d: string;
   ic: string;
+}
+
+export interface GlacierForecastPoint {
+  areaPctChange: number;
+  massBalance: number;
+}
+
+export interface GlacierForecast {
+  trajectory: Trajectory;
+  confidence: number;
+  horizon6m: GlacierForecastPoint;
+  horizon12m: GlacierForecastPoint;
+  horizon24m: GlacierForecastPoint;
+  rationale: string;
 }
 
 export interface GlacierAI {
@@ -13,6 +28,7 @@ export interface GlacierAI {
   impact: string;
   recT: string;
   recR: string;
+  forecast?: GlacierForecast;
 }
 
 export interface Glacier {

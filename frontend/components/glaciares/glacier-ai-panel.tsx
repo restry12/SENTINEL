@@ -1,6 +1,6 @@
 "use client";
 
-import type { Glacier } from "@/lib/glacier-types";
+import type { Glacier, GlacierForecast, Trajectory } from "@/lib/glacier-types";
 
 const URGENCY_CLASS: Record<string, string> = {
   CRITICA: "text-red-300 border-red-400/40 bg-red-500/15",
@@ -8,6 +8,85 @@ const URGENCY_CLASS: Record<string, string> = {
   MEDIA: "text-cyan-300 border-cyan-400/40 bg-cyan-500/15",
   BAJA: "text-emerald-300 border-emerald-400/40 bg-emerald-500/15",
 };
+
+const TRAJECTORY_COLOR: Record<Trajectory, string> = {
+  "Crecimiento": "#1dd38a",
+  "Estable": "#46b8ff",
+  "Retroceso lento": "#ff9a3d",
+  "Retroceso acelerado": "#ff5a5a",
+  "Colapso": "#ff2d2d",
+};
+
+function formatPct(value: number): string {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
+}
+
+function formatMass(value: number): string {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(2)} m EH`;
+}
+
+function ForecastBlock({ forecast }: { forecast: GlacierForecast }) {
+  const color = TRAJECTORY_COLOR[forecast.trajectory] ?? "#46b8ff";
+  const horizons = [
+    { label: "6 meses", point: forecast.horizon6m },
+    { label: "12 meses", point: forecast.horizon12m },
+    { label: "24 meses", point: forecast.horizon24m },
+  ];
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#0a0d14]/90 p-3.5 shadow-2xl backdrop-blur-xl">
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-white/45">Pronostico IA</p>
+        <span
+          className="rounded border px-2 py-0.5 text-[9px] font-black uppercase"
+          style={{ color, borderColor: `${color}66`, backgroundColor: `${color}1a` }}
+        >
+          {forecast.trajectory}
+        </span>
+      </div>
+
+      <div className="mb-3">
+        <div className="mb-1 flex items-center justify-between text-[8px] font-mono uppercase tracking-widest text-white/40">
+          <span>Confianza</span>
+          <span>{forecast.confidence}%</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full transition-all"
+            style={{ width: `${forecast.confidence}%`, backgroundColor: color }}
+          />
+        </div>
+      </div>
+
+      <div className="mb-3 grid grid-cols-3 gap-1.5">
+        {horizons.map((h) => {
+          const areaColor = h.point.areaPctChange >= 0 ? "#1dd38a" : "#ff8a2a";
+          const massColor = h.point.massBalance >= 0 ? "#1dd38a" : "#ff5a5a";
+          return (
+            <div key={h.label} className="rounded border border-white/10 bg-white/[0.03] p-2">
+              <p className="text-[7px] font-bold uppercase tracking-widest text-white/35">{h.label}</p>
+              <p className="mt-0.5 text-[10px] font-black" style={{ color: areaColor }}>
+                {formatPct(h.point.areaPctChange)}
+              </p>
+              <p className="text-[8px] font-mono leading-tight" style={{ color: massColor }}>
+                {formatMass(h.point.massBalance)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {forecast.rationale && (
+        <>
+          <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-cyan-300">Razonamiento</p>
+          <p className="text-[10px] leading-relaxed text-white/70">{forecast.rationale}</p>
+        </>
+      )}
+    </div>
+  );
+}
 
 function ActionPlan({ riesgo }: { riesgo: number }) {
   const items =
@@ -124,6 +203,8 @@ export function GlacierAIPanel({ glacier, analyzing, onAnalyze, embedded = false
             </div>
           )}
         </div>
+
+        {glacier.ai?.forecast && <ForecastBlock forecast={glacier.ai.forecast} />}
 
         <ActionPlan riesgo={glacier.riesgo} />
       </div>

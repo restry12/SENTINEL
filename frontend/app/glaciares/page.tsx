@@ -7,6 +7,7 @@ import { TopBar } from "@/components/dashboard/top-bar";
 import { GlacierKPIBar } from "@/components/glaciares/glacier-kpi-bar";
 import { GlacierCards } from "@/components/glaciares/glacier-cards";
 import { GlacierDetailDrawer } from "@/components/glaciares/glacier-detail-drawer";
+import { GlacierTierList } from "@/components/glaciares/glacier-tier-list";
 import { MobileDrawer } from "@/components/ui/mobile-drawer";
 import { useGlaciers } from "@/hooks/use-glaciers";
 import type { Glacier } from "@/lib/glacier-types";
@@ -28,6 +29,7 @@ function GlaciersPageInner() {
   const {
     glaciers,
     loading,
+    refreshing,
     error,
     source,
     selected,
@@ -37,6 +39,8 @@ function GlaciersPageInner() {
     selectGlacier,
     analyzeGlacier,
   } = useGlaciers();
+
+  const showInitialOverlay = loading && glaciers.length === 0;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailGlacier, setDetailGlacier] = useState<Glacier | null>(null);
@@ -57,12 +61,19 @@ function GlaciersPageInner() {
     <div className="h-[calc(100dvh-4rem)] md:h-screen w-screen flex flex-col bg-background overflow-hidden">
       <TopBar />
       <main className="relative flex-1 overflow-hidden">
-        {loading && (
+        {showInitialOverlay && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/65 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
               <div className="h-8 w-8 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin" />
               <p className="text-[10px] font-mono tracking-widest text-white/50">CARGANDO GLIMS...</p>
             </div>
+          </div>
+        )}
+
+        {refreshing && !showInitialOverlay && (
+          <div className="pointer-events-none absolute left-1/2 top-3 z-40 -translate-x-1/2 flex items-center gap-2 rounded-full border border-cyan-400/30 bg-[#0a0d14]/85 px-2.5 py-1 text-[9px] font-bold uppercase tracking-widest text-cyan-200 backdrop-blur">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
+            Actualizando GLIMS
           </div>
         )}
 
@@ -83,6 +94,10 @@ function GlaciersPageInner() {
 
         <div className="hidden md:block absolute left-5 bottom-5 z-40 w-[30rem] max-w-[calc(100vw-2.5rem)]">
           <GlacierKPIBar glaciers={glaciers} />
+        </div>
+
+        <div className="hidden md:block absolute right-5 top-14 z-40">
+          <GlacierTierList onSelect={handleSelectGlacier} selectedId={selected?.id} />
         </div>
 
         <GlacierDetailDrawer

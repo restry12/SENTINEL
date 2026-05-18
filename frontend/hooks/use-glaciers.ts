@@ -8,6 +8,7 @@ type GlacierSource = "glims-points" | "glims-detail" | "glims" | null;
 interface UseGlaciersReturn {
   glaciers: Glacier[];
   loading: boolean;
+  refreshing: boolean;
   error: string | null;
   source: GlacierSource;
   selected: Glacier | null;
@@ -18,13 +19,70 @@ interface UseGlaciersReturn {
   analyzeGlacier: (g: Glacier) => Promise<void>;
 }
 
-function serializeViewport(bbox: [number, number, number, number], zoom: number): string {
-  return `${bbox.map((value) => value.toFixed(3)).join(",")}::${zoom.toFixed(2)}`;
+interface CacheEntry {
+  data: Glacier[];
+  source: GlacierSource;
+  ts: number;
+}
+
+const DEBOUNCE_MS = 700;
+const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_STORAGE_KEY = "sentinel.glaciers.viewport-cache.v1";
+const MAX_CACHE_ENTRIES = 24;
+
+const memoryCache = new Map<string, CacheEntry>();
+let storageHydrated = false;
+
+function hydrateFromStorage(): void {
+  if (storageHydrated || typeof window === "undefined") return;
+  storageHydrated = true;
+  try {
+    const raw = window.sessionStorage.getItem(CACHE_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Record<string, CacheEntry>;
+    for (const [key, entry] of Object.entries(parsed)) {
+      if (entry && Array.isArray(entry.data)) memoryCache.set(key, entry);
+    }
+  } catch {
+    // ignore corrupted cache
+  }
+}
+
+function persistToStorage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const obj: Record<string, CacheEntry> = {};
+    for (const [key, entry] of memoryCache) obj[key] = entry;
+    window.sessionStorage.setItem(CACHE_STORAGE_KEY, JSON.stringify(obj));
+  } catch {
+    // quota or private mode — skip
+  }
+}
+
+function trimCache(): void {
+  if (memoryCache.size <= MAX_CACHE_ENTRIES) return;
+  const sorted = Array.from(memoryCache.entries()).sort((a, b) => a[1].ts - b[1].ts);
+  while (memoryCache.size > MAX_CACHE_ENTRIES && sorted.length > 0) {
+    const [key] = sorted.shift() as [string, CacheEntry];
+    memoryCache.delete(key);
+  }
+}
+
+function quantizeKey(bbox: [number, number, number, number], zoom: number): string {
+  const step =
+    zoom <= 2.5 ? 20 :
+    zoom <= 4 ? 8 :
+    zoom <= 6 ? 3 :
+    zoom <= 9 ? 1 : 0.4;
+  const q = (v: number) => Math.round(v / step) * step;
+  const zq = Math.round(zoom * 2) / 2;
+  return `${q(bbox[0])},${q(bbox[1])},${q(bbox[2])},${q(bbox[3])}::${zq}`;
 }
 
 export function useGlaciers(): UseGlaciersReturn {
   const [glaciers, setGlaciers] = useState<Glacier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [source, setSource] = useState<GlacierSource>(null);
   const [selected, setSelected] = useState<Glacier | null>(null);
@@ -36,22 +94,56 @@ export function useGlaciers(): UseGlaciersReturn {
     zoom: 1.8,
   });
 
-  const latestViewportKeyRef = useRef<string>("");
+  const lastKeyRef = useRef<string>("");
+  const pendingViewportRef = useRef<{ bbox: [number, number, number, number]; zoom: number } | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadRequestIdRef = useRef(0);
   const detailRequestIdRef = useRef(0);
+  const glaciersLenRef = useRef(0);
+
+  useEffect(() => {
+    glaciersLenRef.current = glaciers.length;
+  }, [glaciers.length]);
 
   const updateViewport = useCallback((bbox: [number, number, number, number], zoom: number) => {
-    const key = serializeViewport(bbox, zoom);
-    if (latestViewportKeyRef.current === key) return;
-    latestViewportKeyRef.current = key;
-    setViewport({ bbox, zoom });
+    pendingViewportRef.current = { bbox, zoom };
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      const next = pendingViewportRef.current;
+      if (!next) return;
+      const nextKey = quantizeKey(next.bbox, next.zoom);
+      if (nextKey === lastKeyRef.current && glaciersLenRef.current > 0) return;
+      setViewport(next);
+    }, DEBOUNCE_MS);
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    hydrateFromStorage();
+    const key = quantizeKey(viewport.bbox, viewport.zoom);
+
+    const cached = memoryCache.get(key);
+    if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+      lastKeyRef.current = key;
+      setGlaciers(cached.data);
+      setSource(cached.source);
+      setLoading(false);
+      setRefreshing(false);
+      setError(null);
+      return;
+    }
+
     let cancelled = false;
     const requestId = ++loadRequestIdRef.current;
+    const hasExistingData = glaciersLenRef.current > 0;
 
-    setLoading(true);
+    if (hasExistingData) setRefreshing(true);
+    else setLoading(true);
     setError(null);
 
     const params = new URLSearchParams({
@@ -66,10 +158,14 @@ export function useGlaciers(): UseGlaciersReturn {
         const sourceHeader = (response.headers.get("X-Glacier-Source") ?? "glims") as GlacierSource;
         return { data, source: sourceHeader };
       })
-      .then(({ data, source }) => {
+      .then(({ data, source: nextSource }) => {
         if (cancelled || requestId !== loadRequestIdRef.current) return;
+        memoryCache.set(key, { data, source: nextSource, ts: Date.now() });
+        trimCache();
+        persistToStorage();
+        lastKeyRef.current = key;
         setGlaciers(data);
-        setSource(source);
+        setSource(nextSource);
         setSelected((prev) => {
           if (!prev) return prev;
           const stillVisible = data.find((item) => item.glimsId === prev.glimsId);
@@ -81,7 +177,9 @@ export function useGlaciers(): UseGlaciersReturn {
         setError(String(e));
       })
       .finally(() => {
-        if (!cancelled && requestId === loadRequestIdRef.current) setLoading(false);
+        if (cancelled || requestId !== loadRequestIdRef.current) return;
+        setLoading(false);
+        setRefreshing(false);
       });
 
     return () => {
@@ -149,6 +247,7 @@ export function useGlaciers(): UseGlaciersReturn {
   return {
     glaciers,
     loading,
+    refreshing,
     error,
     source,
     selected,
