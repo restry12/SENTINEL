@@ -191,54 +191,154 @@ function getArticleCategory(title: string): 'fire' | 'air' | 'water' | 'earth' |
   return 'general'
 }
 
-const CATEGORY_CONFIG = {
-  fire: { keywords: 'forest,fire,emergency', color: 'from-red-950/80 to-black', accent: 'text-red-500' },
-  air: { keywords: 'city,smog,pollution,air', color: 'from-green-950/80 to-black', accent: 'text-green-500' },
-  water: { keywords: 'flood,storm,ocean,rain', color: 'from-blue-950/80 to-black', accent: 'text-blue-500' },
-  earth: { keywords: 'earthquake,volcano,nature,mountain', color: 'from-orange-950/80 to-black', accent: 'text-orange-500' },
-  general: { keywords: 'news,world,technology', color: 'from-slate-900/80 to-black', accent: 'text-slate-500' }
+const CATEGORY_CONFIG: Record<string, { keywords: string; color: string; accent: string; bg: string; dot: string }> = {
+  fire:    { keywords: 'fire,forest', color: 'rgba(180, 50, 50, 0.25)', accent: 'border-red-900/60', bg: 'bg-red-950/30', dot: '#991b1b' },
+  air:     { keywords: 'nature,city', color: 'rgba(40, 120, 60, 0.2)',  accent: 'border-green-900/60', bg: 'bg-green-950/30', dot: '#166534' },
+  water:   { keywords: 'flood,storm', color: 'rgba(30, 100, 180, 0.2)', accent: 'border-blue-900/60',  bg: 'bg-blue-950/30',  dot: '#1e40af' },
+  earth:   { keywords: 'mountain',    color: 'rgba(180, 100, 40, 0.2)', accent: 'border-orange-900/60', bg: 'bg-orange-950/30', dot: '#9a3412' },
+  general: { keywords: 'tech,news',   color: 'rgba(100, 116, 139, 0.2)', accent: 'border-slate-800',    bg: 'bg-slate-900/30',  dot: '#475569' }
 }
 
 function ArticleImagePlaceholder({ title, className = "" }: { title: string; className?: string }) {
   const category = getArticleCategory(title)
   const config = CATEGORY_CONFIG[category]
+  const [imgStatus, setImgStatus] = useState<'loading' | 'loaded' | 'error'>('loading')
+  const [retryAttempt, setRetryAttempt] = useState(0)
   
-  // Use a reliable themed URL structure from Unsplash
-  const displayUrl = `https://source.unsplash.com/featured/800x600?${config.keywords}`
+  // Create a more unique lock/seed based on title hash for better variety
+  const hash = useMemo(() => {
+    let h = 0
+    for (let i = 0; i < title.length; i++) {
+      h = (Math.imul(31, h) + title.charCodeAt(i)) | 0
+    }
+    return Math.abs(h)
+  }, [title])
+
+  const urls = [
+    `https://picsum.photos/seed/${hash}/800/600`,
+    `https://loremflickr.com/800/600/${config.keywords.split(',')[0]}?lock=${hash}`,
+    `https://loremflickr.com/800/600/emergency,satellite?lock=${hash + retryAttempt}`,
+    `https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=60&w=800`
+  ]
+
+  const currentUrl = urls[Math.min(retryAttempt, urls.length - 1)]
 
   return (
-    <div className={`relative w-full h-full overflow-hidden bg-black group ${className}`}>
-      {/* Background Image with Filter */}
+    <HUDWrapper title={title} className={`${config.bg} ${className}`}>
+      {/* Fallback CSS Grid Pattern - Always visible base */}
+      <div className="absolute inset-0 opacity-15" 
+           style={{ 
+             backgroundImage: `radial-gradient(${config.dot} 1px, transparent 1px)`, 
+             backgroundSize: '24px 24px' 
+           }} 
+      />
+
+      {/* Background Image */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={displayUrl}
+        src={currentUrl}
         alt=""
-        className="absolute inset-0 w-full h-full object-cover opacity-60 grayscale-[0.5] contrast-[1.2] transition-transform duration-700 group-hover:scale-110 group-hover:grayscale-0"
+        onLoad={() => setImgStatus('loaded')}
+        onError={() => {
+          if (retryAttempt < urls.length - 1) {
+            setRetryAttempt(prev => prev + 1)
+          } else {
+            setImgStatus('error')
+          }
+        }}
+        className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ${
+          imgStatus === 'loaded' ? 'opacity-70 grayscale-[0.2]' : 'opacity-0'
+        } group-hover:scale-110 group-hover:opacity-100`}
+        style={{ zIndex: 1 }}
       />
+
+      {/* No Signal / Loading Placeholder */}
+      {imgStatus !== 'loaded' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
+          <Zap className={`w-8 h-8 ${config.accent.replace('border-', 'text-')} animate-pulse`} />
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-[8px] font-mono tracking-[0.3em] uppercase opacity-60">
+              {retryAttempt > 0 ? `RE-SCANNING_MODE: ATTEMPT_${retryAttempt}` : 'INITIALIZING_SIGNAL'}
+            </span>
+            <div className="w-24 h-0.5 bg-white/5 overflow-hidden rounded-full">
+               <div className="h-full bg-current animate-progress-scan" style={{ width: '30%' }} />
+            </div>
+          </div>
+        </div>
+      )}
+    </HUDWrapper>
+  )
+}
+
+function HUDWrapper({ 
+  children, 
+  title, 
+  className = ""
+}: { 
+  children: React.ReactNode; 
+  title: string; 
+  className?: string;
+}) {
+  const category = getArticleCategory(title)
+  const config = CATEGORY_CONFIG[category]
+
+  return (
+    <div className={`relative overflow-hidden group border border-white/10 w-full h-full ${className}`}>
+      <style jsx global>{`
+        @keyframes flicker {
+          0% { opacity: 0.8; }
+          5% { opacity: 0.4; }
+          10% { opacity: 0.9; }
+          15% { opacity: 0.3; }
+          25% { opacity: 0.8; }
+          30% { opacity: 1; }
+          70% { opacity: 0.9; }
+          72% { opacity: 0.2; }
+          75% { opacity: 0.9; }
+          100% { opacity: 1; }
+        }
+        @keyframes scan {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(300%); }
+        }
+        .animate-flicker { animation: flicker 3s infinite; }
+        .animate-progress-scan { animation: scan 1.5s infinite ease-in-out; }
+      `}</style>
+      
+      {children}
       
       {/* Tonal Overlay */}
-      <div className={`absolute inset-0 bg-gradient-to-t ${config.color} opacity-70`} />
-      
+      <div 
+        className="absolute inset-0 pointer-events-none" 
+        style={{ 
+          background: `linear-gradient(to top, rgba(0,0,0,0.8), ${config.color})`,
+          zIndex: 5
+        }} 
+      />
+
       {/* Scanlines Effect */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.03]" 
-           style={{ backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))', backgroundSize: '100% 2px, 3px 100%' }} />
+      <div className="absolute inset-0 pointer-events-none opacity-[0.1] z-10" 
+           style={{ 
+             backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.08), rgba(0, 255, 0, 0.04), rgba(0, 0, 255, 0.08))', 
+             backgroundSize: '100% 4px, 4px 100%',
+           }} />
 
       {/* HUD Brackets */}
-      <div className="absolute inset-4 border border-white/5 pointer-events-none">
+      <div className="absolute inset-4 border border-white/5 pointer-events-none z-20 animate-flicker">
         {/* Corners */}
-        <div className={`absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 ${config.accent.replace('text-', 'border-')}/60`} />
-        <div className={`absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 ${config.accent.replace('text-', 'border-')}/60`} />
-        <div className={`absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 ${config.accent.replace('text-', 'border-')}/60`} />
-        <div className={`absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 ${config.accent.replace('text-', 'border-')}/60`} />
+        <div className={`absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 ${config.accent}/80`} />
+        <div className={`absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 ${config.accent}/80`} />
+        <div className={`absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 ${config.accent}/80`} />
+        <div className={`absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 ${config.accent}/80`} />
         
         {/* Data readout mockups */}
-        <div className="absolute top-2 left-2 flex flex-col gap-0.5 opacity-40">
-          <div className="w-8 h-[1px] bg-white/40" />
-          <div className="w-4 h-[1px] bg-white/40" />
+        <div className="absolute top-2 left-2 flex flex-col gap-0.5 opacity-60">
+          <div className="w-10 h-[1px] bg-white/60" />
+          <div className="w-6 h-[1px] bg-white/40" />
         </div>
-        <div className="absolute bottom-2 right-2 text-[6px] font-mono text-white/30 uppercase tracking-tighter">
-          SCN_RES: 1280x720<br />
-          SENTINEL_V2.4
+        <div className="absolute bottom-2 right-2 text-[7px] font-mono text-white/50 uppercase tracking-tighter text-right leading-tight">
+          SCAN_MODE: ACTIVE<br />
+          STNL_RES_L1
         </div>
       </div>
     </div>
@@ -253,24 +353,26 @@ function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: bo
   const variant = category === 'fire' ? 'orange' : (category === 'water' ? 'blue' : 'default')
 
   return (
-    <div className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0b0e/40] backdrop-blur-2xl transition-all duration-500 hover:border-orange/30">
+    <div className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0b0e]/40 backdrop-blur-2xl transition-all duration-500 hover:border-orange/30">
       <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-orange/40 to-transparent opacity-50" />
       
       <div className="flex flex-col lg:flex-row h-full">
         {/* Visual Side */}
-        <div className="w-full lg:w-2/5 h-64 lg:h-auto relative bg-surface/40 overflow-hidden">
+        <div className="w-full lg:w-2/5 h-64 lg:h-auto relative bg-black overflow-hidden">
           {article.imageUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={article.imageUrl}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-80 group-hover:opacity-100"
-            />
+            <HUDWrapper title={article.title} className="absolute inset-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={article.imageUrl}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-90 group-hover:opacity-100"
+              />
+            </HUDWrapper>
           ) : (
             <ArticleImagePlaceholder title={article.title} className="absolute inset-0" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#04050a]/60" />
-          <div className="absolute top-4 left-4 flex gap-1">
+          
+          <div className="absolute top-4 left-4 flex gap-1 z-40">
             <div className="w-1 h-1 rounded-full bg-orange" />
             <div className="w-1 h-1 rounded-full bg-orange/40" />
             <div className="w-1 h-1 rounded-full bg-orange/20" />
@@ -323,16 +425,18 @@ function ArticleCard({ article }: { article: NewsArticle }) {
       {/* Article image */}
       <div className="w-full h-36 relative overflow-hidden shrink-0">
         {article.imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={article.imageUrl}
-            alt=""
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
-          />
+          <HUDWrapper title={article.title} className="w-full h-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={article.imageUrl}
+              alt=""
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
+            />
+          </HUDWrapper>
         ) : (
           <ArticleImagePlaceholder title={article.title} />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#04050a]/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#04050a]/80 to-transparent pointer-events-none z-30" />
       </div>
 
       <div className="flex flex-col p-6 flex-1">
