@@ -40,9 +40,17 @@ export function TelemetryTiles() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
       <Tile
-        label={t('tileHotspots')}
-        value="2,412"
-        delta="▲ 312 / HR"
+        label={t('tileAgents')}
+        value="7"
+        delta="▲ TODOS OPERATIVOS"
+        sparklinePoints="0,8 10,8 20,8 30,8 40,8 50,8 60,8"
+        sparklineColor="#10b981"
+      />
+      <Tile
+        label={t('tileThreats')}
+        value="4"
+        unit="TIPOS"
+        delta="FUEGO · AIRE · TORNADO · HIELO"
         deltaType="crit"
         sparklinePoints="0,12 8,10 16,11 24,7 32,8 40,4 48,6 60,2"
         sparklineColor="#ff3333"
@@ -50,24 +58,17 @@ export function TelemetryTiles() {
       <Tile
         label={t('tileCoverage')}
         value="98.4%"
-        delta="▲ STABLE · 4 SAT"
+        delta="▲ ESTABLE · 4 SAT"
         sparklinePoints="0,12 10,11 20,12 30,11 40,11 50,10 60,10"
-        sparklineColor="#10b981"
-      />
-      <Tile
-        label={t('tileAlerts')}
-        value="18,906"
-        delta="▲ +6.1% TODAY"
-        sparklinePoints="0,13 10,11 20,10 30,9 40,7 50,6 60,4"
         sparklineColor="#38bdf8"
       />
       <Tile
-        label={t('tileLatency')}
-        value="3.4"
-        unit="MIN"
-        delta="▼ -12% OPTIMIZED"
+        label={t('tileResponse')}
+        value="<30"
+        unit="SEG"
+        delta="▼ ANÁLISIS MULTIAGENTE"
         deltaType="warn"
-        sparklinePoints="0,4 10,6 20,7 30,9 40,8 50,10 60,11"
+        sparklinePoints="0,10 10,8 20,9 30,6 40,5 50,4 60,3"
         sparklineColor="#ff7e15"
       />
     </div>
