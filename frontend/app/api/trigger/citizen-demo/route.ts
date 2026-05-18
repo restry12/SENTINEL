@@ -14,9 +14,13 @@ export async function POST(req: Request) {
     const fireLat = Math.round((userLat + 0.004) * 10000) / 10000
     const fireLon = Math.round((userLon + 0.003) * 10000) / 10000
 
-    await fetch(makeUrl, {
+    const makeHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+    const secret = process.env.MAKE_WEBHOOK_SECRET
+    if (secret) makeHeaders['x-make-apikey'] = secret
+
+    const makeRes = await fetch(makeUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: makeHeaders,
       body: JSON.stringify({
         to: phone,
         fire_lat: fireLat,
@@ -30,6 +34,12 @@ export async function POST(req: Request) {
         timestamp: new Date().toISOString(),
       }),
     })
+
+    if (!makeRes.ok) {
+      const text = await makeRes.text()
+      console.error('[citizen-demo] Make.com rejected:', makeRes.status, text)
+      return NextResponse.json({ ok: false, error: `Make.com ${makeRes.status}: ${text}` }, { status: 502 })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err) {
