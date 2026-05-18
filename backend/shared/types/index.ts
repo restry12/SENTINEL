@@ -189,6 +189,7 @@ export interface NaturalRoutes {
   rutas: NaturalRoute[]
   punto_encuentro_principal: string
   mensaje_alerta: string
+  weather?: WeatherData // Local weather for the citizen
 }
 
 export interface RoutesResult {

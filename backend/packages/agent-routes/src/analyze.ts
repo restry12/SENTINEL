@@ -199,9 +199,10 @@ async function runA5CitizenRoutes(
   nearestFireDistKm: number,
   escapeBearing: number,
   orsRoutes: RouteData[],
-  weather: { wind_speed_kmh: number; wind_dir_deg: number },
+  weather: WeatherData,
 ): Promise<NaturalRoutes> {
   const compassDir = bearingToCompass(escapeBearing)
+  const wind_speed_kmh = Math.round(weather.speed * 3.6)
 
   const system = `Eres un experto en evacuaciones de emergencia para incendios forestales.
 Recibes la posición real de un ciudadano en peligro y rutas calculadas por OpenRouteService.
@@ -227,7 +228,7 @@ El JSON debe tener exactamente esta estructura:
   const userMsg = `Ciudadano en: lat=${userLat.toFixed(5)}, lon=${userLon.toFixed(5)}
 Foco más cercano: ${nearestFireDistKm.toFixed(2)} km
 Dirección de escape recomendada: ${Math.round(escapeBearing)}° (${compassDir})
-Viento: ${weather.wind_speed_kmh} km/h desde ${weather.wind_dir_deg}°
+Viento: ${wind_speed_kmh} km/h desde ${weather.deg}°
 
 Rutas calculadas por OpenRouteService (desde la posición del ciudadano):
 ${JSON.stringify(
@@ -309,11 +310,11 @@ export async function calculateCitizenEscapeRoute(
   userLat: number,
   userLon: number,
   fires: FireData[],
-  weather: { wind_speed_kmh: number; wind_dir_deg: number },
+  weather: WeatherData,
 ): Promise<RoutesResult> {
   if (fires.length === 0) return { routes: [], naturalRoutes: null }
 
-  const escapeBearing = computeEscapeBearing(userLat, userLon, fires, weather.wind_dir_deg)
+  const escapeBearing = computeEscapeBearing(userLat, userLon, fires, weather.deg)
 
   const destinations = [1, 3, 8].map((d) => {
     const pt = destinationPointLocal(userLat, userLon, escapeBearing, d)
@@ -360,6 +361,7 @@ export async function calculateCitizenEscapeRoute(
       userLat, userLon, nearestFireDistKm, escapeBearing, routes, weather,
     )
     if (naturalRoutes) {
+      naturalRoutes.weather = weather // Attach the local weather
       const fallbackBearing = bearingMap.size > 0 ? bearingMap.values().next().value : undefined
       for (const ruta of naturalRoutes.rutas) {
         const bearing =

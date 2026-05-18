@@ -38,11 +38,11 @@ app.post('/analyze/citizen', async (req, res) => {
   const rawWeather = (body.weather && typeof body.weather === 'object' && !Array.isArray(body.weather))
     ? body.weather as Record<string, unknown>
     : {}
-  const weather = {
-    wind_speed_kmh: typeof rawWeather.wind_speed_kmh === 'number' && isFinite(rawWeather.wind_speed_kmh)
-      ? rawWeather.wind_speed_kmh : 0,
-    wind_dir_deg: typeof rawWeather.wind_dir_deg === 'number' && isFinite(rawWeather.wind_dir_deg)
-      ? rawWeather.wind_dir_deg : 0,
+  const weather: WeatherData = {
+    speed: typeof rawWeather.speed === 'number' && isFinite(rawWeather.speed) ? rawWeather.speed : 0,
+    deg: typeof rawWeather.deg === 'number' && isFinite(rawWeather.deg) ? rawWeather.deg : 0,
+    humidity: typeof rawWeather.humidity === 'number' && isFinite(rawWeather.humidity) ? rawWeather.humidity : 0,
+    temp: typeof rawWeather.temp === 'number' && isFinite(rawWeather.temp) ? rawWeather.temp : undefined,
   }
 
   if (userLat === null || userLon === null) {
