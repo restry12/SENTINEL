@@ -338,7 +338,7 @@ function formatCoords(lat: number, lon: number): string {
   return `${deg}°${min}'${sec}"${latDir} · ${ldeg}°${lmin}'${lsec}"${lonDir}`
 }
 
-export function ScreenAlert({ riskLevel = 'critical', route, user, fires, expansion, onCompass, onTrapped }: ScreenAlertProps) {
+export function ScreenAlert({ riskLevel = 'critical', route, user, fires, expansion, weather, onCompass, onTrapped }: ScreenAlertProps) {
   return (
     <div className="screen scanlines" style={{
       width: '100%', height: '100%',
