@@ -26,7 +26,7 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     )
   }
 
-  const isCitizen = pathname === "/dashboard/citizen"
+  const isCitizen = pathname === "/incendios/citizen"
 
   return (
     <>

@@ -91,6 +91,7 @@ function TornadoPageInner() {
   const [selectedPoint, setSelectedPoint] = useState<GridPoint | null>(null)
   const [detail, setDetail] = useState<SevereWeatherDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [hintDismissed, setHintDismissed] = useState(false)
   const detailCacheRef = useRef<Record<string, SevereWeatherDetail>>({})
   const detailRequestRef = useRef(0)
   const boundariesRef = useRef<AdminBoundaryCollection | null>(null)
@@ -186,10 +187,12 @@ function TornadoPageInner() {
     setSelectedPoint(null)
     setDetail(null)
     setDetailLoading(false)
+    setHintDismissed(true)
   }, [])
 
   const handlePointSelect = useCallback((point: GridPoint) => {
     setSelectedPoint(point)
+    setHintDismissed(true)
     fetchDetail(point)
   }, [])
 
@@ -246,6 +249,22 @@ function TornadoPageInner() {
 
         {/* Right panel */}
         <TornadoRightPanel selectedPoint={selectedPoint} detail={detail} detailLoading={detailLoading} />
+
+        {/* Hint — desaparece al hacer click en el mapa */}
+        {!hintDismissed && !selectedCountryIso && !selectedPoint && (
+          <div className="absolute top-1/2 right-6 -translate-y-1/2 z-40 pointer-events-none">
+            <div className="flex flex-col items-center gap-3 px-5 py-4 bg-[#0a0b0e]/80 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl max-w-[180px] text-center animate-pulse">
+              <div className="w-9 h-9 rounded-full border border-white/20 bg-white/5 flex items-center justify-center">
+                <svg className="w-5 h-5 text-white/60" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672 13.684 16.6m0 0-2.51 2.225.569-9.47 5.227 7.917-3.286-.672ZM12 2.25V4.5m5.834.166-1.591 1.591M20.25 10.5H18M7.757 14.743l-1.59 1.59M6 10.5H3.75m4.007-4.243-1.59-1.59" />
+                </svg>
+              </div>
+              <p className="text-[11px] font-semibold text-white/70 leading-snug tracking-wide">
+                Presiona sobre un país para revisarlo
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Risk Scale Legend */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none">

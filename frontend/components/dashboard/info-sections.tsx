@@ -49,19 +49,14 @@ export function InfoSections() {
           <Label>{tx.socialImpact}</Label>
         </div>
         
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: tx.atRisk, value: populationAtRisk != null ? populationAtRisk.toLocaleString() : "—", color: "text-red-soft" },
-            { label: tx.evacuated, value: "—", color: "text-green-soft" },
-            { label: tx.inShelters, value: "—", color: "text-blue" },
-            { label: tx.structures, value: "—", color: "text-orange-soft" },
-          ].map((item) => (
-            <div key={item.label} className="p-3 bg-background border border-border rounded-md">
-              <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">{item.label}</div>
-              <div className={`text-lg font-medium ${item.color} num leading-none`}>{item.value}</div>
-            </div>
-          ))}
-        </div>
+        {populationAtRisk != null ? (
+          <div className="p-3 bg-background border border-border rounded-md">
+            <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1">{tx.atRisk}</div>
+            <div className="text-lg font-medium text-red-soft num leading-none">{populationAtRisk.toLocaleString()}</div>
+          </div>
+        ) : (
+          <p className="text-[13px] text-text-muted italic">{tx.awaitingBriefing}</p>
+        )}
         
       </div>
     </div>

@@ -90,7 +90,7 @@ export function RegisterForm() {
           if (loginResponse.ok && loginResult.ok && loginResult.token) {
             localStorage.setItem('sentinel_token', loginResult.token)
             localStorage.setItem('sentinel_user', JSON.stringify(loginResult.user ?? {}))
-            setTimeout(() => router.push('/dashboard'), 1000)
+            setTimeout(() => router.push('/incendios'), 1000)
           } else {
             // Fallback to manual login if auto-login fails
             setTimeout(() => router.push('/login'), 1200)

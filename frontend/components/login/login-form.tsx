@@ -52,7 +52,7 @@ export function LoginForm() {
         localStorage.setItem('sentinel_token', result.token)
         localStorage.setItem('sentinel_user', JSON.stringify(result.user ?? {}))
         toast.success(t('loginSuccessTitle'), { description: t('loginSuccessDesc') })
-        setTimeout(() => router.push('/dashboard'), 1000)
+        setTimeout(() => router.push('/incendios'), 1000)
       } else {
         toast.error(t('loginErrorTitle'), {
           description: result.error ?? t('loginErrorDesc'),
@@ -138,7 +138,7 @@ export function LoginForm() {
         disabled={isLoading}
         onClick={() => {
           localStorage.setItem('sentinel_token', 'demo')
-          router.push('/dashboard')
+          router.push('/incendios')
         }}
         className="w-full h-11 border border-orange/30 bg-orange/5 hover:bg-orange/10 hover:border-orange/50 text-orange font-mono tracking-widest uppercase text-[10px] transition-all duration-200 shadow-[0_0_20px_rgba(255,126,21,0.08)] hover:shadow-[0_0_24px_rgba(255,126,21,0.18)]"
       >

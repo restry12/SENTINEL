@@ -6,32 +6,14 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useLang } from "@/contexts/language-context"
 import { useSentinel } from "@/contexts/sentinel-context"
-import { HotspotSearch } from "@/components/dashboard/hotspot-search"
 
 export function TopBar() {
   const pathname = usePathname()
   const { tx } = useLang()
-  const { connected, status, sentinelUpdate } = useSentinel()
+  const { connected, sentinelUpdate } = useSentinel()
   const [time, setTime] = useState<string>("")
 
-  const fireCount = sentinelUpdate?.fires.length ?? 0
-  const isLoading = status.state === "loading"
   const riskLevel = (sentinelUpdate?.riskLevel ?? "stable").toLowerCase()
-  
-  const statusLabel = !connected
-    ? "OFFLINE"
-    : isLoading
-      ? "ANALIZANDO…"
-      : status.state === "error"
-        ? "ERROR"
-        : riskLevel === 'critical' ? 'SITUACIÓN CRÍTICA'
-        : riskLevel === 'high' ? 'ALERTA ALTA'
-        : 'ESTADO OPERATIVO'
-
-  const statusColor = !connected || status.state === "error" ? "text-text-muted" 
-    : riskLevel === 'critical' ? "text-red drop-shadow-[0_0_8px_rgba(255,51,51,0.5)]"
-    : riskLevel === 'high' ? "text-orange drop-shadow-[0_0_8px_rgba(255,126,21,0.5)]"
-    : "text-green-soft"
 
   useEffect(() => {
     const updateTime = () => {
@@ -54,7 +36,7 @@ export function TopBar() {
         }`} style={{ width: connected ? '100%' : '0%' }} />
 
         {/* Brand Section */}
-        <div className="flex items-center gap-2 md:gap-4 shrink-0">
+        <Link href="/login" className="flex items-center gap-2 md:gap-4 shrink-0 cursor-pointer">
           <div className="relative">
             <div className="absolute inset-0 bg-blue/20 blur-xl rounded-full" />
             <img
@@ -67,25 +49,18 @@ export function TopBar() {
             <h1 className="text-base md:text-xl font-black tracking-[0.25em] text-white leading-none">SENTINEL</h1>
             <p className="hidden md:block text-[9px] font-bold tracking-[0.3em] text-text-muted mt-1.5 uppercase opacity-70">{tx.brandSub}</p>
           </div>
-        </div>
+        </Link>
 
-        {/* Tactical Status & Navigation */}
+        {/* Navigation */}
         <div className="hidden md:flex flex-1 items-center gap-6">
-          <div className={`mr-auto flex items-center gap-4 px-6 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl transition-all duration-500 ${
-            riskLevel === 'critical' ? 'border-red/30 bg-red/5' : ''
-          }`}>
-            <div className="flex items-center gap-3 pr-4 border-r border-white/10">
-              <div className={`w-2 h-2 rounded-full ${connected ? (riskLevel === 'critical' ? 'bg-red' : 'bg-green') : 'bg-text-muted'} ${connected ? 'animate-pulse' : ''}`} />
-              <span className={`text-[11px] font-black tracking-[0.2em] uppercase ${statusColor}`}>{statusLabel}</span>
-            </div>
-            
+          <div className="mr-auto flex items-center gap-1 px-3 py-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl">
             <nav className="flex items-center gap-1">
               {[
-                { href: '/dashboard', label: tx.navDashboard },
+                { href: '/incendios', label: tx.navDashboard },
                 { href: '/air',       label: tx.navAir },
                 { href: '/tornado',   label: tx.navTornado },
-                { href: '/news',      label: tx.navNews ?? 'Noticias' },
                 { href: '/glaciares', label: tx.navGlaciares ?? 'GLACIARES' },
+                { href: '/news',      label: tx.navNews ?? 'Noticias' },
               ].map(({ href, label }) => (
                 <Link
                   key={href}
@@ -102,56 +77,34 @@ export function TopBar() {
             </nav>
           </div>
 
-          {/* Right-aligned utility group */}
-          <div className="flex items-center gap-3">
-            <HotspotSearch />
-
-            {/* SENTINEL AI — attention-grabbing CTA */}
-            <Link
-              href="/chat"
-              className="group relative inline-flex items-center"
-            >
-              {/* Soft contained glow */}
-              <span
-                aria-hidden
-                className={`pointer-events-none absolute inset-0 rounded-full blur-[6px] transition-opacity duration-500 bg-gradient-to-r from-blue/60 via-fuchsia-500/50 to-orange/60 ${
-                  pathname === '/chat' ? 'opacity-70' : 'opacity-40 group-hover:opacity-70'
-                }`}
-              />
-              {/* Gradient ring via padding */}
-              <span className="relative rounded-full p-[1.5px] bg-gradient-to-r from-blue via-fuchsia-400 to-orange">
-                <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#0b1220] text-[11px] font-black tracking-[0.2em] uppercase text-white">
-                  <Sparkles className="w-3.5 h-3.5 text-blue drop-shadow-[0_0_4px_rgba(56,189,248,0.9)] animate-pulse" />
-                  <span>{tx.navChat ?? 'SENTINEL AI'}</span>
-                </span>
+          {/* SENTINEL AI CTA */}
+          <Link href="/chat" className="group relative inline-flex items-center">
+            <span
+              aria-hidden
+              className={`pointer-events-none absolute inset-0 rounded-full blur-[6px] transition-opacity duration-500 bg-gradient-to-r from-blue/60 via-fuchsia-500/50 to-orange/60 ${
+                pathname === '/chat' ? 'opacity-70' : 'opacity-40 group-hover:opacity-70'
+              }`}
+            />
+            <span className="relative rounded-full p-[1.5px] bg-gradient-to-r from-blue via-fuchsia-400 to-orange">
+              <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#0b1220] text-[11px] font-black tracking-[0.2em] uppercase text-white">
+                <Sparkles className="w-3.5 h-3.5 text-blue drop-shadow-[0_0_4px_rgba(56,189,248,0.9)] animate-pulse" />
+                <span>{tx.navChat ?? 'SENTINEL AI'}</span>
               </span>
-            </Link>
-          </div>
-
+            </span>
+          </Link>
         </div>
 
-        {/* Telemetry & Global Info */}
-        <div className="hidden md:flex items-center justify-end gap-4 min-w-[250px]">
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-3 px-3 py-1.5 bg-white/5 border border-white/10 rounded-md">
-              <span className="text-[9px] font-bold text-text-muted tracking-widest uppercase">Hotspots</span>
-              <span className="text-sm font-black text-orange num leading-none">{fireCount.toLocaleString()}</span>
-            </div>
-            <div className="text-[11px] font-mono text-text-muted flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-soft animate-pulse" />
-              {time || "00:00:00"} <span className="opacity-50">UTC</span>
-            </div>
+        {/* UTC Clock */}
+        <div className="hidden md:flex items-center">
+          <div className="text-[11px] font-mono text-text-muted flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-soft animate-pulse" />
+            {time || "00:00:00"} <span className="opacity-50">UTC</span>
           </div>
-
-          <div className="h-10 w-[1px] bg-white/10 mx-2" />
         </div>
-        {/* Mobile: status dot + time */}
+        {/* Mobile: connection dot + time */}
         <div className="flex md:hidden items-center gap-3 ml-auto">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
             <div className={`w-2 h-2 rounded-full ${connected ? (riskLevel === 'critical' ? 'bg-red' : 'bg-green') : 'bg-text-muted'} ${connected ? 'animate-pulse' : ''}`} />
-            <span className={`text-[10px] font-black tracking-widest uppercase ${statusColor}`}>
-              {statusLabel}
-            </span>
           </div>
           <span className="text-[10px] font-mono text-text-muted">{time || "00:00:00"}</span>
         </div>

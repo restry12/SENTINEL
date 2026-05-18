@@ -6,7 +6,7 @@ import { useGlacierTierList } from "@/hooks/use-glacier-tier-list";
 
 const TABS = [
   { id: "risk", label: "Riesgo", color: "#ff5a5a" },
-  { id: "area", label: "Tamano", color: "#1dd38a" },
+  { id: "area", label: "Tamaño", color: "#1dd38a" },
   { id: "retreat", label: "Retroceso", color: "#ff9a3d" },
 ] as const;
 

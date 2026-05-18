@@ -6,8 +6,8 @@ import { useSentinel } from "@/contexts/sentinel-context"
 import type { FireRiskRegionMap, FireRiskRegion, RegionDetail } from "@/hooks/use-socket"
 import { FireDetailOverlay } from "./fire-detail-overlay"
 import { FireRiskCellPanel } from "./fire-risk-cell-panel"
-import { SituationalOverlay } from "./situational-overlay"
 import { TacticalExpansionWidget } from "./tactical-expansion-widget"
+import { HotspotSearch } from "./hotspot-search"
 
 const MapboxPanel = dynamic(
   () => import("./mapbox-panel").then((m) => m.MapboxPanel),
@@ -17,6 +17,7 @@ const MapboxPanel = dynamic(
 export function MapPanel() {
   const { sentinelUpdate: u } = useSentinel()
   const fires = u?.fires ?? []
+  const fireCount = fires.length
   const [activeExpansion, setActiveExpansion] = useState<'2h' | '6h' | '12h' | null>(null)
 
   const [showGrid, setShowGrid] = useState(false)
@@ -114,9 +115,6 @@ export function MapPanel() {
           onClose={() => { setSelectedRegion(null); setRegionDetail(null); setDetailLoading(false); setDetailError(null) }}
         />
 
-        {/* Situational Intelligence Overlay — hidden in Fire Risk Grid mode */}
-        {!showGrid && <SituationalOverlay />}
-
         {/* Tactical Expansion HUD (Fixed Right side) — hidden in Fire Risk Grid mode */}
         {!showGrid && (
           <TacticalExpansionWidget
@@ -164,6 +162,17 @@ export function MapPanel() {
             Fire Risk Grid
           </span>
         </button>
+
+        {/* Hotspots count — below Tracking Fires */}
+        <div className="absolute top-[62px] left-6 z-30 flex items-center gap-2 px-2.5 py-1.5 bg-[#0f172a] border border-border-2 rounded-sm backdrop-blur-md">
+          <span className="text-[9px] font-bold text-text-muted tracking-widest uppercase">Hotspots</span>
+          <span className="text-sm font-black text-orange num leading-none">{fireCount.toLocaleString()}</span>
+        </div>
+
+        {/* Top Focos — below Fire Risk Grid */}
+        <div className="absolute top-[62px] right-6 z-30">
+          <HotspotSearch />
+        </div>
 
         {/* Grid load error */}
         {gridError && showGrid && (

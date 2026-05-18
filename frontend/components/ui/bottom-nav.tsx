@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation"
 import { LayoutGrid, Wind, Tornado, MessageCircle, Newspaper, UserCircle } from "lucide-react"
 
 const tabs = [
-  { href: "/dashboard",         label: "Dashboard",  Icon: LayoutGrid },
+  { href: "/incendios",         label: "Incendios",  Icon: LayoutGrid },
   { href: "/air",               label: "Aire",        Icon: Wind },
   { href: "/tornado",           label: "Tornado",     Icon: Tornado },
   { href: "/chat",              label: "AI",          Icon: MessageCircle },
   { href: "/news",              label: "Noticias",    Icon: Newspaper },
-  { href: "/dashboard/citizen", label: "Ciudadano",   Icon: UserCircle },
+  { href: "/incendios/citizen", label: "Ciudadano",   Icon: UserCircle },
 ] as const
 
 export function BottomNav() {
