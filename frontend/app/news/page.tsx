@@ -203,10 +203,45 @@ function ArticleImagePlaceholder({ title, className = "" }: { title: string; cla
   const category = getArticleCategory(title)
   const config = CATEGORY_CONFIG[category]
   
+  // Use a reliable themed URL structure from Unsplash
+  const displayUrl = `https://source.unsplash.com/featured/800x600?${config.keywords}`
+
   return (
-    <div
-      className={`w-full h-full bg-gradient-to-br ${config.color} ${className}`}
-    />
+    <div className={`relative w-full h-full overflow-hidden bg-black group ${className}`}>
+      {/* Background Image with Filter */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={displayUrl}
+        alt=""
+        className="absolute inset-0 w-full h-full object-cover opacity-60 grayscale-[0.5] contrast-[1.2] transition-transform duration-700 group-hover:scale-110 group-hover:grayscale-0"
+      />
+      
+      {/* Tonal Overlay */}
+      <div className={`absolute inset-0 bg-gradient-to-t ${config.color} opacity-70`} />
+      
+      {/* Scanlines Effect */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03]" 
+           style={{ backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))', backgroundSize: '100% 2px, 3px 100%' }} />
+
+      {/* HUD Brackets */}
+      <div className="absolute inset-4 border border-white/5 pointer-events-none">
+        {/* Corners */}
+        <div className={`absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 ${config.accent.replace('text-', 'border-')}/60`} />
+        <div className={`absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 ${config.accent.replace('text-', 'border-')}/60`} />
+        <div className={`absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 ${config.accent.replace('text-', 'border-')}/60`} />
+        <div className={`absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 ${config.accent.replace('text-', 'border-')}/60`} />
+        
+        {/* Data readout mockups */}
+        <div className="absolute top-2 left-2 flex flex-col gap-0.5 opacity-40">
+          <div className="w-8 h-[1px] bg-white/40" />
+          <div className="w-4 h-[1px] bg-white/40" />
+        </div>
+        <div className="absolute bottom-2 right-2 text-[6px] font-mono text-white/30 uppercase tracking-tighter">
+          SCN_RES: 1280x720<br />
+          SENTINEL_V2.4
+        </div>
+      </div>
+    </div>
   )
 }
 
