@@ -25,9 +25,10 @@ Make.com hace todas las llamadas externas (NASA, OpenWeather, OpenAQ) y manda lo
 
 | Escenario | Link público |
 |---|---|
-| Flujo principal (NASA FIRMS + alertas) | [Ver escenario](https://us2.make.com/public/shared-scenario/XZpPiTewABR/integration-webhooks-http) |
-| Flujo de notificaciones (SMS / Gmail) | [Ver escenario](https://us2.make.com/public/shared-scenario/oyXzOIfPO3W/integration-webhooks) |
-| Flujo de datos Sentinel | [Ver escenario](https://us2.make.com/public/shared-scenario/NHNjZ4Lag7a/integration-http-sentinel-data) |
+| Flujo de datos Sentinel Principal| [Ver escenario](https://us2.make.com/public/shared-scenario/NHNjZ4Lag7a/integration-http-sentinel-data) |
+| Flujo Citizen (Datos Cercanos al usuario) | [Ver escenario](https://us2.make.com/public/shared-scenario/XZpPiTewABR/integration-webhooks-http) |
+| Flujo de notificaciones (SMS) | [Ver escenario](https://us2.make.com/public/shared-scenario/oyXzOIfPO3W/integration-webhooks) |
+
 
 ---
 
