@@ -134,8 +134,8 @@ export function SentinelMap({ size = 360, user, fires, route, expansion }: Senti
           container: el,
           style: "mapbox://styles/mapbox/satellite-streets-v12",
           center: [user.lon, user.lat],
-          zoom: 14,
-          minZoom: 13,
+          zoom: 13,
+          minZoom: 11,
           attributionControl: false,
         })
         mapRef.current = map
@@ -274,6 +274,13 @@ export function SentinelMap({ size = 360, user, fires, route, expansion }: Senti
             new mapboxgl.Marker({ element: makeLabelEl(route.label, "#bbf7d0"), offset: [0, 18] })
               .setLngLat([dest.lon, dest.lat]).addTo(map),
           )
+
+          // Auto-fit so user, fire(s), and escape destination are all visible
+          const allLngs = [user.lon, dest.lon, ...fires.map((f) => f.lon)]
+          const allLats = [user.lat, dest.lat, ...fires.map((f) => f.lat)]
+          const sw: [number, number] = [Math.min(...allLngs), Math.min(...allLats)]
+          const ne: [number, number] = [Math.max(...allLngs), Math.max(...allLats)]
+          map.fitBounds([sw, ne], { padding: 70, maxZoom: 14, duration: 0 })
         })
       })
       .catch((err) => console.error("[SentinelMap] mapbox-gl load failed:", err))

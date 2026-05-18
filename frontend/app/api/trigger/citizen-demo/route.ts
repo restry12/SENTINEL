@@ -11,8 +11,14 @@ export async function POST(req: Request) {
 
     const userLat = body.lat ?? -38.5
     const userLon = body.lon ?? -72.0
+
+    // Fire ~0.54km NE of user
     const fireLat = Math.round((userLat + 0.004) * 10000) / 10000
     const fireLon = Math.round((userLon + 0.003) * 10000) / 10000
+
+    // Escape destination ~1.2km NW (bearing 315°) — matches the hardcoded demo route
+    const escapeLat = Math.round((userLat + 0.0077) * 10000) / 10000
+    const escapeLon = Math.round((userLon - 0.0098) * 10000) / 10000
 
     const makeHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
     const secret = process.env.MAKE_WEBHOOK_SECRET
@@ -30,7 +36,7 @@ export async function POST(req: Request) {
         distance_km: 0.54,
         user_lat: userLat,
         user_lon: userLon,
-        google_maps_fire_url: `https://maps.google.com/?q=${fireLat},${fireLon}`,
+        google_maps_fire_url: `https://maps.google.com/?q=${escapeLat},${escapeLon}`,
         timestamp: new Date().toISOString(),
       }),
     })

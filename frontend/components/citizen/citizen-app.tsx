@@ -158,7 +158,7 @@ export function CitizenApp() {
     const res = await fetch('/api/trigger/citizen-demo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, lat: userLoc?.lat ?? -38.5, lon: userLoc?.lon ?? -72.0 }),
+      body: JSON.stringify({ phone, lat: userLoc?.lat, lon: userLoc?.lon }),
     })
     const json = await res.json().catch(() => ({}))
     if (!res.ok) {
