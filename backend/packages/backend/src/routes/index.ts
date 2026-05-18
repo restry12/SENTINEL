@@ -477,6 +477,35 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
   })
 
+  // POST /api/trigger/citizen-demo — fires a proximity alert with mock fire data.
+  // Used by the demo button in the citizen app to showcase the SMS flow without
+  // requiring a real nearby fire.
+  app.post('/api/trigger/citizen-demo', async (req, res) => {
+    const body = req.body as { phone?: unknown; lat?: unknown; lon?: unknown }
+    const phone = typeof body.phone === 'string' && body.phone.startsWith('+') ? body.phone : undefined
+
+    if (!phone) {
+      res.status(400).json({ ok: false, error: 'phone required' })
+      return
+    }
+
+    const userLat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : -38.5
+    const userLon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : -72.0
+
+    const mockFire = {
+      lat: userLat + 0.004,
+      lon: userLon + 0.003,
+      frp: 127.4,
+      brightness: 412.8,
+    }
+
+    res.status(202).json({ ok: true, accepted: true })
+
+    triggerCitizenProximityAlert(phone, mockFire, 0.54, userLat, userLon).catch(err =>
+      console.error('[citizen-demo] alert error:', err instanceof Error ? err.message : err)
+    )
+  })
+
   // POST /api/polling/start — start polling at given interval
   // Minimum 10 seconds to avoid rate-limiting NASA FIRMS, OpenWeather, and OpenAQ
   app.post('/api/polling/start', (req, res) => {

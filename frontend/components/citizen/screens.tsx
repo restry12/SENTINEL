@@ -109,6 +109,7 @@ interface ScreenLocatingProps {
 export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLocatingProps) {
   const [phase, setPhase] = useState(0)
   const [geoError, setGeoError] = useState<string | null>(null)
+  const [demoState, setDemoState] = useState<'idle' | 'sending' | 'sent'>('idle')
   const doneRef = useRef(false)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
@@ -253,6 +254,40 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
               }}
             >
               Continuar sin ubicación
+            </button>
+            <button
+              onClick={async () => {
+                if (demoState !== 'idle') return
+                let phone: string | undefined
+                try {
+                  const raw = localStorage.getItem('sentinel_user')
+                  if (raw) phone = (JSON.parse(raw) as { phone?: string }).phone
+                } catch { /* ignore */ }
+                if (!phone) {
+                  setGeoError('Inicia sesión con un número registrado para recibir el SMS de demo.')
+                  return
+                }
+                setDemoState('sending')
+                try {
+                  await fetch('/api/trigger/citizen-demo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, lat: -38.5, lon: -72.0 }),
+                  })
+                } catch { /* ignore — backend confirms via SMS */ }
+                setDemoState('sent')
+                setTimeout(() => finish({ lat: -38.5, lon: -72.0 }), 1200)
+              }}
+              style={{
+                width: '100%', minHeight: 44, borderRadius: 14,
+                background: demoState === 'sent' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.08)',
+                color: demoState === 'sent' ? 'var(--safe)' : 'var(--critical)',
+                border: `1px solid ${demoState === 'sent' ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.30)'}`,
+                fontSize: 12, fontWeight: 600, cursor: demoState !== 'idle' ? 'default' : 'pointer',
+                letterSpacing: '0.08em', fontFamily: 'monospace',
+              }}
+            >
+              {demoState === 'idle' ? '⚡ DEMO — Simular foco cercano + SMS' : demoState === 'sending' ? 'Enviando alerta...' : '✓ SMS enviado — cargando pantalla'}
             </button>
           </div>
         ) : (
