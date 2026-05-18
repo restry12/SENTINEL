@@ -48,7 +48,7 @@ Make.com hace todas las llamadas externas (NASA, OpenWeather, OpenAQ) y manda lo
 
 ## Servicios del backend
 
-Monorepo TypeScript en `backend/`. Cada agente es un microservicio independiente.
+Monorepo TypeScript en `backend/`. Cada agente es un microservicio independiente. (Puertos Locales, No de producción) 
 
 | Servicio | Carpeta | Puerto |
 |---|---|---|
