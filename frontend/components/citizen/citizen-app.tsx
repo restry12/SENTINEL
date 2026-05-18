@@ -111,7 +111,7 @@ function buildScene(
     : { direccion_principal_deg: 0, velocidad_propagacion_kmh: 0, eta_min: 0 }
 
   // Real weather — prioritize local weather from the routes agent
-  const rawWeather = citizenRoutes?.weather ?? u?.weather
+  const rawWeather = (citizenRoutes as { weather?: typeof u.weather } | null)?.weather ?? u?.weather
   const weather = rawWeather
     ? {
         wind_speed_kmh: Math.round((rawWeather.speed ?? 0) * 3.6),
@@ -128,6 +128,7 @@ export function CitizenApp() {
   const [screen, setScreen] = useState<ScreenState>('locating')
   const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(null)
   const demoActiveRef = useRef(false)
+  const [demoFire, setDemoFire] = useState<{ id: string; lat: number; lon: number; frp: number; dist_km: number } | null>(null)
   const { sentinelUpdate, connected, triggerCitizen, citizenRoutes } = useSentinel()
   const data = useMemo(
     () => buildScene(userLoc, sentinelUpdate, citizenRoutes),
@@ -161,10 +162,19 @@ export function CitizenApp() {
         body: JSON.stringify({ phone, lat: -38.5, lon: -72.0 }),
       })
     } catch { /* backend responds via SMS */ }
+    const baseLat = userLoc?.lat ?? -38.5
+    const baseLon = userLoc?.lon ?? -72.0
+    setDemoFire({
+      id: 'F-DEMO',
+      lat: baseLat + 0.004,
+      lon: baseLon + 0.003,
+      frp: 127.4,
+      dist_km: 0.54,
+    })
     demoActiveRef.current = true
     setScreen('alert')
     return 'ok'
-  }, [])
+  }, [userLoc])
 
   useEffect(() => {
     if (demoActiveRef.current) return
@@ -197,10 +207,13 @@ export function CitizenApp() {
       )}
       {screen === 'alert' && (
         <ScreenAlert
-          riskLevel={data.riskLevel}
-          route={route}
+          riskLevel={demoFire ? 'critical' : data.riskLevel}
+          route={demoFire ? {
+            id: 'R-DEMO', label: 'Av. Los Leones', destino: 'Punto de encuentro norte',
+            distancia_km: 1.2, bearing_deg: 315, eta_min: 8, estado: 'LIBRE',
+          } : route}
           user={data.user}
-          fires={data.fires}
+          fires={demoFire ? [demoFire] : data.fires}
           expansion={data.expansion}
           weather={data.weather}
           onCompass={() => setScreen('compass')}
