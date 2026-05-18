@@ -85,7 +85,7 @@ export function TopBar() {
                 { href: '/air',       label: tx.navAir },
                 { href: '/tornado',   label: tx.navTornado },
                 { href: '/news',      label: tx.navNews ?? 'Noticias' },
-                { href: '/glaciares', label: tx.navGlaciares ?? 'GLACIARES', badge: 'BETA' },
+                { href: '/glaciares', label: tx.navGlaciares ?? 'GLACIARES' },
               ].map(({ href, label, badge }) => (
                 <Link
                   key={href}
