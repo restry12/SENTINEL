@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { CITIZEN_MOCK, type CitizenData, type NaturalRoute, type ScreenRisk } from '@/lib/citizen-mock-data'
 import type { SentinelUpdate, NaturalRoutes } from '@/hooks/use-socket'
@@ -111,7 +111,7 @@ function buildScene(
     : { direccion_principal_deg: 0, velocidad_propagacion_kmh: 0, eta_min: 0 }
 
   // Real weather — prioritize local weather from the routes agent
-  const rawWeather = citizenRoutes?.weather ?? u?.weather
+  const rawWeather = (citizenRoutes as { weather?: typeof u.weather } | null)?.weather ?? u?.weather
   const weather = rawWeather
     ? {
         wind_speed_kmh: Math.round((rawWeather.speed ?? 0) * 3.6),
@@ -127,6 +127,8 @@ function buildScene(
 export function CitizenApp() {
   const [screen, setScreen] = useState<ScreenState>('locating')
   const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(null)
+  const demoActiveRef = useRef(false)
+  const [demoFire, setDemoFire] = useState<{ id: string; lat: number; lon: number; frp: number; dist_km: number } | null>(null)
   const { sentinelUpdate, connected, triggerCitizen, citizenRoutes } = useSentinel()
   const data = useMemo(
     () => buildScene(userLoc, sentinelUpdate, citizenRoutes),
@@ -140,17 +142,48 @@ export function CitizenApp() {
       if (!connected) {
         console.warn('[CitizenApp] socket not connected — trigger-citizen not sent')
       }
-      
       // Screen decision will be handled by the useEffect below
     } else {
       setScreen('safe')
     }
   }, [triggerCitizen, connected])
 
+  const handleDemo = useCallback(async (): Promise<string> => {
+    let phone: string | undefined
+    try {
+      const raw = localStorage.getItem('sentinel_user')
+      if (raw) phone = (JSON.parse(raw) as { phone?: string }).phone
+    } catch { /* ignore */ }
+    if (!phone) return 'no_phone'
+    const res = await fetch('/api/trigger/citizen-demo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, lat: userLoc?.lat, lon: userLoc?.lon }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      console.error('[citizen-demo] webhook failed', res.status, json)
+      return 'webhook_error'
+    }
+    const baseLat = userLoc?.lat ?? -38.5
+    const baseLon = userLoc?.lon ?? -72.0
+    setDemoFire({
+      id: 'F-DEMO',
+      lat: baseLat + 0.004,
+      lon: baseLon + 0.003,
+      frp: 127.4,
+      dist_km: 0.54,
+    })
+    demoActiveRef.current = true
+    setScreen('alert')
+    return 'ok'
+  }, [userLoc])
+
   useEffect(() => {
+    if (demoActiveRef.current) return
     if (screen !== 'alert' && screen !== 'safe' && screen !== 'locating') return
     if (!userLoc) return
-    
+
     const nearest = nearestFireKm(userLoc, data.fires)
     const nextScreen = nearest <= CITIZEN_ALERT_RADIUS_KM ? 'alert' : 'safe'
     if (nextScreen !== screen) setScreen(nextScreen)
@@ -172,14 +205,18 @@ export function CitizenApp() {
         <ScreenLocating
           riskLevel={data.riskLevel}
           onLocated={handleLocated}
+          onDemo={handleDemo}
         />
       )}
       {screen === 'alert' && (
         <ScreenAlert
-          riskLevel={data.riskLevel}
-          route={route}
+          riskLevel={demoFire ? 'critical' : data.riskLevel}
+          route={demoFire ? {
+            id: 'R-DEMO', label: 'Av. Los Leones', destino: 'Punto de encuentro norte',
+            distancia_km: 1.2, bearing_deg: 315, eta_min: 8, estado: 'LIBRE',
+          } : route}
           user={data.user}
-          fires={data.fires}
+          fires={demoFire ? [demoFire] : data.fires}
           expansion={data.expansion}
           weather={data.weather}
           onCompass={() => setScreen('compass')}
@@ -212,6 +249,7 @@ export function CitizenApp() {
             : null}
           weather={data.weather}
           onRefresh={() => setScreen('locating')}
+          onDemo={handleDemo}
         />
       )}
     </div>
