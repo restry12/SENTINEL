@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSentinel } from '@/contexts/sentinel-context'
 import { CITIZEN_MOCK, type CitizenData, type NaturalRoute, type ScreenRisk } from '@/lib/citizen-mock-data'
 import type { SentinelUpdate, NaturalRoutes } from '@/hooks/use-socket'
@@ -127,6 +127,7 @@ function buildScene(
 export function CitizenApp() {
   const [screen, setScreen] = useState<ScreenState>('locating')
   const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(null)
+  const demoActiveRef = useRef(false)
   const { sentinelUpdate, connected, triggerCitizen, citizenRoutes } = useSentinel()
   const data = useMemo(
     () => buildScene(userLoc, sentinelUpdate, citizenRoutes),
@@ -140,17 +141,36 @@ export function CitizenApp() {
       if (!connected) {
         console.warn('[CitizenApp] socket not connected — trigger-citizen not sent')
       }
-      
       // Screen decision will be handled by the useEffect below
     } else {
       setScreen('safe')
     }
   }, [triggerCitizen, connected])
 
+  const handleDemo = useCallback(async (): Promise<string> => {
+    let phone: string | undefined
+    try {
+      const raw = localStorage.getItem('sentinel_user')
+      if (raw) phone = (JSON.parse(raw) as { phone?: string }).phone
+    } catch { /* ignore */ }
+    if (!phone) return 'no_phone'
+    try {
+      await fetch('/api/trigger/citizen-demo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, lat: -38.5, lon: -72.0 }),
+      })
+    } catch { /* backend responds via SMS */ }
+    demoActiveRef.current = true
+    setScreen('alert')
+    return 'ok'
+  }, [])
+
   useEffect(() => {
+    if (demoActiveRef.current) return
     if (screen !== 'alert' && screen !== 'safe' && screen !== 'locating') return
     if (!userLoc) return
-    
+
     const nearest = nearestFireKm(userLoc, data.fires)
     const nextScreen = nearest <= CITIZEN_ALERT_RADIUS_KM ? 'alert' : 'safe'
     if (nextScreen !== screen) setScreen(nextScreen)
@@ -172,6 +192,7 @@ export function CitizenApp() {
         <ScreenLocating
           riskLevel={data.riskLevel}
           onLocated={handleLocated}
+          onDemo={handleDemo}
         />
       )}
       {screen === 'alert' && (
@@ -212,6 +233,7 @@ export function CitizenApp() {
             : null}
           weather={data.weather}
           onRefresh={() => setScreen('locating')}
+          onDemo={handleDemo}
         />
       )}
     </div>

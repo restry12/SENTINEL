@@ -102,11 +102,12 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 
 interface ScreenLocatingProps {
   onLocated?: (coords?: { lat: number; lon: number }) => void
+  onDemo?: () => Promise<string>
   riskLevel?: ScreenRisk
 }
 
 // phase: 0 = waiting for user tap, 1 = requesting GPS, 2 = done
-export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLocatingProps) {
+export function ScreenLocating({ onLocated, onDemo, riskLevel = 'critical' }: ScreenLocatingProps) {
   const [phase, setPhase] = useState(0)
   const [geoError, setGeoError] = useState<string | null>(null)
   const [demoState, setDemoState] = useState<'idle' | 'sending' | 'sent'>('idle')
@@ -257,26 +258,15 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
             </button>
             <button
               onClick={async () => {
-                if (demoState !== 'idle') return
-                let phone: string | undefined
-                try {
-                  const raw = localStorage.getItem('sentinel_user')
-                  if (raw) phone = (JSON.parse(raw) as { phone?: string }).phone
-                } catch { /* ignore */ }
-                if (!phone) {
+                if (demoState !== 'idle' || !onDemo) return
+                setDemoState('sending')
+                const result = await onDemo()
+                if (result === 'no_phone') {
                   setGeoError('Inicia sesión con un número registrado para recibir el SMS de demo.')
+                  setDemoState('idle')
                   return
                 }
-                setDemoState('sending')
-                try {
-                  await fetch('/api/trigger/citizen-demo', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, lat: -38.5, lon: -72.0 }),
-                  })
-                } catch { /* ignore — backend confirms via SMS */ }
                 setDemoState('sent')
-                setTimeout(() => finish({ lat: -38.5, lon: -72.0 }), 1200)
               }}
               style={{
                 width: '100%', minHeight: 44, borderRadius: 14,
@@ -602,9 +592,11 @@ interface ScreenSafeProps {
   nearestKm: number | null
   weather: { wind_speed_kmh: number; wind_dir_deg: number; humidity_pct: number; temp_c: number }
   onRefresh?: () => void
+  onDemo?: () => Promise<string>
 }
 
-export function ScreenSafe({ nearestKm, weather, onRefresh }: ScreenSafeProps) {
+export function ScreenSafe({ nearestKm, weather, onRefresh, onDemo }: ScreenSafeProps) {
+  const [demoState, setDemoState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   return (
     <div className="screen scanlines" style={{
       width: '100%', height: '100%',
@@ -661,10 +653,10 @@ export function ScreenSafe({ nearestKm, weather, onRefresh }: ScreenSafeProps) {
         </div>
       </div>
 
-      <div style={{ padding: '14px 22px 36px' }}>
+      <div style={{ padding: '14px 22px 36px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="font-mono" style={{
           fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em',
-          textAlign: 'center', marginBottom: 14, textTransform: 'uppercase',
+          textAlign: 'center', marginBottom: 4, textTransform: 'uppercase',
         }}>
           SENTINEL MONITOREA EN TIEMPO REAL
         </div>
@@ -685,6 +677,34 @@ export function ScreenSafe({ nearestKm, weather, onRefresh }: ScreenSafeProps) {
           </svg>
           Actualizar mi ubicación
         </button>
+        {onDemo && (
+          <button
+            onClick={async () => {
+              if (demoState !== 'idle') return
+              setDemoState('sending')
+              const result = await onDemo()
+              if (result === 'no_phone') {
+                setDemoState('error')
+                setTimeout(() => setDemoState('idle'), 3000)
+              } else {
+                setDemoState('sent')
+              }
+            }}
+            style={{
+              width: '100%', minHeight: 48, borderRadius: 14,
+              background: demoState === 'sent' ? 'rgba(34,197,94,0.10)' : demoState === 'error' ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.08)',
+              color: demoState === 'sent' ? 'var(--safe)' : demoState === 'error' ? 'var(--critical)' : 'var(--critical)',
+              border: `1px solid ${demoState === 'sent' ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.30)'}`,
+              fontSize: 12, fontWeight: 600, cursor: demoState !== 'idle' ? 'default' : 'pointer',
+              letterSpacing: '0.08em', fontFamily: 'monospace',
+            }}
+          >
+            {demoState === 'idle' && '⚡ DEMO — Simular foco cercano + SMS'}
+            {demoState === 'sending' && 'Enviando alerta...'}
+            {demoState === 'sent' && '✓ SMS enviado — mostrando alerta'}
+            {demoState === 'error' && 'Inicia sesión con número registrado'}
+          </button>
+        )}
       </div>
     </div>
   )
