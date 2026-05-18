@@ -86,7 +86,7 @@ export function TopBar() {
                 { href: '/tornado',   label: tx.navTornado },
                 { href: '/news',      label: tx.navNews ?? 'Noticias' },
                 { href: '/glaciares', label: tx.navGlaciares ?? 'GLACIARES' },
-              ].map(({ href, label, badge }) => (
+              ].map(({ href, label }) => (
                 <Link
                   key={href}
                   href={href}
@@ -97,7 +97,6 @@ export function TopBar() {
                   }`}
                 >
                   {label}
-                  {badge && <span className="ml-1 text-[7px] font-black tracking-widest text-blue opacity-70">{badge}</span>}
                 </Link>
               ))}
             </nav>

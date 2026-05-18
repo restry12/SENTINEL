@@ -28,10 +28,41 @@ interface CacheEntry {
 const DEBOUNCE_MS = 700;
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const CACHE_STORAGE_KEY = "sentinel.glaciers.viewport-cache.v1";
+const SELECTED_STORAGE_KEY = "sentinel.glaciers.selected.v1";
 const MAX_CACHE_ENTRIES = 24;
 
 const memoryCache = new Map<string, CacheEntry>();
 let storageHydrated = false;
+
+function persistSelected(glacier: Glacier | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (!glacier) {
+      window.sessionStorage.removeItem(SELECTED_STORAGE_KEY);
+      return;
+    }
+    const payload = {
+      name: glacier.name,
+      glimsId: glacier.glimsId,
+      area: glacier.area,
+      riesgo: glacier.riesgo,
+      cat: glacier.cat,
+      lat: glacier.lat,
+      lon: glacier.lon,
+      trend: glacier.trend,
+      srcDate: glacier.srcDate,
+      tempAnomaly: glacier.tempAnomaly,
+      deltaShort: glacier.deltaShort,
+      deltaYear: glacier.deltaYear,
+      masaVar: glacier.masaVar,
+      diag: glacier.ai?.diag,
+      forecast: glacier.ai?.forecast,
+    };
+    window.sessionStorage.setItem(SELECTED_STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore quota
+  }
+}
 
 function hydrateFromStorage(): void {
   if (storageHydrated || typeof window === "undefined") return;
@@ -189,6 +220,7 @@ export function useGlaciers(): UseGlaciersReturn {
 
   const selectGlacier = useCallback(async (glacier: Glacier) => {
     setSelected(glacier);
+    persistSelected(glacier);
 
     const shouldHydrate =
       glacier.tempHistory.length <= 1 ||
@@ -211,9 +243,12 @@ export function useGlaciers(): UseGlaciersReturn {
       setGlaciers((prev) =>
         prev.map((item) => (item.glimsId === detail.glimsId ? { ...item, ...detail, ai: item.ai ?? detail.ai } : item))
       );
-      setSelected((prev) =>
-        prev?.glimsId === detail.glimsId ? { ...prev, ...detail, ai: prev.ai ?? detail.ai } : prev
-      );
+      setSelected((prev) => {
+        if (prev?.glimsId !== detail.glimsId) return prev;
+        const merged = { ...prev, ...detail, ai: prev.ai ?? detail.ai };
+        persistSelected(merged);
+        return merged;
+      });
       setSource("glims-detail");
     } catch (e) {
       console.error("[selectGlacier detail]", e);
@@ -236,7 +271,12 @@ export function useGlaciers(): UseGlaciersReturn {
       setGlaciers((prev) =>
         prev.map((item) => (item.glimsId === glacier.glimsId ? { ...item, ai } : item))
       );
-      setSelected((prev) => (prev?.glimsId === glacier.glimsId ? { ...prev, ai } : prev));
+      setSelected((prev) => {
+        if (prev?.glimsId !== glacier.glimsId) return prev;
+        const merged = { ...prev, ai };
+        persistSelected(merged);
+        return merged;
+      });
     } catch (e) {
       console.error("[analyzeGlacier]", e);
     } finally {
