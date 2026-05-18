@@ -8,19 +8,20 @@ export const translations = {
 
     // Visual scene
     badgeRestricted: 'ACCESO RESTRINGIDO',
-    heroTitleBefore: 'Centro de Comando para Inteligencia de Incendios en',
+    heroTitleBefore: 'Centro de Comando para Amenazas Climáticas en',
     heroTitleHighlight: 'Tiempo Real.',
     heroTitleAfter: '',
-    heroSub: 'Aprovechando telemetría NASA FIRMS, análisis con IA y rutas de evacuación autónomas.',
-    pillFirms: 'NASA FIRMS EN VIVO',
-    pillGlobal: 'VIGILANCIA GLOBAL ACTIVA',
-    pillSms: 'ALERTAS SMS LISTAS',
+    heroSub: 'Inteligencia artificial y telemetría satelital al servicio de la protección global.',
+    pillFires: 'INCENDIOS EN VIVO',
+    pillAir: 'AIRE GLOBAL ACTIVO',
+    pillTornado: 'TORNADOS MONITOREADOS',
+    pillIceberg: 'ICEBERGS EN SEGUIMIENTO',
 
     // Telemetry tiles
-    tileHotspots: 'FOCOS · 24H',
+    tileAgents: 'AGENTES IA ACTIVOS',
+    tileThreats: 'AMENAZAS DETECTADAS',
     tileCoverage: 'COBERTURA GLOBAL',
-    tileAlerts: 'ALERTAS ENVIADAS',
-    tileLatency: 'LATENCIA FIRMS',
+    tileResponse: 'TIEMPO DE RESPUESTA',
 
     // Auth card
     tabLogin: 'Iniciar Sesión',

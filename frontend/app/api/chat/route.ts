@@ -69,24 +69,88 @@ interface NewsArticle {
 
 type ChatMode = 'citizen' | 'expert'
 
+interface GlacierSummary {
+  name: string
+  glimsId: string
+  area: number
+  riesgo: number
+  cat: string
+  lat: number
+  lon: number
+  trend: string
+  srcDate?: string
+}
+
+interface GlacierForecastSnapshot {
+  trajectory: string
+  confidence: number
+  horizon6m: { areaPctChange: number; massBalance: number }
+  horizon12m: { areaPctChange: number; massBalance: number }
+  horizon24m: { areaPctChange: number; massBalance: number }
+  rationale?: string
+}
+
+interface SelectedGlacierSnapshot extends GlacierSummary {
+  tempAnomaly?: number
+  deltaShort?: string
+  deltaYear?: string
+  masaVar?: string
+  forecast?: GlacierForecastSnapshot
+  diag?: string
+}
+
+interface GlaciersBlock {
+  total: number
+  byRisk: GlacierSummary[]
+  byArea: GlacierSummary[]
+  byRetreat: GlacierSummary[]
+  selected?: SelectedGlacierSnapshot
+}
+
+interface SevereWeatherTopPoint {
+  lat: number
+  lon: number
+  score: number
+  risk_level: string
+  country_iso?: string | null
+  wind_gusts_10m: number | null
+}
+
+interface SevereWeatherBlock {
+  timestamp?: string
+  total: number
+  critical: number
+  high: number
+  moderate: number
+  top: SevereWeatherTopPoint[]
+}
+
 interface ChatRequest {
   message: string
   history: ChatMessage[]
   sentinelSnapshot: SentinelSnapshot | null
   newsArticles: NewsArticle[]
   mode?: ChatMode
+  glaciers?: GlaciersBlock | null
+  severeWeather?: SevereWeatherBlock | null
 }
 
-function buildSystemPrompt(snapshot: SentinelSnapshot | null, news: NewsArticle[], mode: ChatMode): string {
-  let prompt = `Eres SENTINEL AI, asistente del sistema SENTINEL de monitoreo de incendios forestales en AMÉRICA (Norte, Centro y Sur). Respondes exclusivamente en español.
+function buildSystemPrompt(
+  snapshot: SentinelSnapshot | null,
+  news: NewsArticle[],
+  mode: ChatMode,
+  glaciers: GlaciersBlock | null,
+  severeWeather: SevereWeatherBlock | null,
+): string {
+  let prompt = `Eres SENTINEL AI, asistente del sistema SENTINEL de monitoreo ambiental: incendios forestales en AMÉRICA, glaciares del mundo (GLIMS/Open-Meteo), y eventos meteorológicos severos / tornados (SSPI). Respondes exclusivamente en español.
 
 ## REGLA ANTI-INVENCIÓN (CRÍTICA)
-- Solo puedes nombrar ubicaciones, países, regiones o ciudades de focos que aparecen LITERALMENTE en la sección "FOCOS ACTIVOS" más abajo.
-- Solo puedes citar números (FRP en MW, AQI, PM2.5, hectáreas, viento km/h, conteos) que aparecen LITERALMENTE en las secciones de DATOS EN VIVO.
-- Si el usuario pregunta por un foco, región o métrica que no está en el contexto: responde "No tengo ese dato en vivo en este momento" y NO inventes nombres ni números.
-- Si la lista de FOCOS ACTIVOS está vacía o ausente: di explícitamente que no hay focos en los datos en vivo y ofrece información general sin valores específicos.
-- Está estrictamente prohibido inventar nombres de comunas, estados, ciudades o agencias que no estén en el contexto.
-- **CLIMA:** Los datos de viento, humedad y temperatura que aparecen en DATOS EN VIVO o CLIMA pertenecen ÚNICAMENTE a la zona de análisis (punto donde se disparó el sistema). NO corresponden a focos de otros países o regiones. Nunca atribuyas ese clima a un foco de otro país.
+- Solo puedes nombrar ubicaciones, países, regiones, glaciares o ciudades que aparecen LITERALMENTE en las secciones de DATOS EN VIVO más abajo (FOCOS ACTIVOS, GLACIARES, EVENTOS SEVEROS).
+- Solo puedes citar números (FRP en MW, AQI, PM2.5, hectáreas, viento km/h, conteos, área km², riesgo /100, anomalía térmica, SSPI score) que aparecen LITERALMENTE en el contexto.
+- Si el usuario pregunta por algo que no está en el contexto: responde "No tengo ese dato en vivo en este momento" y NO inventes nombres ni números.
+- Si una sección está vacía o ausente: di explícitamente que no hay datos vivos para ese dominio.
+- Está estrictamente prohibido inventar nombres de comunas, estados, ciudades, glaciares, GLIMS IDs o agencias que no estén en el contexto.
+- **CLIMA:** Los datos de viento, humedad y temperatura que aparecen en DATOS EN VIVO o CLIMA pertenecen ÚNICAMENTE a la zona de análisis (punto donde se disparó el sistema). NO corresponden a focos de otros países o regiones. Nunca atribuyas ese clima a un foco, glaciar o tornado de otro país.
 
 ## ÁMBITO
 SENTINEL cubre incendios en América. Agencias por país (cita la del país donde está el foco que el usuario pregunta; si no estás seguro del país, no inventes):
@@ -221,6 +285,66 @@ Reglas para esta situación:
 - Sugiere recargar la página o esperar próxima actualización del backend si el usuario insiste en datos en vivo.`
   }
 
+  if (glaciers && (glaciers.byRisk.length > 0 || glaciers.byArea.length > 0)) {
+    prompt += `\n\n## GLACIARES (GLIMS · universo: ${glaciers.total.toLocaleString('es-CL')})\n`
+    prompt += `Fuentes: GLIMS Glacier Database (NSIDC) + Open-Meteo Archive. Score interno 0-100.\n`
+
+    const top = glaciers.byRisk.slice(0, 6)
+    if (top.length > 0) {
+      prompt += `\n### Top riesgo global:\n`
+      top.forEach((g, i) => {
+        prompt += `${i + 1}. ${g.name} (${g.glimsId}) — riesgo ${g.riesgo}/100 [${g.cat}], área ${g.area.toFixed(2)} km², trend ${g.trend}, lat ${g.lat.toFixed(2)} lon ${g.lon.toFixed(2)}\n`
+      })
+    }
+
+    const topArea = glaciers.byArea.slice(0, 5)
+    if (topArea.length > 0) {
+      prompt += `\n### Top tamaño:\n`
+      topArea.forEach((g, i) => {
+        prompt += `${i + 1}. ${g.name} (${g.glimsId}) — área ${g.area.toFixed(2)} km², riesgo ${g.riesgo}/100\n`
+      })
+    }
+
+    const topRetreat = glaciers.byRetreat.slice(0, 5)
+    if (topRetreat.length > 0) {
+      prompt += `\n### Top retroceso (composite riesgo+edad+area):\n`
+      topRetreat.forEach((g, i) => {
+        prompt += `${i + 1}. ${g.name} (${g.glimsId}) — última obs ${g.srcDate ?? 'N/D'}, riesgo ${g.riesgo}/100, área ${g.area.toFixed(2)} km²\n`
+      })
+    }
+
+    if (glaciers.selected) {
+      const s = glaciers.selected
+      prompt += `\n### Glaciar seleccionado por el usuario:\n`
+      prompt += `- ${s.name} (${s.glimsId}) — lat ${s.lat.toFixed(4)}, lon ${s.lon.toFixed(4)}\n`
+      prompt += `- Área: ${s.area.toFixed(3)} km², riesgo ${s.riesgo}/100 [${s.cat}], trend ${s.trend}\n`
+      if (s.tempAnomaly != null) prompt += `- Anomalía térmica: ${s.tempAnomaly > 0 ? '+' : ''}${s.tempAnomaly.toFixed(2)} °C\n`
+      if (s.deltaShort) prompt += `- Δ corto: ${s.deltaShort}, Δ anual: ${s.deltaYear ?? 'N/D'}, masa: ${s.masaVar ?? 'N/D'}\n`
+      if (s.diag) prompt += `- Diagnóstico IA previo: ${s.diag}\n`
+      if (s.forecast) {
+        const f = s.forecast
+        prompt += `- Pronóstico IA: trayectoria ${f.trajectory} (confianza ${f.confidence}%). 6m: ${f.horizon6m.areaPctChange > 0 ? '+' : ''}${f.horizon6m.areaPctChange.toFixed(1)}% área / ${f.horizon6m.massBalance.toFixed(2)} m EH. 12m: ${f.horizon12m.areaPctChange.toFixed(1)}% / ${f.horizon12m.massBalance.toFixed(2)}. 24m: ${f.horizon24m.areaPctChange.toFixed(1)}% / ${f.horizon24m.massBalance.toFixed(2)}.\n`
+        if (f.rationale) prompt += `- Razonamiento forecast: ${f.rationale}\n`
+      }
+    }
+  } else {
+    prompt += `\n\n## GLACIARES\nNo hay datos en vivo de glaciares en este snapshot. Si el usuario pregunta por glaciares puntuales: di "No tengo ese dato en vivo" y sugiere abrir la pestaña Glaciares para cargar el ranking global.\n`
+  }
+
+  if (severeWeather && severeWeather.top.length > 0) {
+    prompt += `\n\n## EVENTOS METEOROLÓGICOS SEVEROS (SSPI · ${severeWeather.timestamp ?? 'sin timestamp'})\n`
+    prompt += `Total puntos escaneados: ${severeWeather.total} · CRÍTICO ${severeWeather.critical} · ALTO ${severeWeather.high} · MODERADO ${severeWeather.moderate}.\n`
+    prompt += `\n### Top puntos por SSPI score (riesgo tornado/severo):\n`
+    severeWeather.top.forEach((p, i) => {
+      const country = p.country_iso ? ` [${p.country_iso}]` : ''
+      const gusts = p.wind_gusts_10m != null ? `, ráfagas ${p.wind_gusts_10m} km/h` : ''
+      prompt += `${i + 1}. lat ${p.lat.toFixed(2)} lon ${p.lon.toFixed(2)}${country} — SSPI ${p.score.toFixed(2)} [${p.risk_level}]${gusts}\n`
+    })
+    prompt += `\nSSPI = Severe Storm Potential Index. CRITICAL ≥ alta probabilidad de tornado/granizo/vientos destructivos. Recomendar refugio, monitoreo meteorológico oficial.\n`
+  } else {
+    prompt += `\n\n## EVENTOS METEOROLÓGICOS SEVEROS\nNo hay datos en vivo del agente severe-weather. Si el usuario pregunta por tornados o tormentas severas: di "No tengo escaneo activo en vivo" y sugiere abrir la pestaña Tornados.\n`
+  }
+
   if (news.length > 0) {
     prompt += `\n\n## NOTICIAS RECIENTES\n`
     news.slice(0, 8).forEach((n, i) => {
@@ -239,14 +363,20 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   try {
     const body: ChatRequest = await req.json()
-    const { message, history, sentinelSnapshot, newsArticles, mode } = body
+    const { message, history, sentinelSnapshot, newsArticles, mode, glaciers, severeWeather } = body
 
     if (!message?.trim()) {
       return new Response(JSON.stringify({ error: 'message required' }), { status: 400 })
     }
 
     const chatMode: ChatMode = mode === 'expert' ? 'expert' : 'citizen'
-    const systemPrompt = buildSystemPrompt(sentinelSnapshot, newsArticles ?? [], chatMode)
+    const systemPrompt = buildSystemPrompt(
+      sentinelSnapshot,
+      newsArticles ?? [],
+      chatMode,
+      glaciers ?? null,
+      severeWeather ?? null,
+    )
 
     // Cap history to last 20 messages to avoid runaway token cost from a buggy / hostile client.
     const safeHistory = (history ?? []).slice(-20)

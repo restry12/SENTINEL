@@ -15,6 +15,7 @@ export const t = {
     navAir:          'CALIDAD AIRE',
     navNews:         'NOTICIAS',
     navTornado:      'TORNADOS',
+    navGlaciares:    'GLACIARES',
     navChat:         'SENTINEL AI',
     airMonitor:      'MONITOR CALIDAD AIRE',
     // Login

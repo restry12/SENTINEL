@@ -16,7 +16,7 @@ vi.mock('../services/history', () => ({
   saveIncident: vi.fn(),
 }))
 vi.mock('../services/alert', () => ({
-  triggerMakeWebhook: vi.fn(),
+  triggerCitizenProximityAlert: vi.fn(),
 }))
 
 import { executeAndBroadcast } from './handlers'
@@ -24,7 +24,7 @@ import { runAnalysis } from '../services/orchestrator'
 import { acquireLock, releaseLock } from '../services/analysis-lock'
 import { setLastUpdate } from '../services/last-update'
 import { saveIncident } from '../services/history'
-import { triggerMakeWebhook } from '../services/alert'
+import { triggerCitizenProximityAlert } from '../services/alert'
 import type { SentinelUpdate } from '@sentinel/types'
 
 const MOCK_UPDATE: SentinelUpdate = {
@@ -52,7 +52,7 @@ describe('executeAndBroadcast', () => {
     vi.mocked(runAnalysis).mockResolvedValue(MOCK_UPDATE)
     vi.mocked(setLastUpdate).mockReturnValue(undefined)
     vi.mocked(saveIncident).mockResolvedValue(undefined)
-    vi.mocked(triggerMakeWebhook).mockResolvedValue(undefined)
+    vi.mocked(triggerCitizenProximityAlert).mockResolvedValue(undefined)
   })
 
   it('broadcasts to ALL clients when no targetSocketId', async () => {

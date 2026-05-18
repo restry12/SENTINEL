@@ -10,6 +10,91 @@ import { WelcomeSequence } from "./welcome-sequence"
 import { cn } from "@/lib/utils"
 import { CondorGuideAvatar } from "./condor-avatar"
 
+interface TierListGlacier {
+  name: string
+  glimsId: string
+  area: number
+  riesgo: number
+  cat: string
+  lat: number
+  lon: number
+  trend: string
+  srcDate?: string
+}
+
+interface TierListPayload {
+  total: number
+  byRisk: TierListGlacier[]
+  byArea: TierListGlacier[]
+  byRetreat: TierListGlacier[]
+}
+
+interface GlacierSummaryChat {
+  name: string
+  glimsId: string
+  area: number
+  riesgo: number
+  cat: string
+  lat: number
+  lon: number
+  trend: string
+  srcDate?: string
+}
+
+interface SelectedGlacierChat extends GlacierSummaryChat {
+  tempAnomaly?: number
+  deltaShort?: string
+  deltaYear?: string
+  masaVar?: string
+  diag?: string
+  forecast?: {
+    trajectory: string
+    confidence: number
+    horizon6m: { areaPctChange: number; massBalance: number }
+    horizon12m: { areaPctChange: number; massBalance: number }
+    horizon24m: { areaPctChange: number; massBalance: number }
+    rationale?: string
+  }
+}
+
+interface GlaciersChatBlock {
+  total: number
+  byRisk: GlacierSummaryChat[]
+  byArea: GlacierSummaryChat[]
+  byRetreat: GlacierSummaryChat[]
+  selected?: SelectedGlacierChat
+}
+
+interface SevereGridPoint {
+  lat: number
+  lon: number
+  score: number
+  risk_level: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL'
+  country_iso?: string | null
+  wind_gusts_10m: number | null
+}
+
+interface SevereGridResponse {
+  timestamp?: string
+  points: SevereGridPoint[]
+}
+
+interface SevereWeatherChatBlock {
+  timestamp?: string
+  total: number
+  critical: number
+  high: number
+  moderate: number
+  top: Array<{
+    lat: number
+    lon: number
+    score: number
+    risk_level: string
+    country_iso?: string | null
+    wind_gusts_10m: number | null
+  }>
+}
+
 type ChatMode = 'citizen' | 'expert'
 const MODE_LS_KEY = 'sentinel_chat_mode'
 
@@ -39,6 +124,8 @@ export function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [newsArticles, setNewsArticles] = useState<Array<{ title: string; snippet?: string; source: string; publishedAt: string }>>([])
+  const [glaciersCtx, setGlaciersCtx] = useState<GlaciersChatBlock | null>(null)
+  const [severeWeatherCtx, setSevereWeatherCtx] = useState<SevereWeatherChatBlock | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -47,6 +134,75 @@ export function ChatPage() {
     fetch('/api/news', { signal: ctrl.signal })
       .then(r => r.json())
       .then(d => setNewsArticles(d.articles ?? []))
+      .catch(() => {})
+    return () => ctrl.abort()
+  }, [])
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    fetch('/api/glaciers/tier-list', { signal: ctrl.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: TierListPayload | null) => {
+        if (!d) return
+        const summarize = (list: TierListGlacier[]): GlacierSummaryChat[] =>
+          list.slice(0, 10).map(g => ({
+            name: g.name,
+            glimsId: g.glimsId,
+            area: g.area,
+            riesgo: g.riesgo,
+            cat: g.cat,
+            lat: g.lat,
+            lon: g.lon,
+            trend: g.trend,
+            srcDate: g.srcDate,
+          }))
+        let selected: SelectedGlacierChat | undefined
+        try {
+          const raw = sessionStorage.getItem('sentinel.glaciers.selected.v1')
+          if (raw) selected = JSON.parse(raw) as SelectedGlacierChat
+        } catch { /* ignore */ }
+        setGlaciersCtx({
+          total: d.total,
+          byRisk: summarize(d.byRisk ?? []),
+          byArea: summarize(d.byArea ?? []),
+          byRetreat: summarize(d.byRetreat ?? []),
+          selected,
+        })
+      })
+      .catch(() => {})
+    return () => ctrl.abort()
+  }, [])
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    fetch('/api/severe-weather/grid', { signal: ctrl.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then((d: SevereGridResponse | null) => {
+        if (!d || !Array.isArray(d.points)) return
+        const points = d.points
+        const critical = points.filter(p => p.risk_level === 'CRITICAL').length
+        const high = points.filter(p => p.risk_level === 'HIGH').length
+        const moderate = points.filter(p => p.risk_level === 'MODERATE').length
+        const top = [...points]
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 8)
+          .map(p => ({
+            lat: p.lat,
+            lon: p.lon,
+            score: p.score,
+            risk_level: p.risk_level,
+            country_iso: p.country_iso,
+            wind_gusts_10m: p.wind_gusts_10m,
+          }))
+        setSevereWeatherCtx({
+          timestamp: d.timestamp,
+          total: points.length,
+          critical,
+          high,
+          moderate,
+          top,
+        })
+      })
       .catch(() => {})
     return () => ctrl.abort()
   }, [])
@@ -91,7 +247,15 @@ export function ChatPage() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: content, history, sentinelSnapshot: sentinelUpdate, newsArticles, mode }),
+        body: JSON.stringify({
+          message: content,
+          history,
+          sentinelSnapshot: sentinelUpdate,
+          newsArticles,
+          mode,
+          glaciers: glaciersCtx,
+          severeWeather: severeWeatherCtx,
+        }),
         signal: controller.signal,
       })
 

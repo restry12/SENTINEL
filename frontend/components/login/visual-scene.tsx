@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import styles from '@/app/login/login.module.css'
 import { TelemetryTiles } from './telemetry-tiles'
 import { GlobeCanvas } from './globe-canvas'
-import { ShieldAlert, Activity, Globe } from 'lucide-react'
+import { Flame, Wind, Snowflake, CloudRain } from 'lucide-react'
 import { useLang } from '@/lib/i18n/language-context'
 
 export function VisualScene() {
@@ -40,9 +40,10 @@ export function VisualScene() {
   }, [])
 
   const pills = [
-    { icon: <Activity className="w-3 h-3" />, text: t('pillFirms'), color: 'text-orange' },
-    { icon: <Globe className="w-3 h-3" />, text: t('pillGlobal'), color: 'text-blue' },
-    { icon: <ShieldAlert className="w-3 h-3" />, text: t('pillSms'), color: 'text-red' },
+    { icon: <Flame className="w-3 h-3" />, text: t('pillFires'), color: 'text-orange' },
+    { icon: <CloudRain className="w-3 h-3" />, text: t('pillAir'), color: 'text-blue' },
+    { icon: <Wind className="w-3 h-3" />, text: t('pillTornado'), color: 'text-red' },
+    { icon: <Snowflake className="w-3 h-3" />, text: t('pillIceberg'), color: 'text-cyan-400' },
   ]
 
   return (
@@ -96,8 +97,8 @@ export function VisualScene() {
           <div className="absolute top-[52%] left-[56%] w-2 h-2 bg-orange rounded-full shadow-[0_0_12px_var(--orange)] animate-pulse" />
           <div className="absolute top-0 left-0 p-2 font-mono text-[9px] font-black tracking-widest text-blue uppercase opacity-70">LAT 32.4°S</div>
           <div className="absolute top-0 right-0 p-2 font-mono text-[9px] font-black tracking-widest text-blue uppercase opacity-70">LON 70.6°W</div>
-          <div className="absolute bottom-0 left-0 p-2 font-mono text-[9px] font-black tracking-widest text-text-muted uppercase opacity-70">SATELLITE DOWNLINK · SECURE</div>
-          <div className="absolute bottom-0 right-0 p-2 font-mono text-[9px] font-black tracking-widest text-green-soft uppercase opacity-70 animate-pulse">ENCRYPTED</div>
+          <div className="absolute bottom-0 left-0 p-2 font-mono text-[9px] font-black tracking-widest text-text-muted uppercase opacity-70">INCENDIOS · AIRE · TORNADOS · ICEBERGS</div>
+          <div className="absolute bottom-0 right-0 p-2 font-mono text-[9px] font-black tracking-widest text-green-soft uppercase opacity-70 animate-pulse">EN VIVO</div>
         </div>
       </div>
 

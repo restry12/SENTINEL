@@ -85,11 +85,12 @@ export function TopBar() {
                 { href: '/air',       label: tx.navAir },
                 { href: '/tornado',   label: tx.navTornado },
                 { href: '/news',      label: tx.navNews ?? 'Noticias' },
+                { href: '/glaciares', label: tx.navGlaciares ?? 'GLACIARES' },
               ].map(({ href, label }) => (
                 <Link
                   key={href}
                   href={href}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all duration-300 ${
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center ${
                     pathname === href
                       ? 'bg-white/10 text-white border border-white/20'
                       : 'text-text-muted hover:text-white hover:bg-white/5'
