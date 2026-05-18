@@ -1,4 +1,4 @@
-import type { FireData, RouteData, NaturalRoutes, RoutesResult } from '@sentinel/types'
+import type { FireData, RouteData, NaturalRoutes, RoutesResult, WeatherData } from '@sentinel/types'
 import { callOpenRouter, parseJSON, MODELS } from './openrouter'
 
 export function initialBearing(lat1: number, lon1: number, lat2: number, lon2: number): number {

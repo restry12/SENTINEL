@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import express from 'express'
-import type { AgentRequest, AgentResponse, NaturalRoutes, FireData } from '@sentinel/types'
+import type { AgentRequest, AgentResponse, NaturalRoutes, FireData, WeatherData } from '@sentinel/types'
 import { calculateEvacuationRoutes, calculateCitizenEscapeRoute } from './analyze'
 
 const app = express()
