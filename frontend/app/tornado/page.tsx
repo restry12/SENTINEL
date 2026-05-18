@@ -7,6 +7,7 @@ import { TopBar } from "@/components/dashboard/top-bar"
 import { TornadoLeftPanel } from "@/components/tornado/tornado-left-panel"
 import { TornadoRightPanel } from "@/components/tornado/tornado-right-panel"
 import type { GridPoint, GridScanResult } from "@/components/tornado/world-tornado-map"
+import { assignPointCountries, type AdminBoundaryCollection } from "@/lib/tornado-utils"
 
 const WorldTornadoMap = dynamic(
   () => import("@/components/tornado/world-tornado-map").then(m => m.WorldTornadoMap),
@@ -91,6 +92,8 @@ function TornadoPageInner() {
   const [detail, setDetail] = useState<SevereWeatherDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const detailCacheRef = useRef<Record<string, SevereWeatherDetail>>({})
+  const detailRequestRef = useRef(0)
+  const boundariesRef = useRef<AdminBoundaryCollection | null>(null)
   const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -125,7 +128,12 @@ function TornadoPageInner() {
           return
         }
 
+        if (!boundariesRef.current) {
+          boundariesRef.current = await fetch("/ne_admin1.geojson").then(r => r.json())
+        }
+
         const gridResult = data as GridScanResult
+        gridResult.points = assignPointCountries(gridResult.points, boundariesRef.current.features)
         setGridData(gridResult)
         saveCachedGrid(gridResult)
 
@@ -146,6 +154,7 @@ function TornadoPageInner() {
 
   // Fetch detail when a point is selected
   async function fetchDetail(point: GridPoint) {
+    const requestId = ++detailRequestRef.current
     const cacheKey = `${point.lat},${point.lon}`
     if (detailCacheRef.current[cacheKey]) {
       setDetail(detailCacheRef.current[cacheKey])
@@ -159,19 +168,24 @@ function TornadoPageInner() {
       if (res.ok) {
         const data = await res.json()
         detailCacheRef.current[cacheKey] = data
+        if (detailRequestRef.current !== requestId) return
         setDetail(data)
       }
     } catch (err) {
       console.error("[tornado] Detail fetch failed:", err)
     } finally {
-      setDetailLoading(false)
+      if (detailRequestRef.current === requestId) {
+        setDetailLoading(false)
+      }
     }
   }
 
   const handleCountrySelect = useCallback((iso: string) => {
+    detailRequestRef.current += 1
     setSelectedCountryIso(iso)
     setSelectedPoint(null)
     setDetail(null)
+    setDetailLoading(false)
   }, [])
 
   const handlePointSelect = useCallback((point: GridPoint) => {
@@ -179,10 +193,23 @@ function TornadoPageInner() {
     fetchDetail(point)
   }, [])
 
+  const handlePointsCountryResolve = useCallback((points: GridPoint[]) => {
+    setGridData(prev => {
+      if (!prev || prev.points.length !== points.length) return prev
+      const changed = prev.points.some((point, index) => point.country_iso !== points[index]?.country_iso)
+      if (!changed) return prev
+      const next = { ...prev, points }
+      saveCachedGrid(next)
+      return next
+    })
+  }, [])
+
   const handleBack = useCallback(() => {
     if (selectedPoint) {
+      detailRequestRef.current += 1
       setSelectedPoint(null)
       setDetail(null)
+      setDetailLoading(false)
     } else if (selectedCountryIso) {
       setSelectedCountryIso(null)
     }
@@ -200,6 +227,7 @@ function TornadoPageInner() {
           selectedPoint={selectedPoint}
           onCountrySelect={handleCountrySelect}
           onPointSelect={handlePointSelect}
+          onPointsCountryResolve={handlePointsCountryResolve}
           onBack={handleBack}
           loading={gridLoading}
           detail={detail}

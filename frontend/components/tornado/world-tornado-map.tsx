@@ -18,6 +18,7 @@ export interface GridPoint {
   confidence: number
   wind_gusts_10m: number | null
   weather_code: number | null
+  country_iso?: string | null
 }
 
 export interface GridScanResult {
@@ -112,6 +113,34 @@ function generateForecastCone(point: GridPoint, bearingDeg: number = 45, detail?
   return { polygon: [[lon, lat], ...left, ...right.reverse(), [lon, lat]], centerPath: center }
 }
 
+function getGeometryBbox(geometry: { coordinates?: unknown } | undefined): [number, number, number, number] | null {
+  if (!geometry?.coordinates) return null
+  let west = Infinity
+  let south = Infinity
+  let east = -Infinity
+  let north = -Infinity
+
+  const visit = (coords: unknown) => {
+    if (!Array.isArray(coords)) return
+    if (coords.length >= 2 && typeof coords[0] === "number" && typeof coords[1] === "number") {
+      const lng = coords[0]
+      const lat = coords[1]
+      west = Math.min(west, lng)
+      south = Math.min(south, lat)
+      east = Math.max(east, lng)
+      north = Math.max(north, lat)
+      return
+    }
+    coords.forEach(visit)
+  }
+
+  visit(geometry.coordinates)
+  if (!Number.isFinite(west) || !Number.isFinite(south) || !Number.isFinite(east) || !Number.isFinite(north)) {
+    return null
+  }
+  return [west, south, east, north]
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface SevereWeatherDetail {
@@ -135,20 +164,23 @@ interface Props {
   selectedPoint: GridPoint | null
   onCountrySelect?: (iso: string) => void
   onPointSelect: (point: GridPoint) => void
+  onPointsCountryResolve?: (points: GridPoint[]) => void
   onBack: () => void
   loading: boolean
   detail?: SevereWeatherDetail | null
 }
 
-export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, onCountrySelect, onPointSelect, onBack, loading, detail }: Props) {
+export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, onCountrySelect, onPointSelect, onPointsCountryResolve, onBack, loading, detail }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapboxMap | null>(null)
   const onCountryRef = useRef(onCountrySelect)
   const onPointRef = useRef(onPointSelect)
+  const onPointsCountryResolveRef = useRef(onPointsCountryResolve)
   const onBackRef = useRef(onBack)
   const markersRef = useRef<{ remove: () => void }[]>([])
   const rafRef = useRef<number>(0)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const countryBoundsRef = useRef<Record<string, [number, number, number, number]>>({})
 
   const [mapReady, setMapReady] = useState(false)
   const countryDataRef = useRef<Record<string, { risk: string; points: GridPoint[] }>>({})
@@ -159,8 +191,38 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
 
   useEffect(() => { onCountryRef.current = onCountrySelect }, [onCountrySelect])
   useEffect(() => { onPointRef.current = onPointSelect }, [onPointSelect])
+  useEffect(() => { onPointsCountryResolveRef.current = onPointsCountryResolve }, [onPointsCountryResolve])
   useEffect(() => { onBackRef.current = onBack }, [onBack])
   useEffect(() => { viewModeRef.current = viewMode }, [viewMode])
+
+  const resolvePointCountriesFromRenderedMap = useCallback(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !gridData?.points.length || !map.getLayer("country-fills")) return
+
+    let changed = false
+    const resolved = gridData.points.map(point => {
+      const screenPoint = map.project([point.lon, point.lat])
+      if (
+        screenPoint.x < 0 ||
+        screenPoint.y < 0 ||
+        screenPoint.x > map.getCanvas().clientWidth ||
+        screenPoint.y > map.getCanvas().clientHeight
+      ) {
+        return point
+      }
+
+      const features = map.queryRenderedFeatures(screenPoint, { layers: ["country-fills"] })
+      const iso = features[0]?.properties?.iso_3166_1_alpha_3 as string | undefined
+      if (!iso || iso === point.country_iso) return point
+
+      changed = true
+      return { ...point, country_iso: iso }
+    })
+
+    if (changed) {
+      onPointsCountryResolveRef.current?.(resolved)
+    }
+  }, [gridData, mapReady])
 
   // ── CSS animations ──
   useEffect(() => {
@@ -209,7 +271,7 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
 
       const map = new mapboxgl.Map({
         container: el,
-        style: "mapbox://styles/mapbox/satellite-streets-v12",
+        style: "mapbox://styles/mapbox/dark-v11",
         center: [-20, 20],
         zoom: 2,
         minZoom: 1.5,
@@ -261,7 +323,6 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
           paint: {
             "fill-color": initialColorMatch as never,
             "fill-opacity": 0.75,
-            "fill-antialias": false,
           },
         })
 
@@ -284,17 +345,7 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
           source: "countries",
           "source-layer": "country_boundaries",
           filter: ["==", ["get", "iso_3166_1_alpha_3"], "___"],
-          paint: { "fill-color": "#ffffff", "fill-opacity": 0.85, "fill-antialias": false },
-        })
-
-        // Selected country glow
-        map.addLayer({
-          id: "country-glow",
-          type: "fill",
-          source: "countries",
-          "source-layer": "country_boundaries",
-          filter: ["==", ["get", "iso_3166_1_alpha_3"], "___"],
-          paint: { "fill-color": "#ffffff", "fill-opacity": 0.10, "fill-antialias": false },
+          paint: { "fill-color": "#ffffff", "fill-opacity": 0.85 },
         })
 
         // Selected country border
@@ -393,14 +444,20 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
           const iso = e.features[0].properties?.iso_3166_1_alpha_3 as string
           const info = countryDataRef.current[iso]
           const tEl = tooltipRef.current!
-          if (ISO_NAME[iso]) {
+          const countryName =
+            ISO_NAME[iso] ??
+            (e.features[0].properties?.name_en as string | undefined) ??
+            (e.features[0].properties?.name as string | undefined) ??
+            iso
+
+          if (iso) {
             const color = info ? (RISK_COLOR[info.risk] || "#22c55e") : "#22c55e"
             const labels: Record<string, string> = { LOW: "Bajo", MODERATE: "Moderado", HIGH: "Alto", CRITICAL: "Crítico" }
             const riskLabel = info ? (labels[info.risk] ?? "—") : "Bajo"
             const ptsLen = info ? info.points.length : 0
             
             tEl.innerHTML = `
-              <div style="font-weight:800;font-size:13px;color:#f8fafc;margin-bottom:4px">${ISO_NAME[iso]}</div>
+              <div style="font-weight:800;font-size:13px;color:#f8fafc;margin-bottom:4px">${countryName}</div>
               <div style="display:flex;align-items:center;gap:7px">
                 <div style="width:9px;height:9px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color}"></div>
                 <span style="color:${color};font-weight:700;font-size:11px">${riskLabel}</span>
@@ -427,7 +484,9 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
           if (!e.features?.length) return
           e.originalEvent.stopPropagation()
           const iso = e.features[0].properties?.iso_3166_1_alpha_3 as string
-          if (!iso || !ISO_NAME[iso]) return
+          if (!iso) return
+          const bbox = getGeometryBbox(e.features[0].geometry as { coordinates?: unknown } | undefined)
+          if (bbox) countryBoundsRef.current[iso] = bbox
           if (tooltipRef.current) tooltipRef.current.style.display = "none"
           if (onCountryRef.current) {
             onCountryRef.current(iso)
@@ -501,13 +560,14 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
       }
       try {
         map.setPaintProperty("country-fills", "fill-color", expr as never)
+        map.once("idle", resolvePointCountriesFromRenderedMap)
       } catch (err) {
         console.error("Mapbox paint error on country-fills:", err)
       }
     }
 
     apply()
-  }, [gridData, mapReady])
+  }, [gridData, mapReady, resolvePointCountriesFromRenderedMap])
 
   // ── View mode transitions ──
   useEffect(() => {
@@ -522,7 +582,6 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
       map.setPaintProperty("country-fills", "fill-opacity", 0.75)
       map.setPaintProperty("country-borders", "line-opacity", 1)
       map.setFilter("country-highlight", hide as never)
-      map.setFilter("country-glow", hide as never)
       map.setFilter("country-highlight-border", hide as never)
 
       // Hide points
@@ -547,7 +606,6 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
       map.setPaintProperty("country-highlight", "fill-color", color)
       map.setPaintProperty("country-highlight", "fill-opacity", 1.0)
       map.setFilter("country-highlight", filter as never)
-      map.setFilter("country-glow", filter as never)
       map.setFilter("country-highlight-border", filter as never)
 
       // Show points for this country
@@ -564,13 +622,16 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
         }))
         const src = map.getSource("weather-points") as { setData?: (d: unknown) => void } | undefined
         src?.setData?.({ type: "FeatureCollection", features })
+      } else {
+        const src = map.getSource("weather-points") as { setData?: (d: unknown) => void } | undefined
+        src?.setData?.({ type: "FeatureCollection", features: [] })
       }
 
       clearAllOverlays()
 
       // Zoom to country if coming from world view
       if (!selectedPoint) {
-        const bbox = COUNTRY_BBOX[selectedCountryIso]
+          const bbox = COUNTRY_BBOX[selectedCountryIso] ?? countryBoundsRef.current[selectedCountryIso]
         if (bbox) {
           const [w, s, e, n] = bbox
           const padLng = Math.max((e - w) * 0.15, 2)
@@ -579,10 +640,11 @@ export function WorldTornadoMap({ gridData, selectedCountryIso, selectedPoint, o
             [[w - padLng, s - padLat], [e + padLng, n + padLat]] as LngLatBoundsLike,
             { duration: 1200, padding: { top: 80, bottom: 80, left: 380, right: 380 } }
           )
+          map.once("idle", resolvePointCountriesFromRenderedMap)
         }
       }
     }
-  }, [viewMode, selectedCountryIso, mapReady])
+  }, [viewMode, selectedCountryIso, mapReady, resolvePointCountriesFromRenderedMap])
 
   // ── Selected point (from props) ──
   useEffect(() => {

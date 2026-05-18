@@ -1,5 +1,23 @@
 import type { GridPoint } from "@/components/tornado/world-tornado-map"
 
+export interface AdminBoundaryFeature {
+  type: "Feature"
+  bbox?: [number, number, number, number]
+  properties: {
+    adm0_a3?: string
+    admin?: string
+  }
+  geometry: {
+    type: "Polygon" | "MultiPolygon"
+    coordinates: number[][][] | number[][][][]
+  }
+}
+
+export interface AdminBoundaryCollection {
+  type: "FeatureCollection"
+  features: AdminBoundaryFeature[]
+}
+
 export const RISK_PRIORITY: Record<string, number> = {
   LOW: 1, MODERATE: 2, HIGH: 3, CRITICAL: 4,
 }
@@ -106,12 +124,62 @@ export function findCountryForPoint(lat: number, lon: number): string | null {
   return null
 }
 
+function pointInRing(lat: number, lon: number, ring: number[][]): boolean {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0]
+    const yi = ring[i][1]
+    const xj = ring[j][0]
+    const yj = ring[j][1]
+    const intersects = ((yi > lat) !== (yj > lat)) && (lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi)
+    if (intersects) inside = !inside
+  }
+  return inside
+}
+
+function pointInPolygon(lat: number, lon: number, polygon: number[][][]): boolean {
+  if (!polygon.length || !pointInRing(lat, lon, polygon[0])) return false
+  for (let i = 1; i < polygon.length; i++) {
+    if (pointInRing(lat, lon, polygon[i])) return false
+  }
+  return true
+}
+
+export function findCountryForPointInBoundaries(
+  lat: number,
+  lon: number,
+  boundaries: AdminBoundaryFeature[]
+): string | null {
+  for (const feature of boundaries) {
+    const [w, s, e, n] = feature.bbox ?? [-180, -90, 180, 90]
+    if (lon < w || lon > e || lat < s || lat > n) continue
+
+    const iso = feature.properties.adm0_a3
+    if (!iso) continue
+
+    if (feature.geometry.type === "Polygon") {
+      if (pointInPolygon(lat, lon, feature.geometry.coordinates as number[][][])) return iso
+    } else {
+      const polygons = feature.geometry.coordinates as number[][][][]
+      if (polygons.some(polygon => pointInPolygon(lat, lon, polygon))) return iso
+    }
+  }
+  return null
+}
+
+export function assignPointCountries(points: GridPoint[], boundaries: AdminBoundaryFeature[]): GridPoint[] {
+  return points.map(point => ({
+    ...point,
+    country_iso: findCountryForPointInBoundaries(point.lat, point.lon, boundaries) ?? findCountryForPoint(point.lat, point.lon),
+  }))
+}
+
 export function aggregatePointsByCountry(points: GridPoint[]): Record<string, { risk: string; points: GridPoint[] }> {
   const result: Record<string, { risk: string; points: GridPoint[] }> = {}
   
   // Group points by country
   for (const p of points) {
-    const iso = findCountryForPoint(p.lat, p.lon)
+    const iso = p.country_iso ?? findCountryForPoint(p.lat, p.lon)
     if (!iso) continue
     if (!result[iso]) result[iso] = { risk: "LOW", points: [] }
     result[iso].points.push(p)

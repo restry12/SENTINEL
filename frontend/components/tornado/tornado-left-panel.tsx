@@ -74,7 +74,7 @@ export function TornadoLeftPanel({ gridData, selectedCountryIso, selectedPoint, 
 function GlobalPanel({ gridData, selectedCountryIso, onPointSelect, onBack }: { gridData: GridScanResult | null; selectedCountryIso?: string | null; onPointSelect: (p: GridPoint) => void; onBack: () => void }) {
   const globalPoints = gridData?.points ?? []
   const points = selectedCountryIso 
-    ? globalPoints.filter(p => findCountryForPoint(p.lat, p.lon) === selectedCountryIso)
+    ? globalPoints.filter(p => (p.country_iso ?? findCountryForPoint(p.lat, p.lon)) === selectedCountryIso)
     : globalPoints
 
   const highRisk = points.filter(p => p.risk_level === "HIGH" || p.risk_level === "CRITICAL")
