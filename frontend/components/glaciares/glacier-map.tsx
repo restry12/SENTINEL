@@ -22,7 +22,7 @@ interface Props {
 
 export function GlacierMap({ glaciers, selected, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<MapboxMap | null>(null)
+  const [mapInstance, setMapInstance] = useState<MapboxMap | null>(null)
   const markersRef = useRef<{ remove: () => void }[]>([])
   const onSelectRef = useRef(onSelect)
   const [showBasins, setShowBasins] = useState(true)
@@ -31,14 +31,15 @@ export function GlacierMap({ glaciers, selected, onSelect }: Props) {
 
   useEffect(() => {
     const el = containerRef.current
-    if (!el || mapRef.current) return
+    if (!el) return
     let cancelled = false
+    let map: MapboxMap | null = null
 
     import('mapbox-gl').then(({ default: mapboxgl }) => {
       if (cancelled) return
       mapboxgl.accessToken = TOKEN
 
-      const map = new mapboxgl.Map({
+      map = new mapboxgl.Map({
         container: el,
         style: 'mapbox://styles/mapbox/satellite-streets-v12',
         center: [-71, -38],
@@ -47,9 +48,10 @@ export function GlacierMap({ glaciers, selected, onSelect }: Props) {
         maxZoom: 14,
         attributionControl: false,
       })
-      mapRef.current = map
 
       map.on('style.load', () => {
+        if (cancelled || !map) return
+        
         map.setFog({
           'color': 'rgba(56, 189, 248, 0.1)',
           'high-color': 'rgba(10, 11, 14, 0.9)',
@@ -60,22 +62,25 @@ export function GlacierMap({ glaciers, selected, onSelect }: Props) {
 
         map.getStyle().layers?.forEach(layer => {
           if (layer.type !== 'symbol') return
-          try { map.setPaintProperty(layer.id, 'text-color', '#ffffff') } catch { /* skip */ }
-          try { map.setPaintProperty(layer.id, 'text-halo-color', 'rgba(0,0,0,0.7)') } catch { /* skip */ }
-          try { map.setPaintProperty(layer.id, 'text-halo-width', 1.5) } catch { /* skip */ }
+          try { map?.setPaintProperty(layer.id, 'text-color', '#ffffff') } catch { /* skip */ }
+          try { map?.setPaintProperty(layer.id, 'text-halo-color', 'rgba(0,0,0,0.7)') } catch { /* skip */ }
+          try { map?.setPaintProperty(layer.id, 'text-halo-width', 1.5) } catch { /* skip */ }
         })
+        
+        setMapInstance(map)
       })
     })
 
     return () => {
       cancelled = true
-      mapRef.current?.remove()
-      mapRef.current = null
+      if (map) {
+        map.remove()
+      }
     }
   }, [])
 
   useEffect(() => {
-    const map = mapRef.current
+    const map = mapInstance
     if (!map || glaciers.length === 0) return
 
     const waitForLoad = () => {
@@ -115,17 +120,17 @@ export function GlacierMap({ glaciers, selected, onSelect }: Props) {
     }
 
     waitForLoad()
-  }, [glaciers, selected?.id])
+  }, [glaciers, selected?.id, mapInstance])
 
   useEffect(() => {
-    if (!selected || !mapRef.current) return
-    mapRef.current.flyTo({
+    if (!selected || !mapInstance) return
+    mapInstance.flyTo({
       center: [selected.lon, selected.lat],
       zoom: 9,
       duration: 1800,
       essential: true,
     })
-  }, [selected?.id])
+  }, [selected?.id, mapInstance])
 
   return (
     <div className="absolute inset-0">

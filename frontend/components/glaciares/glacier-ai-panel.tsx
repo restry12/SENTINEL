@@ -66,7 +66,7 @@ export function GlacierAIPanel({ glacier: g, analyzing, onAnalyze }: Props) {
   )
 
   return (
-    <div className="absolute top-6 right-6 z-40 w-72 h-[calc(100vh-120px)] overflow-y-auto scrollbar-none pointer-events-auto">
+    <div className="absolute top-6 right-6 z-40 w-72 max-h-[calc(100vh-360px)] overflow-y-auto scrollbar-none pointer-events-auto">
       <div className="flex flex-col gap-3 pb-4">
         <div className="bg-[#0a0d14]/90 backdrop-blur-xl border border-white/10 rounded-lg p-4 shadow-2xl">
           <div className="flex justify-between items-center mb-3">
