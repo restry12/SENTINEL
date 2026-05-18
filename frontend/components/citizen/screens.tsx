@@ -261,12 +261,15 @@ export function ScreenLocating({ onLocated, onDemo, riskLevel = 'critical' }: Sc
                 if (demoState !== 'idle' || !onDemo) return
                 setDemoState('sending')
                 const result = await onDemo()
-                if (result === 'no_phone') {
+                if (result === 'ok') {
+                  setDemoState('sent')
+                } else if (result === 'no_phone') {
                   setGeoError('Inicia sesión con un número registrado para recibir el SMS de demo.')
                   setDemoState('idle')
-                  return
+                } else {
+                  setGeoError('Error al enviar alerta — revisa la consola.')
+                  setDemoState('idle')
                 }
-                setDemoState('sent')
               }}
               style={{
                 width: '100%', minHeight: 44, borderRadius: 14,
@@ -683,11 +686,11 @@ export function ScreenSafe({ nearestKm, weather, onRefresh, onDemo }: ScreenSafe
               if (demoState !== 'idle') return
               setDemoState('sending')
               const result = await onDemo()
-              if (result === 'no_phone') {
-                setDemoState('error')
-                setTimeout(() => setDemoState('idle'), 3000)
-              } else {
+              if (result === 'ok') {
                 setDemoState('sent')
+              } else {
+                setDemoState('error')
+                setTimeout(() => setDemoState('idle'), 4000)
               }
             }}
             style={{
@@ -702,7 +705,7 @@ export function ScreenSafe({ nearestKm, weather, onRefresh, onDemo }: ScreenSafe
             {demoState === 'idle' && '⚡ DEMO — Simular foco cercano + SMS'}
             {demoState === 'sending' && 'Enviando alerta...'}
             {demoState === 'sent' && '✓ SMS enviado — mostrando alerta'}
-            {demoState === 'error' && 'Inicia sesión con número registrado'}
+            {demoState === 'error' && 'Error — revisa consola del navegador'}
           </button>
         )}
       </div>

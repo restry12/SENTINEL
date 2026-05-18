@@ -155,13 +155,16 @@ export function CitizenApp() {
       if (raw) phone = (JSON.parse(raw) as { phone?: string }).phone
     } catch { /* ignore */ }
     if (!phone) return 'no_phone'
-    try {
-      await fetch('/api/trigger/citizen-demo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, lat: -38.5, lon: -72.0 }),
-      })
-    } catch { /* backend responds via SMS */ }
+    const res = await fetch('/api/trigger/citizen-demo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, lat: userLoc?.lat ?? -38.5, lon: userLoc?.lon ?? -72.0 }),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      console.error('[citizen-demo] webhook failed', res.status, json)
+      return 'webhook_error'
+    }
     const baseLat = userLoc?.lat ?? -38.5
     const baseLon = userLoc?.lon ?? -72.0
     setDemoFire({
