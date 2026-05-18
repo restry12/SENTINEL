@@ -2,7 +2,6 @@ import type { Server, Socket } from 'socket.io'
 import type { StatusPayload, AlertPayload, SentinelUpdate } from '@sentinel/types'
 import type { PollingController } from '../controllers/polling'
 import { runAnalysis } from '../services/orchestrator'
-import { triggerMakeWebhook } from '../services/alert'
 import { acquireLock, releaseLock, isLocked } from '../services/analysis-lock'
 import { saveIncident } from '../services/history'
 import { getLastUpdate, setLastUpdate } from '../services/last-update'
@@ -171,9 +170,6 @@ export async function executeAndBroadcast(io: Server, lat?: number, lon?: number
         timestamp: update.timestamp,
       }
       emitter.emit('alert', alert)
-      const centLat = lat ?? DEFAULT_LAT
-      const centLon = lon ?? DEFAULT_LON
-      await triggerMakeWebhook(update as SentinelUpdate, centLat, centLon)
       alertsSent = true
     }
 
