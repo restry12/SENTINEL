@@ -210,9 +210,9 @@ export async function scanGrid(
       }
     }
 
-    // 300ms between batches to respect Open-Meteo rate limits
+    // 2000ms between batches to respect Open-Meteo rate limits
     if (i + concurrency < points.length) {
-      await new Promise(resolve => setTimeout(resolve, 300))
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
   }
 
