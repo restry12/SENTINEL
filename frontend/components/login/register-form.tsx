@@ -74,7 +74,31 @@ export function RegisterForm() {
 
       if (response.ok && result.ok) {
         toast.success(t('registerSuccessTitle'), { description: t('registerSuccessDesc') })
-        setTimeout(() => router.push('/login'), 1200)
+        
+        // Auto-login after registration
+        try {
+          const loginResponse = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: data.email,
+              password: data.password,
+            }),
+          })
+          const loginResult = await loginResponse.json()
+
+          if (loginResponse.ok && loginResult.ok && loginResult.token) {
+            localStorage.setItem('sentinel_token', loginResult.token)
+            localStorage.setItem('sentinel_user', JSON.stringify(loginResult.user ?? {}))
+            setTimeout(() => router.push('/dashboard'), 1000)
+          } else {
+            // Fallback to manual login if auto-login fails
+            setTimeout(() => router.push('/login'), 1200)
+          }
+        } catch (loginError) {
+          console.error('Auto-login failed:', loginError)
+          setTimeout(() => router.push('/login'), 1200)
+        }
       } else {
         toast.error(t('registerErrorTitle'), {
           description: result.error ?? t('registerErrorDesc'),

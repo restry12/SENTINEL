@@ -98,20 +98,21 @@ export function registerSocketHandlers(io: Server, polling: PollingController): 
           headers: webhookHeaders,
           body: JSON.stringify({
             lat, lon, socketId: socket.id,
-            west: Math.round((lon - 3) * 10) / 10,
-            south: Math.round((lat - 3) * 10) / 10,
-            east: Math.round((lon + 3) * 10) / 10,
-            north: Math.round((lat + 3) * 10) / 10,
+            west:  Math.round((lon - 0.018) * 10000) / 10000,
+            south: Math.round((lat - 0.018) * 10000) / 10000,
+            east:  Math.round((lon + 0.018) * 10000) / 10000,
+            north: Math.round((lat + 0.018) * 10000) / 10000,
           }),
         }).catch((err) => {
           console.error('[trigger-citizen] Make.com webhook call failed:', err)
           socket.emit('status', { state: 'error', message: 'No se pudo iniciar el análisis ciudadano.' } satisfies StatusPayload)
         })
       } else {
-        console.warn('[trigger-citizen] MAKE_CITIZEN_WEBHOOK_URL not set — running degraded analysis')
-        executeAndBroadcast(io, lat, lon, [], undefined, undefined, socket.id).catch((err) => {
-          console.error('[trigger-citizen] fallback analysis error:', err)
-        })
+        // Without Make.com we have no local fires for the citizen's 2 km area.
+        // Calling executeAndBroadcast with empty fires would overwrite last-update and
+        // clear all hotspots for every connected client. Log and no-op instead.
+        console.warn('[trigger-citizen] MAKE_CITIZEN_WEBHOOK_URL not set — citizen analysis unavailable')
+        socket.emit('status', { state: 'ok' } satisfies StatusPayload)
       }
     })
 

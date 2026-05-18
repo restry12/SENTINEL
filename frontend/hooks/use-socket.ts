@@ -283,6 +283,15 @@ export function useSocket() {
     const body: Record<string, unknown> = { lat, lon }
     if (socketId) body.socketId = socketId
 
+    // Pass the registered phone so the backend can send a proximity SMS alert
+    try {
+      const raw = localStorage.getItem('sentinel_user')
+      if (raw) {
+        const user = JSON.parse(raw) as { phone?: string }
+        if (user.phone) body.phone = user.phone
+      }
+    } catch { /* localStorage unavailable — continue without phone */ }
+
     fetch('/api/trigger/citizen-init', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

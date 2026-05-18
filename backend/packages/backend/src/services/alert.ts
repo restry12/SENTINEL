@@ -1,5 +1,7 @@
 import type { SentinelUpdate } from '@sentinel/types'
 
+type ProximityFire = { lat: number; lon: number; frp: number; brightness: number }
+
 function windDegToDir(deg: number): string {
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO']
   return dirs[Math.round(deg / 45) % 8]
@@ -79,5 +81,44 @@ export async function triggerMakeWebhook(update: SentinelUpdate, centroidLat: nu
     }
   } catch (err) {
     console.error('[alert] Make.com webhook error:', err)
+  }
+}
+
+export async function triggerCitizenProximityAlert(
+  phone: string,
+  fire: ProximityFire,
+  distanceKm: number,
+  userLat: number,
+  userLon: number,
+): Promise<void> {
+  const url = process.env.MAKE_WEBHOOK_URL
+  if (!url) return
+
+  const payload = {
+    to: phone,
+    fire_lat: fire.lat,
+    fire_lon: fire.lon,
+    fire_frp_mw: Math.round(fire.frp * 10) / 10,
+    fire_brightness: fire.brightness,
+    distance_km: Math.round(distanceKm * 100) / 100,
+    user_lat: userLat,
+    user_lon: userLon,
+    google_maps_fire_url: `https://maps.google.com/?q=${fire.lat},${fire.lon}`,
+    timestamp: new Date().toISOString(),
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      console.error(`[alert] citizen SMS webhook failed: ${res.status}`)
+    } else {
+      console.log(`[alert] citizen SMS → ${phone} — foco a ${distanceKm.toFixed(2)} km, FRP ${fire.frp} MW`)
+    }
+  } catch (err) {
+    console.error('[alert] citizen SMS webhook error:', err)
   }
 }

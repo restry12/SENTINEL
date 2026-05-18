@@ -10,7 +10,7 @@ import { HotspotSearch } from "@/components/dashboard/hotspot-search"
 
 export function TopBar() {
   const pathname = usePathname()
-  const { lang, toggle, tx } = useLang()
+  const { tx } = useLang()
   const { connected, status, sentinelUpdate } = useSentinel()
   const [time, setTime] = useState<string>("")
 
@@ -145,13 +145,6 @@ export function TopBar() {
           </div>
 
           <div className="h-10 w-[1px] bg-white/10 mx-2" />
-
-          <button
-            onClick={toggle}
-            className="w-12 h-10 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[11px] font-black transition-colors"
-          >
-            {lang.toUpperCase()}
-          </button>
         </div>
         {/* Mobile: status dot + time */}
         <div className="flex md:hidden items-center gap-3 ml-auto">

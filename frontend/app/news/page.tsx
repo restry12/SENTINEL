@@ -178,30 +178,170 @@ function NewsFilters({ activeFilter, setFilter, searchQuery, setSearch }: {
   )
 }
 
-function isFire(title: string) {
+function getArticleCategory(title: string): 'fire' | 'air' | 'water' | 'earth' | 'general' {
   const t = title.toLowerCase()
-  return t.includes('incendio') || t.includes('fuego') || t.includes('quema')
+  if (t.includes('incendio') || t.includes('fuego') || t.includes('quema') || t.includes('fire') || t.includes('calor'))
+    return 'fire'
+  if (t.includes('contaminaci') || t.includes('calidad') || t.includes('aire') || t.includes('smog') || t.includes('air') || t.includes('particul'))
+    return 'air'
+  if (t.includes('lluvia') || t.includes('inundaci') || t.includes('agua') || t.includes('flood') || t.includes('rain') || t.includes('storm'))
+    return 'water'
+  if (t.includes('sismo') || t.includes('terremoto') || t.includes('earthquake') || t.includes('volc'))
+    return 'earth'
+  return 'general'
 }
 
-function articleColor(title: string): string {
-  const t = title.toLowerCase()
-  if (t.includes('incendio') || t.includes('fuego') || t.includes('quema'))
-    return "linear-gradient(135deg, #7f1d1d 0%, #3f0a0a 100%)"
-  if (t.includes('contaminaci') || t.includes('calidad') || t.includes('aire') || t.includes('smog'))
-    return "linear-gradient(135deg, #14532d 0%, #052e10 100%)"
-  if (t.includes('lluvia') || t.includes('inundaci') || t.includes('agua'))
-    return "linear-gradient(135deg, #1e3a5f 0%, #0a1a30 100%)"
-  if (t.includes('sismo') || t.includes('terremoto'))
-    return "linear-gradient(135deg, #4a3000 0%, #1c1000 100%)"
-  return "linear-gradient(135deg, #1e293b 0%, #0a0f1a 100%)"
+const CATEGORY_CONFIG: Record<string, { keywords: string; color: string; accent: string; bg: string; dot: string }> = {
+  fire:    { keywords: 'fire,forest', color: 'rgba(180, 50, 50, 0.25)', accent: 'border-red-900/60', bg: 'bg-red-950/30', dot: '#991b1b' },
+  air:     { keywords: 'nature,city', color: 'rgba(40, 120, 60, 0.2)',  accent: 'border-green-900/60', bg: 'bg-green-950/30', dot: '#166534' },
+  water:   { keywords: 'flood,storm', color: 'rgba(30, 100, 180, 0.2)', accent: 'border-blue-900/60',  bg: 'bg-blue-950/30',  dot: '#1e40af' },
+  earth:   { keywords: 'mountain',    color: 'rgba(180, 100, 40, 0.2)', accent: 'border-orange-900/60', bg: 'bg-orange-950/30', dot: '#9a3412' },
+  general: { keywords: 'tech,news',   color: 'rgba(100, 116, 139, 0.2)', accent: 'border-slate-800',    bg: 'bg-slate-900/30',  dot: '#475569' }
 }
 
 function ArticleImagePlaceholder({ title, className = "" }: { title: string; className?: string }) {
+  const category = getArticleCategory(title)
+  const config = CATEGORY_CONFIG[category]
+  const [imgStatus, setImgStatus] = useState<'loading' | 'loaded' | 'error'>('loading')
+  const [retryAttempt, setRetryAttempt] = useState(0)
+  
+  // Create a more unique lock/seed based on title hash for better variety
+  const hash = useMemo(() => {
+    let h = 0
+    for (let i = 0; i < title.length; i++) {
+      h = (Math.imul(31, h) + title.charCodeAt(i)) | 0
+    }
+    return Math.abs(h)
+  }, [title])
+
+  const urls = [
+    `https://picsum.photos/seed/${hash}/800/600`,
+    `https://loremflickr.com/800/600/${config.keywords.split(',')[0]}?lock=${hash}`,
+    `https://loremflickr.com/800/600/emergency,satellite?lock=${hash + retryAttempt}`,
+    `https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=60&w=800`
+  ]
+
+  const currentUrl = urls[Math.min(retryAttempt, urls.length - 1)]
+
   return (
-    <div
-      className={`w-full h-full ${className}`}
-      style={{ background: articleColor(title) }}
-    />
+    <HUDWrapper title={title} className={`${config.bg} ${className}`}>
+      {/* Fallback CSS Grid Pattern - Always visible base */}
+      <div className="absolute inset-0 opacity-15" 
+           style={{ 
+             backgroundImage: `radial-gradient(${config.dot} 1px, transparent 1px)`, 
+             backgroundSize: '24px 24px' 
+           }} 
+      />
+
+      {/* Background Image */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={currentUrl}
+        alt=""
+        onLoad={() => setImgStatus('loaded')}
+        onError={() => {
+          if (retryAttempt < urls.length - 1) {
+            setRetryAttempt(prev => prev + 1)
+          } else {
+            setImgStatus('error')
+          }
+        }}
+        className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ${
+          imgStatus === 'loaded' ? 'opacity-70 grayscale-[0.2]' : 'opacity-0'
+        } group-hover:scale-110 group-hover:opacity-100`}
+        style={{ zIndex: 1 }}
+      />
+
+      {/* No Signal / Loading Placeholder */}
+      {imgStatus !== 'loaded' && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 z-10">
+          <Zap className={`w-8 h-8 ${config.accent.replace('border-', 'text-')} animate-pulse`} />
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-[8px] font-mono tracking-[0.3em] uppercase opacity-60">
+              {retryAttempt > 0 ? `RE-SCANNING_MODE: ATTEMPT_${retryAttempt}` : 'INITIALIZING_SIGNAL'}
+            </span>
+            <div className="w-24 h-0.5 bg-white/5 overflow-hidden rounded-full">
+               <div className="h-full bg-current animate-progress-scan" style={{ width: '30%' }} />
+            </div>
+          </div>
+        </div>
+      )}
+    </HUDWrapper>
+  )
+}
+
+function HUDWrapper({ 
+  children, 
+  title, 
+  className = ""
+}: { 
+  children: React.ReactNode; 
+  title: string; 
+  className?: string;
+}) {
+  const category = getArticleCategory(title)
+  const config = CATEGORY_CONFIG[category]
+
+  return (
+    <div className={`relative overflow-hidden group border border-white/10 w-full h-full ${className}`}>
+      <style jsx global>{`
+        @keyframes flicker {
+          0% { opacity: 0.8; }
+          5% { opacity: 0.4; }
+          10% { opacity: 0.9; }
+          15% { opacity: 0.3; }
+          25% { opacity: 0.8; }
+          30% { opacity: 1; }
+          70% { opacity: 0.9; }
+          72% { opacity: 0.2; }
+          75% { opacity: 0.9; }
+          100% { opacity: 1; }
+        }
+        @keyframes scan {
+          from { transform: translateX(-100%); }
+          to { transform: translateX(300%); }
+        }
+        .animate-flicker { animation: flicker 3s infinite; }
+        .animate-progress-scan { animation: scan 1.5s infinite ease-in-out; }
+      `}</style>
+      
+      {children}
+      
+      {/* Tonal Overlay */}
+      <div 
+        className="absolute inset-0 pointer-events-none" 
+        style={{ 
+          background: `linear-gradient(to top, rgba(0,0,0,0.8), ${config.color})`,
+          zIndex: 5
+        }} 
+      />
+
+      {/* Scanlines Effect */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.1] z-10" 
+           style={{ 
+             backgroundImage: 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.08), rgba(0, 255, 0, 0.04), rgba(0, 0, 255, 0.08))', 
+             backgroundSize: '100% 4px, 4px 100%',
+           }} />
+
+      {/* HUD Brackets */}
+      <div className="absolute inset-4 border border-white/5 pointer-events-none z-20 animate-flicker">
+        {/* Corners */}
+        <div className={`absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 ${config.accent}/80`} />
+        <div className={`absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 ${config.accent}/80`} />
+        <div className={`absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 ${config.accent}/80`} />
+        <div className={`absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 ${config.accent}/80`} />
+        
+        {/* Data readout mockups */}
+        <div className="absolute top-2 left-2 flex flex-col gap-0.5 opacity-60">
+          <div className="w-10 h-[1px] bg-white/60" />
+          <div className="w-6 h-[1px] bg-white/40" />
+        </div>
+        <div className="absolute bottom-2 right-2 text-[7px] font-mono text-white/50 uppercase tracking-tighter text-right leading-tight">
+          SCAN_MODE: ACTIVE<br />
+          STNL_RES_L1
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -209,27 +349,30 @@ function FeaturedCard({ article, loading }: { article?: NewsArticle, loading: bo
   if (loading) return <div className="w-full h-80 rounded-2xl border border-white/5 bg-surface/30 animate-pulse" />
   if (!article) return null
 
-  const variant = article.title.toLowerCase().includes('incendio') ? 'orange' : 'blue'
+  const category = getArticleCategory(article.title)
+  const variant = category === 'fire' ? 'orange' : (category === 'water' ? 'blue' : 'default')
 
   return (
-    <div className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0b0e/40] backdrop-blur-2xl transition-all duration-500 hover:border-orange/30">
+    <div className="group relative w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0a0b0e]/40 backdrop-blur-2xl transition-all duration-500 hover:border-orange/30">
       <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-orange/40 to-transparent opacity-50" />
       
       <div className="flex flex-col lg:flex-row h-full">
         {/* Visual Side */}
-        <div className="w-full lg:w-2/5 h-64 lg:h-auto relative bg-surface/40 overflow-hidden">
+        <div className="w-full lg:w-2/5 h-64 lg:h-auto relative bg-black overflow-hidden">
           {article.imageUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={article.imageUrl}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-80 group-hover:opacity-100"
-            />
+            <HUDWrapper title={article.title} className="absolute inset-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={article.imageUrl}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000 opacity-90 group-hover:opacity-100"
+              />
+            </HUDWrapper>
           ) : (
             <ArticleImagePlaceholder title={article.title} className="absolute inset-0" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#04050a]/60" />
-          <div className="absolute top-4 left-4 flex gap-1">
+          
+          <div className="absolute top-4 left-4 flex gap-1 z-40">
             <div className="w-1 h-1 rounded-full bg-orange" />
             <div className="w-1 h-1 rounded-full bg-orange/40" />
             <div className="w-1 h-1 rounded-full bg-orange/20" />
@@ -282,21 +425,23 @@ function ArticleCard({ article }: { article: NewsArticle }) {
       {/* Article image */}
       <div className="w-full h-36 relative overflow-hidden shrink-0">
         {article.imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={article.imageUrl}
-            alt=""
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
-          />
+          <HUDWrapper title={article.title} className="w-full h-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={article.imageUrl}
+              alt=""
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-80 group-hover:opacity-100"
+            />
+          </HUDWrapper>
         ) : (
           <ArticleImagePlaceholder title={article.title} />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#04050a]/80 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#04050a]/80 to-transparent pointer-events-none z-30" />
       </div>
 
       <div className="flex flex-col p-6 flex-1">
       <div className="flex items-start justify-between gap-4 mb-5">
-        <Badge variant={isFire(article.title) ? 'orange' : 'default'}>{article.source}</Badge>
+        <Badge variant={getArticleCategory(article.title) === 'fire' ? 'orange' : 'default'}>{article.source}</Badge>
         <div className="flex items-center gap-1.5 text-[9px] font-bold text-text-dim uppercase tracking-wider">
           <Clock className="w-3 h-3" />
           {formatRelativeTime(article.publishedAt)}
@@ -479,8 +624,8 @@ function NewsContent() {
                            a.snippet.toLowerCase().includes(search.toLowerCase())
       
       if (filter === 'Todo') return matchesSearch
-      if (filter === 'Incendios') return matchesSearch && (a.title.toLowerCase().includes('incendio') || a.title.toLowerCase().includes('fuego'))
-      if (filter === 'Calidad del aire') return matchesSearch && (a.title.toLowerCase().includes('aire') || a.title.toLowerCase().includes('contaminación') || a.title.toLowerCase().includes('calidad'))
+      if (filter === 'Incendios') return matchesSearch && getArticleCategory(a.title) === 'fire'
+      if (filter === 'Calidad del aire') return matchesSearch && getArticleCategory(a.title) === 'air'
       if (filter === 'Chile') return matchesSearch && a.title.toLowerCase().includes('chile')
       return matchesSearch
     })

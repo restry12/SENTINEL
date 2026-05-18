@@ -283,14 +283,34 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
 
 // ── Screen 02: Alert + Escape Route ───────────────────────────────────────
 
+function degreesToCardinal(deg: number): string {
+  const dirs = ['N', 'N-E', 'E', 'S-E', 'S', 'S-O', 'O', 'N-O']
+  return dirs[Math.round(deg / 45) % 8]
+}
+
 interface ScreenAlertProps {
   riskLevel?: ScreenRisk
   route: NaturalRoute
   user: { lat: number; lon: number; accuracy_m: number; heading_deg: number }
   fires: { id: string; lat: number; lon: number; frp: number; dist_km: number }[]
   expansion: { direccion_principal_deg: number; velocidad_propagacion_kmh: number }
+  weather: { wind_speed_kmh: number; wind_dir_deg: number; humidity_pct: number; temp_c: number }
   onCompass?: () => void
   onTrapped?: () => void
+}
+
+function formatCoords(lat: number, lon: number): string {
+  const latDir = lat >= 0 ? 'N' : 'S'
+  const lonDir = lon >= 0 ? 'E' : 'O'
+  const aLat = Math.abs(lat)
+  const aLon = Math.abs(lon)
+  const deg = Math.floor(aLat)
+  const min = Math.floor((aLat % 1) * 60)
+  const sec = Math.floor(((aLat % 1) * 60 % 1) * 60)
+  const ldeg = Math.floor(aLon)
+  const lmin = Math.floor((aLon % 1) * 60)
+  const lsec = Math.floor(((aLon % 1) * 60 % 1) * 60)
+  return `${deg}°${min}'${sec}"${latDir} · ${ldeg}°${lmin}'${lsec}"${lonDir}`
 }
 
 export function ScreenAlert({ riskLevel = 'critical', route, user, fires, expansion, onCompass, onTrapped }: ScreenAlertProps) {
@@ -316,7 +336,7 @@ export function ScreenAlert({ riskLevel = 'critical', route, user, fires, expans
           fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em',
           background: 'rgba(10,10,10,0.55)', padding: '3px 7px', borderRadius: 4,
         }}>
-          36°49&apos;27&quot;S · 73°02&apos;59&quot;O
+          {formatCoords(user.lat, user.lon)}
         </div>
         <div style={{
           position: 'absolute', bottom: 8, right: 10,
@@ -352,12 +372,20 @@ export function ScreenAlert({ riskLevel = 'critical', route, user, fires, expans
             <span style={{ color: 'var(--text-dim)', marginLeft: 2 }}>min</span>
           </span>
           <span className="font-mono" style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.1em' }}>
-            RUMBO {String(Math.round(route.bearing_deg)).padStart(3, '0')}° · N-E
+            RUMBO {String(Math.round(route.bearing_deg)).padStart(3, '0')}° · {degreesToCardinal(route.bearing_deg)}
           </span>
         </div>
-        <div className="font-mono" style={{ marginTop: 10, fontSize: 10.5, letterSpacing: '0.08em', color: 'var(--safe)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--safe)' }} />
-          RUTA LIBRE · CONTRA EL VIENTO
+        <div className="font-mono" style={{ 
+          marginTop: 10, fontSize: 10.5, letterSpacing: '0.08em', 
+          color: route.estado === 'LIBRE' ? 'var(--safe)' : 'var(--critical)', 
+          display: 'flex', alignItems: 'center', gap: 6 
+        }}>
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: route.estado === 'LIBRE' ? 'var(--safe)' : 'var(--critical)' }} />
+          {route.estado === 'LIBRE' ? 'RUTA LIBRE' : 'RUTA BLOQUEADA'} · {
+            Math.abs((route.bearing_deg - weather.wind_dir_deg + 360) % 360 - 180) < 45 
+              ? 'A FAVOR DEL VIENTO' 
+              : 'CONTRA EL VIENTO'
+          }
         </div>
       </div>
 
@@ -655,11 +683,14 @@ function ResponderRow({ label, meta, state }: ResponderRowProps) {
   )
 }
 
-interface ScreenTrappedLiveProps { onRecall?: () => void }
+interface ScreenTrappedLiveProps {
+  onRecall?: () => void
+  user: { lat: number; lon: number }
+}
 
-export function ScreenTrappedLive({ onRecall }: ScreenTrappedLiveProps) {
+export function ScreenTrappedLive({ onRecall, user }: ScreenTrappedLiveProps) {
   const [elapsed, setElapsed] = useState(8)
-  const [coords, setCoords] = useState({ lat: -36.82412, lon: -73.04985 })
+  const [coords, setCoords] = useState({ lat: user.lat, lon: user.lon })
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -729,9 +760,9 @@ export function ScreenTrappedLive({ onRecall }: ScreenTrappedLiveProps) {
 
       {/* Responders */}
       <div style={{ margin: '12px 22px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <ResponderRow label="CONAF · Patrulla Concepción"  meta="ETA 12 min" state="dispatched" />
-        <ResponderRow label="Bomberos · Cía. Talcahuano 4" meta="EN CAMINO"   state="enroute" />
-        <ResponderRow label="Carabineros · 4ta Comisaría"  meta="NOTIFICADOS" state="ack" />
+        <ResponderRow label="Unidad de Emergencia Local"  meta="ETA 12 min" state="dispatched" />
+        <ResponderRow label="Cuerpo de Bomberos" meta="EN CAMINO"   state="enroute" />
+        <ResponderRow label="Policía Local"  meta="NOTIFICADOS" state="ack" />
       </div>
 
       {/* Stats */}

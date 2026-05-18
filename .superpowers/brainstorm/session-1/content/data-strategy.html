@@ -1,0 +1,26 @@
+<h2>Estrategia de Datos y Rendimiento</h2>
+<p class="subtitle">Queremos "todos los glaciares posibles", pero cada análisis requiere datos históricos y climáticos.</p>
+
+<div class="options">
+  <div class="option" data-choice="pre-calculated" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Pre-calculado (Más rápido)</h3>
+      <p>Procesamos los datos de Copernicus para una lista extensa (ej. 500-1000 glaciares) y guardamos el riesgo base. El mapa carga instantáneamente.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="on-the-fly" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>En tiempo real (Más actual)</h3>
+      <p>Calculamos todo al hacer clic. Permite seleccionar CUALQUIER punto, pero puede tardar 5-10s por las llamadas a APIs externas.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Híbrido (Recomendado)</h3>
+      <p>Mapa de calor pre-calculado para visión global rápida. Al seleccionar un glaciar específico, se disparan los datos climáticos en vivo para la predicción final.</p>
+    </div>
+  </div>
+</div>

@@ -189,6 +189,7 @@ export interface NaturalRoutes {
   rutas: NaturalRoute[]
   punto_encuentro_principal: string
   mensaje_alerta: string
+  weather?: WeatherData // Local weather for the citizen
 }
 
 export interface RoutesResult {
@@ -234,6 +235,80 @@ export interface RegionDetail {
   explicacion: string                    // Mistral
   recomendaciones: string[]              // Mistral
   prioridad: 'baja' | 'media' | 'alta' | 'critica'
+}
+
+// ─── Severe Weather Agent types ─────────────────────────────────────────────
+
+export interface SevereWeatherAlert {
+  event: string
+  severity: string
+  urgency: string
+  headline: string
+  area_description: string
+  effective: string
+  expires: string
+  geometry: Record<string, unknown> | null
+}
+
+export interface SevereWeatherImpactCorridor {
+  direction_label: string
+  bearing_degrees: number
+  estimated_distance_km_1h: number
+  estimated_distance_km_3h: number
+  estimated_distance_km_6h: number
+  explanation: string
+}
+
+export interface SevereWeatherVariables {
+  temperature_2m?: number | null
+  relative_humidity_2m?: number | null
+  surface_pressure?: number | null
+  precipitation?: number | null
+  rain?: number | null
+  showers?: number | null
+  weather_code?: number | null
+  cloud_cover?: number | null
+  wind_speed_10m?: number | null
+  wind_direction_10m?: number | null
+  wind_gusts_10m?: number | null
+  wind_speed_80m?: number | null
+  wind_direction_80m?: number | null
+  wind_speed_120m?: number | null
+  wind_direction_120m?: number | null
+}
+
+export interface SevereWeatherForecastRisk {
+  window: 'Now' | '+1h' | '+3h' | '+6h'
+  timestamp: string
+  score: number
+  risk_level: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL'
+  variables: SevereWeatherVariables
+  drivers: string[]
+  confidence: number
+  impact_corridor: SevereWeatherImpactCorridor
+}
+
+export interface SevereWeatherMistralAnalysis {
+  risk_summary: string
+  technical_explanation: string
+  citizen_alert_160_chars: string
+  municipal_briefing: string
+  recommended_actions: string[]
+  shelter_guidance: string
+  uncertainty_note: string
+}
+
+export interface SevereWeatherResponse {
+  demo?: boolean
+  location: { lat: number; lon: number }
+  sources: {
+    forecast: string
+    active_alerts: string
+  }
+  limitations: string[]
+  active_alerts: SevereWeatherAlert[]
+  forecast_risk: SevereWeatherForecastRisk[]
+  mistral_analysis: SevereWeatherMistralAnalysis
 }
 
 // Agent contract — POST /analyze

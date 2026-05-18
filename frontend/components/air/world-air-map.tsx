@@ -123,10 +123,10 @@ export function WorldAirMap({ countryData, selectedCountry, onCountrySelect }: P
       const map = new mapboxgl.Map({
         container: el,
         style:  "mapbox://styles/mapbox/satellite-streets-v12",
-        center: [15, 15],
-        zoom:   1.8,
-        minZoom: 1,
-        maxZoom: 14,
+        center: [-20, 20],
+        zoom:   2,
+        minZoom: 1.5,
+        maxZoom: 12,
         projection: "globe" as never,
         attributionControl: false,
       })
@@ -134,11 +134,11 @@ export function WorldAirMap({ countryData, selectedCountry, onCountrySelect }: P
 
       map.on("style.load", () => {
         map.setFog({
-          "color":          "rgba(56, 189, 248, 0.15)",
-          "high-color":     "rgba(10, 11, 14, 0.8)",
-          "horizon-blend":  0.2,
+          "color":          "rgba(56, 189, 248, 0.12)",
+          "high-color":     "rgba(10, 11, 14, 0.85)",
+          "horizon-blend":  0.15,
           "space-color":    "rgb(2, 2, 5)",
-          "star-intensity": 0.9,
+          "star-intensity": 0.8,
         } as never)
       })
 
@@ -333,7 +333,7 @@ export function WorldAirMap({ countryData, selectedCountry, onCountrySelect }: P
         map.setFilter("country-selected-glow",   hideFilter as never)
         map.setFilter("country-selected-border", hideFilter as never)
 
-        map.flyTo({ center: [center.lng, center.lat], zoom: 1.8, duration: 1200 })
+        map.flyTo({ center: [center.lng, center.lat], zoom: 2, duration: 1200 })
       }
     }
 

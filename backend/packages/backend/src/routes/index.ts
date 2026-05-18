@@ -2,21 +2,53 @@ import type { Express } from 'express'
 import type { Server } from 'socket.io'
 import type { PollingController } from '../controllers/polling'
 import { rateLimit } from 'express-rate-limit'
+import { randomUUID } from 'crypto'
 import { executeAndBroadcast } from '../socket/handlers'
 import { parseFirmsCSV } from '../utils/parseFirmsCSV'
 import { dedupeFires } from '../utils/dedupeFires'
 import { mapRawFiresToFireData } from '../utils/mapRawFires'
 import { storeRun, getRun } from '../services/run-cache'
+import { triggerCitizenProximityAlert } from '../services/alert'
 import { mergeEnriched } from '../utils/mergeEnriched'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
 import { fetchRiskGrid, fetchCellDetail } from '../services/prediction-proxy'
-import type { RiskCategory, RiskFactors } from '@sentinel/types'
+import type { RiskCategory, RiskFactors, FireData } from '@sentinel/types'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
 
 const ENRICH_LIMIT = 50
+
+// Citizen session store: one UUID per user per citizen flow invocation.
+// citizen-init creates the entry with socketId; citizen-filter adds the nearby fires.
+// citizen callback reads both and cleans up. Concurrent users never collide.
+const CITIZEN_SESSION_TTL_MS = 10 * 60 * 1000
+const citizenSessions = new Map<string, { socketId?: string; fires?: FireData[]; phone?: string; createdAt: number }>()
+
+function sweep(): void {
+  const now = Date.now()
+  for (const [k, v] of citizenSessions) {
+    if (now - v.createdAt > CITIZEN_SESSION_TTL_MS) citizenSessions.delete(k)
+  }
+}
+
+function setCitizenSession(sessionId: string, patch: { socketId?: string; fires?: FireData[]; phone?: string }): void {
+  sweep()
+  const existing = citizenSessions.get(sessionId)
+  citizenSessions.set(sessionId, { ...existing, ...patch, createdAt: existing?.createdAt ?? Date.now() })
+}
+
+function popCitizenSession(sessionId: string): { socketId?: string; fires?: FireData[]; phone?: string } | undefined {
+  const entry = citizenSessions.get(sessionId)
+  if (!entry) return undefined
+  if (Date.now() - entry.createdAt > CITIZEN_SESSION_TTL_MS) {
+    citizenSessions.delete(sessionId)
+    return undefined
+  }
+  citizenSessions.delete(sessionId)
+  return entry
+}
 
 type RawCitizenBody = { fires?: unknown; lat?: unknown; lon?: unknown; socketId?: unknown }
 
@@ -159,6 +191,36 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     })
   })
 
+  // POST /api/fires/citizen-filter — filtra el CSV de NASA a ≤2 km del usuario y guarda los
+  // focos en la sesión ciudadana. Make.com módulo 3:
+  //   POST /api/fires/citizen-filter?lat={{1.lat}}&lon={{1.lon}}&sessionId={{1.citizenSessionId}}
+  //   body: text/plain → {{2.data}}   (no necesita parsear la respuesta)
+  app.post('/api/fires/citizen-filter', (req, res) => {
+    const userLat = parseFloat(req.query.lat as string)
+    const userLon = parseFloat(req.query.lon as string)
+    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined
+
+    if (!isFinite(userLat) || !isFinite(userLon)) {
+      res.status(400).json({ ok: false, error: 'lat and lon query params required' })
+      return
+    }
+
+    const csv = typeof req.body === 'string' ? req.body : ''
+    const all = csv ? parseFirmsCSV(csv) : []
+    const deduped = dedupeFires(all)
+
+    const nearby = deduped.filter(f => {
+      const dLat = (f.lat - userLat) * Math.PI / 180
+      const dLon = (f.lon - userLon) * Math.PI / 180
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(userLat * Math.PI / 180) * Math.cos(f.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+      return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= 2
+    })
+
+    if (sessionId) setCitizenSession(sessionId, { fires: nearby })
+    res.json({ ok: true, total: all.length, nearby: nearby.length })
+  })
+
   // POST /api/trigger/full — recibe fires[] de Make.com (rate limited)
   // Cada fire trae: { lat, lon, frp, brightness, speed, deg, humidity, date, pm25 }
   app.post('/api/trigger/full', triggerLimiter, async (req, res) => {
@@ -201,36 +263,44 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       res.status(429).json({ ok: false, error: 'Analysis in progress — try again shortly' })
       return
     }
-    const body = req.body as { lat?: unknown; lon?: unknown; socketId?: unknown }
+    const body = req.body as { lat?: unknown; lon?: unknown; socketId?: unknown; phone?: unknown }
     const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
     const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
+    const phone = typeof body.phone === 'string' && body.phone.startsWith('+') ? body.phone : undefined
 
     if (lat === undefined || lon === undefined) {
       res.status(400).json({ ok: false, error: 'lat and lon required' })
       return
     }
 
+    const citizenSessionId = randomUUID()
+    setCitizenSession(citizenSessionId, { socketId, phone })
+
     const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
     if (citizenWebhookUrl) {
       const webhookHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
       const secret = process.env.MAKE_CITIZEN_WEBHOOK_SECRET
-      if (secret) webhookHeaders['x-make-apikey'] = secret
+      if (secret) {
+        webhookHeaders['x-make-apikey'] = secret
+      }
       fetch(citizenWebhookUrl, {
         method: 'POST',
         headers: webhookHeaders,
         body: JSON.stringify({
           lat, lon,
-          ...(socketId ? { socketId } : {}),
-          west:  Math.round((lon - 3) * 10) / 10,
-          south: Math.round((lat - 3) * 10) / 10,
-          east:  Math.round((lon + 3) * 10) / 10,
-          north: Math.round((lat + 3) * 10) / 10,
+          citizenSessionId,
+          west:  Math.round((lon - 0.018) * 10000) / 10000,
+          south: Math.round((lat - 0.018) * 10000) / 10000,
+          east:  Math.round((lon + 0.018) * 10000) / 10000,
+          north: Math.round((lat + 0.018) * 10000) / 10000,
         }),
       }).catch((err) => console.error('[citizen-init] webhook error:', err instanceof Error ? err.message : err))
-    } else {
-      console.warn('[citizen-init] MAKE_CITIZEN_WEBHOOK_URL not set — running degraded analysis')
-      executeAndBroadcast(io, lat, lon, [], undefined, undefined, socketId).catch(console.error)
+    }
+ else {
+      // Without Make.com we have no local fires — the citizen flow needs fresh NASA data.
+      // Log and no-op; the frontend /api/citizen-routes endpoint handles stale-fire filtering.
+      console.warn('[citizen-init] MAKE_CITIZEN_WEBHOOK_URL not set — citizen analysis unavailable')
     }
 
     res.status(202).json({ ok: true, accepted: true })
@@ -258,8 +328,25 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     }
 
     const last = getLastUpdate()
-    const fires = last?.fires ?? []
+    const allFires = last?.fires ?? []
     const weather = last?.weather ?? { speed: 0, deg: 0 }
+
+    // Exclude fires from unrelated regions — only keep fires within 300 km of the user.
+    // The last analysis may cover a different area (e.g. southern Chile) if Make.com's
+    // citizen webhook hasn't responded yet, which would produce nonsensical distances.
+    const MAX_FIRE_RADIUS_KM = 2
+    const fires = allFires.filter((f) => {
+      const dLat = (f.lat - userLat) * Math.PI / 180
+      const dLon = (f.lon - userLon) * Math.PI / 180
+      const a = Math.sin(dLat / 2) ** 2
+        + Math.cos(userLat * Math.PI / 180) * Math.cos(f.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+      return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= MAX_FIRE_RADIUS_KM
+    })
+
+    if (fires.length === 0) {
+      console.warn(`[citizen-routes] no fires within ${MAX_FIRE_RADIUS_KM} km of user (${allFires.length} total in last update) — Make.com webhook likely still in flight`)
+      return
+    }
 
     try {
       const response = await fetch(`${agentRoutesUrl}/analyze/citizen`, {
@@ -286,44 +373,88 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   })
 
   // POST /api/trigger/citizen — Make.com citizen scenario callback (rate limited)
-  // Receives { runId, socketId, lat, lon, weather, pm25 }
-  // runId references fires cached by /api/fires/filter; weather and pm25 at citizen's location
+  // Receives { fires, socketId, lat, lon } — fires are already local to the user's 2 km bbox.
+  // Does NOT run executeAndBroadcast (that would overwrite the global last-update and clear
+  // all hotspots for every connected client). Only computes escape routes and emits
+  // citizen-routes to the requesting socket.
   app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
-    if (isLocked()) {
-      res.status(202).json({ ok: false, accepted: false, error: 'Analysis in progress — try again shortly' })
-      return
-    }
-
     const body = req.body as {
-      runId?: unknown
-      fires?: unknown
-      socketId?: unknown
+      citizenSessionId?: unknown
       lat?: unknown
       lon?: unknown
       weather?: unknown
       pm25?: unknown
     }
 
-    // socketId optional — if present, result targets that socket; otherwise broadcasts to all
-    const socketId = typeof body.socketId === 'string' && body.socketId.length > 0 ? body.socketId : undefined
-
-    const runId = typeof body.runId === 'string' ? body.runId : undefined
-    const cachedFires = runId ? (getRun(runId) ?? []) : []
-    const rawFires = cachedFires.length > 0
-      ? cachedFires
-      : Array.isArray(body.fires) ? body.fires as Record<string, unknown>[] : []
-
     const lat = typeof body.lat === 'number' && isFinite(body.lat) ? body.lat : undefined
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
-    const pm25 = typeof body.pm25 === 'number' ? body.pm25 : undefined
-    const weather = body.weather ?? undefined
 
-    const enriched = mapRawFiresToFireData(rawFires as Record<string, unknown>[])
+    const citizenSessionId = typeof body.citizenSessionId === 'string' ? body.citizenSessionId : undefined
+    const session = citizenSessionId ? popCitizenSession(citizenSessionId) : undefined
+    const socketId = session?.socketId
+    const nearbyFires = session?.fires ?? []
+    const userPhone = session?.phone
 
-    res.status(202).json({ ok: true, accepted: true, fires: enriched.length })
+    res.status(202).json({ ok: true, accepted: true, fires: nearbyFires.length })
 
-    executeAndBroadcast(io, lat, lon, enriched, weather, pm25, socketId ?? undefined).catch((err) => {
-      console.error('[trigger/citizen] background analysis error:', err instanceof Error ? err.message : err)
+    if (!lat || !lon || nearbyFires.length === 0) {
+      return
+    }
+
+    // SMS proximity alert — find the most dangerous fire within 1 km and notify the user
+    if (userPhone) {
+      const candidates = nearbyFires
+        .map(f => {
+          const dLat = (f.lat - lat) * Math.PI / 180
+          const dLon = (f.lon - lon) * Math.PI / 180
+          const a = Math.sin(dLat / 2) ** 2
+            + Math.cos(lat * Math.PI / 180) * Math.cos(f.lat * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+          return { fire: f, km: 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) }
+        })
+        .filter(x => x.km <= 1)
+        .sort((a, b) => b.fire.frp - a.fire.frp)
+
+      if (candidates.length > 0) {
+        const { fire, km } = candidates[0]
+        triggerCitizenProximityAlert(userPhone, fire, km, lat, lon).catch(err =>
+          console.error('[trigger/citizen] SMS alert error:', err instanceof Error ? err.message : err)
+        )
+      }
+    }
+
+    const agentRoutesUrlCitizen = process.env.AGENT_ROUTES_URL
+    if (!agentRoutesUrlCitizen) return
+
+    const bodyWeather = body.weather as { speed?: number; deg?: number } | undefined
+    const fallbackWeather = getLastUpdate()?.weather ?? { speed: 0, deg: 0 }
+    const windSpeedMs = bodyWeather?.speed ?? fallbackWeather.speed ?? 0
+    const windDirDeg = bodyWeather?.deg ?? fallbackWeather.deg ?? 0
+
+    ;(async () => {
+      try {
+        const response = await fetch(`${agentRoutesUrlCitizen}/analyze/citizen`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userLat: lat,
+            userLon: lon,
+            fires: nearbyFires as unknown[],
+            weather: {
+              wind_speed_kmh: Math.round(windSpeedMs * 3.6),
+              wind_dir_deg: windDirDeg,
+            },
+          }),
+        })
+        const data = await response.json() as { success: boolean; data: unknown }
+        if (data.success) {
+          const emitter = socketId ? io.to(socketId) : io
+          emitter.emit('citizen-routes', data.data)
+        }
+      } catch (err) {
+        console.error('[trigger/citizen] citizen-routes call failed:', err instanceof Error ? err.message : err)
+      }
+    })().catch((err) => {
+      console.error('[trigger/citizen] background error:', err instanceof Error ? err.message : err)
     })
   })
 
