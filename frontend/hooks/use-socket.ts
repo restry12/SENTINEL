@@ -91,6 +91,7 @@ export interface NaturalRoute {
   instrucciones: string
   estado: "LIBRE" | "CONGESTIONADA" | "BLOQUEADA"
   prioridad: 1 | 2 | 3
+  bearing_deg?: number
 }
 
 export interface NaturalRoutes {
@@ -213,7 +214,26 @@ export function useSocket() {
   const [sentinelUpdate, setSentinelUpdate] = useState<SentinelUpdate | null>(null)
   const [status, setStatus] = useState<SocketStatus>({ state: "idle" })
   const [connected, setConnected] = useState(false)
+  const [citizenRoutes, setCitizenRoutes] = useState<NaturalRoutes | null>(null)
   const socketRef = useRef<Socket | null>(null)
+
+  const hydrate = useCallback(async (retries = 3): Promise<boolean> => {
+    try {
+      const r = await fetch("/api/last")
+      const d = await r.json()
+      if (d?.ok && d.update) {
+        setSentinelUpdate(d.update as SentinelUpdate)
+        cacheUpdate(d.update as SentinelUpdate)
+        setStatus({ state: "ok" })
+        return true
+      }
+    } catch {
+      if (retries > 0) {
+        setTimeout(() => hydrate(retries - 1), 2000)
+      }
+    }
+    return false
+  }, [])
 
   useEffect(() => {
     // 1. Instant paint from the browser's own cache of the last analysis.
@@ -224,24 +244,6 @@ export function useSocket() {
     }
 
     // 2. Hydrate from the backend's last snapshot (covers a fresh browser).
-    const hydrate = async (retries = 3) => {
-      try {
-        const r = await fetch("/api/last")
-        const d = await r.json()
-        if (d?.ok && d.update) {
-          setSentinelUpdate(d.update as SentinelUpdate)
-          cacheUpdate(d.update as SentinelUpdate)
-          setStatus({ state: "ok" })
-          return true
-        }
-      } catch (e) {
-        if (retries > 0) {
-          setTimeout(() => hydrate(retries - 1), 2000)
-        }
-      }
-      return false
-    }
-
     hydrate()
 
     const url = process.env.NEXT_PUBLIC_SOCKET_URL ?? "http://localhost:3000"
@@ -256,6 +258,10 @@ export function useSocket() {
       cacheUpdate(data)
     })
 
+    socket.on("citizen-routes", (data: { routes: unknown[]; naturalRoutes: NaturalRoutes | null }) => {
+      if (data.naturalRoutes) setCitizenRoutes(data.naturalRoutes)
+    })
+
     socket.on("status", (s: { state: "loading" | "ok" | "error"; message?: string }) =>
       setStatus(s)
     )
@@ -264,15 +270,37 @@ export function useSocket() {
       socket.disconnect()
       socketRef.current = null
     }
-  }, [])
+  }, [hydrate])
 
   const trigger = useCallback((lat?: number, lon?: number) => {
     socketRef.current?.emit("trigger", { lat, lon })
   }, [])
 
   const triggerCitizen = useCallback((lat: number, lon: number) => {
-    socketRef.current?.emit("trigger-citizen", { lat, lon })
+    setCitizenRoutes(null)
+
+    const socketId = socketRef.current?.id ?? null
+    const body: Record<string, unknown> = { lat, lon }
+    if (socketId) body.socketId = socketId
+
+    fetch('/api/trigger/citizen-init', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).catch((err) => console.error('[triggerCitizen] HTTP trigger failed:', err))
+
+    if (socketId) {
+      fetch('/api/citizen-routes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userLat: lat, userLon: lon, socketId }),
+      }).catch((err) => console.error('[triggerCitizen] citizen-routes failed:', err))
+    } else {
+      console.warn('[triggerCitizen] no socketId — citizen-routes request skipped')
+    }
   }, [])
 
-  return { sentinelUpdate, status, connected, trigger, triggerCitizen }
+  const refresh = useCallback(() => { hydrate() }, [hydrate])
+
+  return { sentinelUpdate, status, connected, trigger, triggerCitizen, refresh, citizenRoutes }
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, type ReactNode } from "react"
-import { useSocket, type SentinelUpdate, type SocketStatus } from "@/hooks/use-socket"
+import { useSocket, type SentinelUpdate, type SocketStatus, type NaturalRoutes } from "@/hooks/use-socket"
 
 interface SentinelContextValue {
   sentinelUpdate: SentinelUpdate | null
@@ -9,6 +9,8 @@ interface SentinelContextValue {
   connected: boolean
   trigger: (lat?: number, lon?: number) => void
   triggerCitizen: (lat: number, lon: number) => void
+  refresh: () => void
+  citizenRoutes: NaturalRoutes | null
 }
 
 const SentinelContext = createContext<SentinelContextValue | null>(null)

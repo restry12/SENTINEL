@@ -134,7 +134,8 @@ export function SentinelMap({ size = 360, user, fires, route, expansion }: Senti
           container: el,
           style: "mapbox://styles/mapbox/satellite-streets-v12",
           center: [user.lon, user.lat],
-          zoom: 15,
+          zoom: 14,
+          minZoom: 13,
           attributionControl: false,
         })
         mapRef.current = map
@@ -273,25 +274,6 @@ export function SentinelMap({ size = 360, user, fires, route, expansion }: Senti
             new mapboxgl.Marker({ element: makeLabelEl(route.label, "#bbf7d0"), offset: [0, 18] })
               .setLngLat([dest.lon, dest.lat]).addTo(map),
           )
-
-          // ── Frame the scene tight and lock the view close ────────────────
-          const bounds = new mapboxgl.LngLatBounds()
-          bounds.extend([user.lon, user.lat])
-          bounds.extend([dest.lon, dest.lat])
-          fires.forEach((f) => bounds.extend([f.lon, f.lat]))
-          map.fitBounds(bounds, { padding: 54, maxZoom: 17, duration: 0 })
-
-          // Emergency screen — forbid zooming out past the initial frame and
-          // keep panning within the scene.
-          map.setMinZoom(map.getZoom())
-          const sw = bounds.getSouthWest()
-          const ne = bounds.getNorthEast()
-          const dLat = (ne.lat - sw.lat) * 0.6 || 0.01
-          const dLon = (ne.lng - sw.lng) * 0.6 || 0.01
-          map.setMaxBounds([
-            [sw.lng - dLon, sw.lat - dLat],
-            [ne.lng + dLon, ne.lat + dLat],
-          ])
         })
       })
       .catch((err) => console.error("[SentinelMap] mapbox-gl load failed:", err))

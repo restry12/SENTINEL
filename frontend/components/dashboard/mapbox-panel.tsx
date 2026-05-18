@@ -148,6 +148,8 @@ export function MapboxPanel({
         'space-color': 'rgb(2, 2, 5)',
         'star-intensity': 0.9,
       })
+      // Reset cache so fire layers are always re-applied on new map instances.
+      lastUpdateRef.current = ''
       setMapLoaded(true)
     })
     

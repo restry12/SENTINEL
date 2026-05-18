@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { SentinelMap } from './sentinel-map'
 import type { ScreenRisk, NaturalRoute } from '@/lib/citizen-mock-data'
 
@@ -105,39 +105,68 @@ interface ScreenLocatingProps {
   riskLevel?: ScreenRisk
 }
 
+// phase: 0 = waiting for user tap, 1 = requesting GPS, 2 = done
 export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLocatingProps) {
   const [phase, setPhase] = useState(0)
+  const [geoError, setGeoError] = useState<string | null>(null)
+  const doneRef = useRef(false)
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
 
   useEffect(() => {
-    let done = false
-    const timers: ReturnType<typeof setTimeout>[] = []
+    return () => timersRef.current.forEach(clearTimeout)
+  }, [])
 
-    const finish = (coords?: { lat: number; lon: number }) => {
-      if (done) return
-      done = true
-      setPhase(2)
-      timers.push(setTimeout(() => onLocated?.(coords), 700))
-    }
-
-    // Triangulating step
-    timers.push(setTimeout(() => { if (!done) setPhase(1) }, 800))
-
-    // Request the real device GPS location
-    if (typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => finish({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-        () => finish(), // permission denied / unavailable → fall back to demo scene
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
-      )
-    } else {
-      timers.push(setTimeout(() => finish(), 2200))
-    }
-
-    // Safety net — never hang on the locating screen
-    timers.push(setTimeout(() => finish(), 9500))
-
-    return () => timers.forEach(clearTimeout)
+  const finish = useCallback((coords?: { lat: number; lon: number }) => {
+    if (doneRef.current) return
+    doneRef.current = true
+    setPhase(2)
+    const t = setTimeout(() => onLocated?.(coords), 700)
+    timersRef.current.push(t)
   }, [onLocated])
+
+  const requestGps = useCallback(() => {
+    if (doneRef.current || phase !== 0) return
+    setGeoError(null)
+    setPhase(1)
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGeoError('Tu navegador no soporta geolocalización.')
+      setPhase(0)
+      return
+    }
+
+    // Safety net in case GPS never responds
+    const safety = setTimeout(() => finish(), 9000)
+    timersRef.current.push(safety)
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(safety)
+        finish({ lat: pos.coords.latitude, lon: pos.coords.longitude })
+      },
+      (err) => {
+        clearTimeout(safety)
+        console.warn('[Sentinel GPS] error', err.code, err.message)
+        if (err.code === 1) {
+          // PERMISSION_DENIED — let user fix it, don't auto-advance
+          setGeoError('Permiso de ubicación bloqueado. Actívalo en los ajustes de tu navegador y vuelve a intentarlo.')
+          setPhase(0)
+          doneRef.current = false
+        } else {
+          // POSITION_UNAVAILABLE or TIMEOUT — fall through to mock
+          setGeoError('No se pudo obtener tu posición. Continuando con datos de ejemplo.')
+          finish()
+        }
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+    )
+  }, [phase, finish])
+
+  const steps = [
+    { l: 'PERMISO DE UBICACIÓN',   done: phase >= 1 },
+    { l: 'TRIANGULANDO GPS',       done: phase >= 1 },
+    { l: 'CALCULANDO RUTA SEGURA', done: phase >= 2 },
+  ]
 
   return (
     <div className="screen scanlines" style={{
@@ -147,7 +176,7 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
     }}>
       <SentinelStatusStrip riskLevel={riskLevel} />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 32 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 28 }}>
         {/* Radar */}
         <div style={{ position: 'relative', width: 200, height: 200 }}>
           <svg viewBox="-100 -100 200 200" width="200" height="200">
@@ -176,35 +205,77 @@ export function ScreenLocating({ onLocated, riskLevel = 'critical' }: ScreenLoca
           <div className="font-mono" style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--critical)', marginBottom: 12, textTransform: 'uppercase' }}>
             SENTINEL · ALERTA RECIBIDA
           </div>
-          <div style={{ fontSize: 26, fontWeight: 600, lineHeight: 1.15, marginBottom: 14 }}>Obteniendo tu ubicación</div>
+          <div style={{ fontSize: 26, fontWeight: 600, lineHeight: 1.15, marginBottom: 14 }}>
+            {phase === 0 ? 'Comparte tu ubicación' : 'Obteniendo tu ubicación'}
+          </div>
           <div style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.45 }}>
             Necesitamos saber dónde estás para calcular tu ruta de escape más segura.
           </div>
         </div>
 
-        <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { l: 'PERMISO DE UBICACIÓN',    done: phase >= 0 },
-            { l: 'TRIANGULANDO GPS',        done: phase >= 1 },
-            { l: 'CALCULANDO RUTA SEGURA',  done: phase >= 2 },
-          ].map((s, i) => (
-            <div key={i} className="font-mono" style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase',
-              color: s.done ? 'var(--foreground)' : 'var(--text-muted)',
-              opacity: phase >= i ? 1 : 0.4,
-            }}>
-              <span style={{
-                width: 8, height: 8, borderRadius: 999,
-                background: s.done ? 'var(--safe)' : 'var(--text-muted)',
-                animation: !s.done && phase === i ? 'pulse-strong 0.9s ease-in-out infinite' : 'none',
-                flexShrink: 0,
-              }} />
-              <span style={{ flex: 1 }}>{s.l}</span>
-              <span style={{ color: s.done ? 'var(--safe)' : 'var(--text-muted)' }}>{s.done ? 'OK' : '···'}</span>
-            </div>
-          ))}
-        </div>
+        {phase === 0 ? (
+          <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {geoError && (
+              <div style={{
+                padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.35)',
+                fontSize: 12, color: 'var(--critical)', lineHeight: 1.45, textAlign: 'center',
+              }}>
+                {geoError}
+              </div>
+            )}
+            <button
+              onClick={requestGps}
+              style={{
+                width: '100%', minHeight: 66, borderRadius: 14, border: 'none',
+                background: 'var(--foreground)', color: '#0a0a0a',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 12, cursor: 'pointer', fontSize: 17, fontWeight: 700,
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                <circle cx="11" cy="11" r="4" fill="#0a0a0a" />
+                <circle cx="11" cy="11" r="8" stroke="#0a0a0a" strokeWidth="1.6" />
+                <line x1="11" y1="1" x2="11" y2="4" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round" />
+                <line x1="11" y1="18" x2="11" y2="21" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round" />
+                <line x1="1" y1="11" x2="4" y2="11" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round" />
+                <line x1="18" y1="11" x2="21" y2="11" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+              {geoError?.includes('bloqueado') ? 'Reintentar' : 'Activar ubicación GPS'}
+            </button>
+            <button
+              onClick={() => finish()}
+              style={{
+                width: '100%', minHeight: 44, borderRadius: 14,
+                background: 'transparent', color: 'var(--text-dim)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              Continuar sin ubicación
+            </button>
+          </div>
+        ) : (
+          <div style={{ width: '100%', maxWidth: 320, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {steps.map((s, i) => (
+              <div key={i} className="font-mono" style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase',
+                color: s.done ? 'var(--foreground)' : 'var(--text-muted)',
+                opacity: phase >= i ? 1 : 0.4,
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: 999,
+                  background: s.done ? 'var(--safe)' : 'var(--text-muted)',
+                  animation: !s.done && phase === 1 && i === 1 ? 'pulse-strong 0.9s ease-in-out infinite' : 'none',
+                  flexShrink: 0,
+                }} />
+                <span style={{ flex: 1 }}>{s.l}</span>
+                <span style={{ color: s.done ? 'var(--safe)' : 'var(--text-muted)' }}>{s.done ? 'OK' : '···'}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -456,6 +527,100 @@ export function ScreenTrappedConfirm({ onCancel, onConfirm }: ScreenTrappedConfi
           border: 'none', fontSize: 14, fontWeight: 500, cursor: 'pointer',
         }}>
           Volver a la ruta de escape
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Screen Safe: No Nearby Fire ───────────────────────────────────────────
+
+interface ScreenSafeProps {
+  nearestKm: number | null
+  weather: { wind_speed_kmh: number; wind_dir_deg: number; humidity_pct: number; temp_c: number }
+  onRefresh?: () => void
+}
+
+export function ScreenSafe({ nearestKm, weather, onRefresh }: ScreenSafeProps) {
+  return (
+    <div className="screen scanlines" style={{
+      width: '100%', height: '100%',
+      background: 'radial-gradient(ellipse 90% 60% at 50% 40%, rgba(34,197,94,0.08) 0%, var(--background) 65%)',
+      display: 'flex', flexDirection: 'column', position: 'relative',
+    }}>
+      <SentinelStatusStrip riskLevel="low" />
+      <div style={{ height: 86 }} />
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 28 }}>
+        {/* Shield icon */}
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+          <path d="M 40 8 L 68 18 L 68 42 C 68 58 55 70 40 74 C 25 70 12 58 12 42 L 12 18 Z"
+            fill="rgba(34,197,94,0.12)" stroke="rgba(34,197,94,0.6)" strokeWidth="2" />
+          <path d="M 26 40 L 36 50 L 54 32" stroke="var(--safe)" strokeWidth="3"
+            strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+
+        <div style={{ textAlign: 'center', maxWidth: 300 }}>
+          <div className="font-mono" style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--safe)', marginBottom: 10, textTransform: 'uppercase' }}>
+            ÁREA MONITOREADA
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.15, marginBottom: 12 }}>
+            Sin amenaza activa
+          </div>
+          {nearestKm !== null && isFinite(nearestKm) && (
+            <div style={{ fontSize: 14, color: 'var(--text-dim)', lineHeight: 1.45 }}>
+              El foco más cercano está a{' '}
+              <span style={{ color: 'var(--foreground)', fontWeight: 600 }}>
+                {nearestKm.toFixed(1)} km
+              </span>{' '}
+              de tu posición.
+            </div>
+          )}
+        </div>
+
+        {/* Weather strip */}
+        <div style={{
+          width: '100%', maxWidth: 320, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,
+        }}>
+          {[
+            { label: 'VIENTO',    value: `${weather.wind_speed_kmh} km/h` },
+            { label: 'HUMEDAD',   value: `${weather.humidity_pct}%` },
+            { label: 'TEMP',      value: `${weather.temp_c}°C` },
+          ].map(({ label, value }) => (
+            <div key={label} style={{
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '8px 10px', textAlign: 'center',
+            }}>
+              <div className="font-mono" style={{ fontSize: 9, letterSpacing: '0.14em', color: 'var(--text-dim)', textTransform: 'uppercase' }}>{label}</div>
+              <div className="font-mono" style={{ fontSize: 15, fontWeight: 600, marginTop: 2 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: '14px 22px 36px' }}>
+        <div className="font-mono" style={{
+          fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em',
+          textAlign: 'center', marginBottom: 14, textTransform: 'uppercase',
+        }}>
+          SENTINEL MONITOREA EN TIEMPO REAL
+        </div>
+        <button
+          onClick={onRefresh}
+          style={{
+            width: '100%', minHeight: 56, borderRadius: 14,
+            background: 'transparent', color: 'var(--foreground)',
+            border: '1px solid rgba(255,255,255,0.15)',
+            fontSize: 15, fontWeight: 500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            cursor: 'pointer',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path d="M 2 8 A 6 6 0 1 1 8 14 M 8 14 L 5 11 M 8 14 L 11 11"
+              stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </svg>
+          Actualizar mi ubicación
         </button>
       </div>
     </div>

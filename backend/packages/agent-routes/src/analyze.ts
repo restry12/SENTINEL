@@ -10,6 +10,74 @@ export function initialBearing(lat1: number, lon1: number, lat2: number, lon2: n
   return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360)
 }
 
+// ── Citizen-mode helpers ──────────────────────────────────────────────────
+
+function haversineKmLocal(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function destinationPointLocal(
+  lat: number, lon: number, bearingDeg: number, distanceKm: number,
+): { lat: number; lon: number } {
+  const R = 6371
+  const d = distanceKm / R
+  const theta = (bearingDeg * Math.PI) / 180
+  const phi1 = (lat * Math.PI) / 180
+  const lambda1 = (lon * Math.PI) / 180
+  const phi2 = Math.asin(
+    Math.sin(phi1) * Math.cos(d) + Math.cos(phi1) * Math.sin(d) * Math.cos(theta),
+  )
+  const lambda2 =
+    lambda1 +
+    Math.atan2(
+      Math.sin(theta) * Math.sin(d) * Math.cos(phi1),
+      Math.cos(d) - Math.sin(phi1) * Math.sin(phi2),
+    )
+  return { lat: (phi2 * 180) / Math.PI, lon: (lambda2 * 180) / Math.PI }
+}
+
+function bearingToCompass(deg: number): string {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO']
+  return dirs[Math.round(deg / 45) % 8]
+}
+
+export function computeEscapeBearing(
+  userLat: number,
+  userLon: number,
+  fires: FireData[],
+  windDirDeg: number,
+): number {
+  // centroid of up to 5 nearest fires
+  const sorted = [...fires].sort(
+    (a, b) =>
+      haversineKmLocal(userLat, userLon, a.lat, a.lon) -
+      haversineKmLocal(userLat, userLon, b.lat, b.lon),
+  )
+  const nearest = sorted.slice(0, 5)
+  const avgLat = nearest.reduce((s, f) => s + f.lat, 0) / nearest.length
+  const avgLon = nearest.reduce((s, f) => s + f.lon, 0) / nearest.length
+
+  const fireBearing = initialBearing(userLat, userLon, avgLat, avgLon)
+  let escapeBearing = (fireBearing + 180) % 360
+
+  // Wind correction: windDirDeg is the direction the wind comes FROM.
+  // Wind blows TOWARD (windDirDeg + 180)°, which is the fire spread direction.
+  // If fire spreads INTO the escape path (fireSpreadDir ≈ escapeBearing ± 45°), shift 90°.
+  const fireSpreadDir = (windDirDeg + 180) % 360
+  const diff = Math.abs(((fireSpreadDir - escapeBearing) + 540) % 360 - 180)
+  if (diff < 45) {
+    escapeBearing = (escapeBearing + 90) % 360
+  }
+
+  return escapeBearing
+}
+
 const EVACUATION_DESTINATIONS: Array<{ name: string; lat: number; lon: number }> = [
   { name: 'Temuco Centro', lat: -38.7359, lon: -72.5904 },
   { name: 'Angol', lat: -37.7972, lon: -72.7085 },
@@ -125,6 +193,59 @@ El JSON debe tener exactamente esta estructura:
   return parseJSON<NaturalRoutes>(raw, 'Agent 5 (Routes)')
 }
 
+async function runA5CitizenRoutes(
+  userLat: number,
+  userLon: number,
+  nearestFireDistKm: number,
+  escapeBearing: number,
+  orsRoutes: RouteData[],
+  weather: { wind_speed_kmh: number; wind_dir_deg: number },
+): Promise<NaturalRoutes> {
+  const compassDir = bearingToCompass(escapeBearing)
+
+  const system = `Eres un experto en evacuaciones de emergencia para incendios forestales.
+Recibes la posición real de un ciudadano en peligro y rutas calculadas por OpenRouteService.
+Debes responder SOLO con JSON válido, sin texto adicional, sin markdown, sin bloques de código.
+El JSON debe tener exactamente esta estructura:
+{
+  "rutas": [
+    {
+      "nombre": "nombre corto de la ruta",
+      "origen": "posición del ciudadano",
+      "destino": "punto seguro de llegada",
+      "distancia_km": número,
+      "tiempo_estimado_min": número,
+      "instrucciones": "instrucciones claras paso a paso DESDE la posición del ciudadano",
+      "estado": "LIBRE" | "CONGESTIONADA" | "BLOQUEADA",
+      "prioridad": 1 | 2 | 3
+    }
+  ],
+  "punto_encuentro_principal": "punto de encuentro principal",
+  "mensaje_alerta": "mensaje urgente y personalizado para el ciudadano en español"
+}`
+
+  const userMsg = `Ciudadano en: lat=${userLat.toFixed(5)}, lon=${userLon.toFixed(5)}
+Foco más cercano: ${nearestFireDistKm.toFixed(2)} km
+Dirección de escape recomendada: ${Math.round(escapeBearing)}° (${compassDir})
+Viento: ${weather.wind_speed_kmh} km/h desde ${weather.wind_dir_deg}°
+
+Rutas calculadas por OpenRouteService (desde la posición del ciudadano):
+${JSON.stringify(
+  orsRoutes.map((r) => ({
+    id: r.id,
+    distancia_km: Math.round(r.distance / 1000),
+    duracion_min: Math.round(r.duration / 60),
+  })),
+  null,
+  2,
+)}
+
+Genera instrucciones de evacuación personalizadas DESDE la posición del ciudadano.`
+
+  const raw = await callOpenRouter(MODELS.small, system, userMsg)
+  return parseJSON<NaturalRoutes>(raw, 'Agent5Citizen')
+}
+
 export async function calculateEvacuationRoutes(fires: FireData[]): Promise<RoutesResult> {
   if (fires.length === 0) return { routes: [], naturalRoutes: null }
 
@@ -179,6 +300,77 @@ export async function calculateEvacuationRoutes(fires: FireData[]): Promise<Rout
     }
   } catch (err) {
     console.warn('[agent-routes] A5 LLM failed, returning ORS routes only:', err)
+  }
+
+  return { routes, naturalRoutes }
+}
+
+export async function calculateCitizenEscapeRoute(
+  userLat: number,
+  userLon: number,
+  fires: FireData[],
+  weather: { wind_speed_kmh: number; wind_dir_deg: number },
+): Promise<RoutesResult> {
+  if (fires.length === 0) return { routes: [], naturalRoutes: null }
+
+  const escapeBearing = computeEscapeBearing(userLat, userLon, fires, weather.wind_dir_deg)
+
+  const destinations = [1, 3, 8].map((d) => {
+    const pt = destinationPointLocal(userLat, userLon, escapeBearing, d)
+    return { name: `Escape-${d}km`, lat: pt.lat, lon: pt.lon }
+  })
+
+  const apiKey = process.env.OPENROUTE_API_KEY
+  const avoidPolygon = buildAvoidPolygon(fires)
+  const routes: RouteData[] = []
+  const bearingMap = new Map<string, number>()
+
+  if (apiKey) {
+    for (const dest of destinations) {
+      try {
+        const route = await fetchOrsRoute(apiKey, userLon, userLat, dest.lon, dest.lat, avoidPolygon)
+        if (route) {
+          routes.push({ ...route, id: dest.name })
+          const coords = route.geometry.coordinates
+          if (coords.length >= 2) {
+            bearingMap.set(dest.name, initialBearing(
+              coords[0][1], coords[0][0],
+              coords[1][1], coords[1][0],
+            ))
+          }
+        }
+      } catch (err) {
+        console.warn(`[agent-routes/citizen] route to ${dest.name} failed:`, err)
+      }
+    }
+  }
+
+  const sortedByDist = [...fires].sort(
+    (a, b) =>
+      haversineKmLocal(userLat, userLon, a.lat, a.lon) -
+      haversineKmLocal(userLat, userLon, b.lat, b.lon),
+  )
+  const nearestFireDistKm = haversineKmLocal(
+    userLat, userLon, sortedByDist[0].lat, sortedByDist[0].lon,
+  )
+
+  let naturalRoutes: NaturalRoutes | null = null
+  try {
+    naturalRoutes = await runA5CitizenRoutes(
+      userLat, userLon, nearestFireDistKm, escapeBearing, routes, weather,
+    )
+    if (naturalRoutes) {
+      const fallbackBearing = bearingMap.size > 0 ? bearingMap.values().next().value : undefined
+      for (const ruta of naturalRoutes.rutas) {
+        const bearing =
+          bearingMap.get(ruta.destino) ??
+          bearingMap.get(ruta.nombre) ??
+          fallbackBearing
+        if (bearing !== undefined) ruta.bearing_deg = bearing
+      }
+    }
+  } catch (err) {
+    console.warn('[agent-routes/citizen] A5 LLM failed, returning ORS routes only:', err)
   }
 
   return { routes, naturalRoutes }

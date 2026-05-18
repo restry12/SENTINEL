@@ -1,8 +1,11 @@
 "use client"
 
-import { User } from "lucide-react"
+import { useState } from "react"
+import { Bot, User, Volume2, Loader2, VolumeX } from "lucide-react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+
+import { CondorGuideAvatar } from "./condor-avatar"
 
 export interface Message {
   id: string
@@ -18,6 +21,48 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false)
+  const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null)
+
+  const handlePlayAudio = async () => {
+    // Si ya está reproduciendo, detenerlo
+    if (isPlaying) {
+      if (audioEl) {
+        audioEl.pause()
+        audioEl.currentTime = 0
+      }
+      window.speechSynthesis.cancel()
+      setIsPlaying(false)
+      return
+    }
+
+    setIsLoadingAudio(true)
+
+    try {
+      // Intentar usar MiniMax
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: message.content })
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const audio = new Audio(URL.createObjectURL(blob))
+        setAudioEl(audio)
+        audio.onended = () => setIsPlaying(false)
+        audio.play()
+        setIsPlaying(true)
+        setIsLoadingAudio(false)
+        return
+      }
+    } catch (e) {
+      console.error("Error con MiniMax:", e)
+    }
+    
+    setIsLoadingAudio(false)
+  }
 
   return (
     <div className={cn("flex flex-col gap-1.5", isUser && "items-end")}>
@@ -31,20 +76,22 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
         )}>
           {isUser
             ? <User className="w-2.5 h-2.5 text-orange-400" />
-            : <Image src="/condor.png" alt="SENTINEL AI" width={20} height={20} className="object-cover object-top w-full h-full" />
+            : <div className="w-full h-full scale-125">
+                <CondorGuideAvatar state="idle" />
+              </div>
           }
         </div>
         <span className={cn(
           "text-[9px] font-bold uppercase tracking-[0.15em]",
           isUser ? "text-orange-400/50" : "text-cyan-400/50"
         )}>
-          {isUser ? "Tú" : "SENTINEL AI"}
+          {isUser ? "Tú" : "NEWEN AI"}
         </span>
       </div>
 
       {/* Bubble */}
       <div className={cn(
-        "max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
+        "max-w-[78%] rounded-2xl px-4 py-3 text-sm leading-relaxed relative group",
         isUser
           ? "bg-[#1a0f02] border border-orange-500/20 text-white shadow-[0_0_24px_rgba(249,115,22,0.07)] rounded-tr-sm"
           : "bg-[#040d18] border border-cyan-500/15 text-white/90 shadow-[0_0_24px_rgba(34,211,238,0.05)] rounded-tl-sm"
@@ -59,6 +106,33 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
         }
         {isStreaming && message.content && (
           <span className="inline-block w-[2px] h-3.5 bg-cyan-400/70 ml-1 animate-pulse align-middle rounded-full" />
+        )}
+
+        {/* Audio Button */}
+        {!isUser && !isStreaming && message.content && (
+          <button 
+            onClick={handlePlayAudio}
+            disabled={isLoadingAudio}
+            className={cn(
+              "absolute -right-2 -bottom-2 flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all duration-300",
+              "bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 text-cyan-300",
+              "shadow-[0_0_15px_rgba(34,211,238,0.15)] hover:shadow-[0_0_20px_rgba(34,211,238,0.25)]",
+              "opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0",
+              isLoadingAudio && "opacity-100 translate-y-0"
+            )}
+            title="Escuchar respuesta"
+          >
+            {isLoadingAudio ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : isPlaying ? (
+              <VolumeX className="w-3 h-3" />
+            ) : (
+              <Volume2 className="w-3 h-3" />
+            )}
+            <span className="text-[9px] font-bold uppercase tracking-widest">
+              {isLoadingAudio ? "Cargando" : isPlaying ? "Parar" : "Escuchar"}
+            </span>
+          </button>
         )}
       </div>
     </div>
