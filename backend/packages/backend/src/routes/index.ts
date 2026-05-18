@@ -12,29 +12,33 @@ import { mergeEnriched } from '../utils/mergeEnriched'
 import { isLocked, getLockStatus } from '../services/analysis-lock'
 import { getLastUpdate } from '../services/last-update'
 import { fetchRiskGrid, fetchCellDetail } from '../services/prediction-proxy'
-import type { RiskCategory, RiskFactors } from '@sentinel/types'
+import type { RiskCategory, RiskFactors, FireData } from '@sentinel/types'
 import authRouter from './auth'
 import geoRouter from './geo'
 import historyRouter from './history'
 
 const ENRICH_LIMIT = 50
 
-// Citizen session store: UUID → socketId, valid for one Make.com round-trip.
-// citizen-init generates a citizenSessionId and sends it to Make.com; Make.com echoes it back
-// in the /api/trigger/citizen callback so we can emit only to the requesting socket.
-// UUID keys ensure 5 concurrent users at the same location each get their own targeted response.
+// Citizen session store: one UUID per user per citizen flow invocation.
+// citizen-init creates the entry with socketId; citizen-filter adds the nearby fires.
+// citizen callback reads both and cleans up. Concurrent users never collide.
 const CITIZEN_SESSION_TTL_MS = 10 * 60 * 1000
-const citizenSessions = new Map<string, { socketId: string; createdAt: number }>()
+const citizenSessions = new Map<string, { socketId?: string; fires?: FireData[]; createdAt: number }>()
 
-function storeCitizenSession(sessionId: string, socketId: string): void {
+function sweep(): void {
   const now = Date.now()
   for (const [k, v] of citizenSessions) {
     if (now - v.createdAt > CITIZEN_SESSION_TTL_MS) citizenSessions.delete(k)
   }
-  citizenSessions.set(sessionId, { socketId, createdAt: now })
 }
 
-function getCitizenSocketId(sessionId: string): string | undefined {
+function setCitizenSession(sessionId: string, patch: { socketId?: string; fires?: FireData[] }): void {
+  sweep()
+  const existing = citizenSessions.get(sessionId)
+  citizenSessions.set(sessionId, { ...existing, ...patch, createdAt: existing?.createdAt ?? Date.now() })
+}
+
+function popCitizenSession(sessionId: string): { socketId?: string; fires?: FireData[] } | undefined {
   const entry = citizenSessions.get(sessionId)
   if (!entry) return undefined
   if (Date.now() - entry.createdAt > CITIZEN_SESSION_TTL_MS) {
@@ -42,7 +46,7 @@ function getCitizenSocketId(sessionId: string): string | undefined {
     return undefined
   }
   citizenSessions.delete(sessionId)
-  return entry.socketId
+  return entry
 }
 
 type RawCitizenBody = { fires?: unknown; lat?: unknown; lon?: unknown; socketId?: unknown }
@@ -186,12 +190,14 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     })
   })
 
-  // POST /api/fires/citizen-filter — recibe CSV de NASA + lat/lon del usuario como query params.
-  // Filtra los focos a ≤2 km del usuario, los guarda bajo un runId y lo devuelve.
-  // Make.com módulo ciudadano: POST /api/fires/citizen-filter?lat={{1.lat}}&lon={{1.lon}}
+  // POST /api/fires/citizen-filter — filtra el CSV de NASA a ≤2 km del usuario y guarda los
+  // focos en la sesión ciudadana. Make.com módulo 3:
+  //   POST /api/fires/citizen-filter?lat={{1.lat}}&lon={{1.lon}}&sessionId={{1.citizenSessionId}}
+  //   body: text/plain → {{2.data}}   (no necesita parsear la respuesta)
   app.post('/api/fires/citizen-filter', (req, res) => {
     const userLat = parseFloat(req.query.lat as string)
     const userLon = parseFloat(req.query.lon as string)
+    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : undefined
 
     if (!isFinite(userLat) || !isFinite(userLon)) {
       res.status(400).json({ ok: false, error: 'lat and lon query params required' })
@@ -210,8 +216,8 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) <= 2
     })
 
-    const runId = storeRun(nearby)
-    res.json({ runId, fires: nearby, total: all.length })
+    if (sessionId) setCitizenSession(sessionId, { fires: nearby })
+    res.json({ ok: true, total: all.length, nearby: nearby.length })
   })
 
   // POST /api/trigger/full — recibe fires[] de Make.com (rate limited)
@@ -266,11 +272,8 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
       return
     }
 
-    // Generate a UUID session ID, store the socketId under it, and send the UUID to Make.com.
-    // Make.com echoes it back via {{1.citizenSessionId}} so the callback can retrieve the exact
-    // socket for this user — works correctly even with multiple concurrent citizen sessions.
     const citizenSessionId = randomUUID()
-    if (socketId) storeCitizenSession(citizenSessionId, socketId)
+    setCitizenSession(citizenSessionId, { socketId: socketId ?? undefined })
 
     const citizenWebhookUrl = process.env.MAKE_CITIZEN_WEBHOOK_URL
     if (citizenWebhookUrl) {
@@ -372,7 +375,6 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
   app.post('/api/trigger/citizen', triggerLimiter, async (req, res) => {
     const body = req.body as {
       citizenSessionId?: unknown
-      runId?: unknown
       lat?: unknown
       lon?: unknown
       weather?: unknown
@@ -383,10 +385,9 @@ export function registerRoutes(app: Express, io: Server, polling: PollingControl
     const lon = typeof body.lon === 'number' && isFinite(body.lon) ? body.lon : undefined
 
     const citizenSessionId = typeof body.citizenSessionId === 'string' ? body.citizenSessionId : undefined
-    const socketId = citizenSessionId ? getCitizenSocketId(citizenSessionId) : undefined
-
-    const runId = typeof body.runId === 'string' ? body.runId : undefined
-    const nearbyFires = runId ? (getRun(runId) ?? []) : []
+    const session = citizenSessionId ? popCitizenSession(citizenSessionId) : undefined
+    const socketId = session?.socketId
+    const nearbyFires = session?.fires ?? []
 
     res.status(202).json({ ok: true, accepted: true, fires: nearbyFires.length })
 
