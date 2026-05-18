@@ -91,7 +91,7 @@ export async function triggerCitizenProximityAlert(
   userLat: number,
   userLon: number,
 ): Promise<void> {
-  const url = process.env.MAKE_CITIZEN_SMS_WEBHOOK_URL
+  const url = process.env.MAKE_WEBHOOK_URL
   if (!url) return
 
   const payload = {
